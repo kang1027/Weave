@@ -111,9 +111,8 @@ public struct NaverProvider: MarketDataProvider {
     /// fchart 응답은 XML 유사 텍스트: `<item data="20240102|76500|77500|76000|77000|1234567" />`
     /// 필드: 날짜|시가|고가|저가|종가|거래량
     static func parseFchart(_ data: Data) throws -> [Candle] {
-        guard let text = String(data: data, encoding: .utf8) else {
-            throw ProviderError.invalidResponse
-        }
+        // 응답이 EUC-KR — 숫자 필드는 전부 ASCII라 lossy UTF-8 디코딩으로 안전하게 읽는다.
+        let text = String(decoding: data, as: UTF8.self)
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
