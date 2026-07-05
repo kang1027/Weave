@@ -6,6 +6,8 @@ struct ManageView: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
     @State private var deletionTarget: Asset?
+    @State private var valueEditTarget: Asset?
+    @State private var valueEditText = ""
 
     private var isShowingSearch: Bool {
         model.searchQuery.trimmingCharacters(in: .whitespaces).count >= 2
@@ -27,9 +29,16 @@ struct ManageView: View {
                     ScrollView {
                         VStack(spacing: 0) {
                             ForEach(model.document.assets) { asset in
-                                ManagedAssetRow(asset: asset) {
-                                    deletionTarget = asset
-                                }
+                                ManagedAssetRow(
+                                    asset: asset,
+                                    onDelete: { deletionTarget = asset },
+                                    onEditValue: {
+                                        valueEditText = MoneyFormatter
+                                            .quantity(asset.manualValue ?? 0)
+                                            .replacingOccurrences(of: ",", with: "")
+                                        valueEditTarget = asset
+                                    }
+                                )
                             }
                         }
                     }
@@ -56,6 +65,26 @@ struct ManageView: View {
         } message: {
             if let target = deletionTarget {
                 Text(model.t("\(target.name) and \(model.tradeCount(assetID: target.id)) trade(s) will be deleted."))
+            }
+        }
+        .alert(
+            model.t("Edit value"),
+            isPresented: Binding(
+                get: { valueEditTarget != nil },
+                set: { if !$0 { valueEditTarget = nil } }
+            )
+        ) {
+            TextField(model.t("Value"), text: $valueEditText)
+            Button(model.t("Save")) {
+                if let target = valueEditTarget, let value = Decimal.clean(valueEditText) {
+                    model.updateManualValue(assetID: target.id, value: value)
+                }
+                valueEditTarget = nil
+            }
+            Button(model.t("Cancel"), role: .cancel) { valueEditTarget = nil }
+        } message: {
+            if let target = valueEditTarget {
+                Text("\(target.name) · \(target.currency)")
             }
         }
     }
@@ -120,6 +149,7 @@ private struct ManagedAssetRow: View {
     @EnvironmentObject private var model: AppModel
     let asset: Asset
     let onDelete: () -> Void
+    let onEditValue: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -136,7 +166,14 @@ private struct ManagedAssetRow: View {
             }
             Spacer(minLength: 6)
 
-            if !asset.isManual {
+            if asset.isManual {
+                rowIcon(
+                    systemName: "pencil",
+                    active: false,
+                    help: model.t("Edit value"),
+                    action: onEditValue
+                )
+            } else {
                 rowIcon(
                     systemName: "menubar.rectangle",
                     active: asset.showInMenuBar,

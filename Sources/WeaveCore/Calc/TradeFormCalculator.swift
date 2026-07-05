@@ -2,7 +2,7 @@ import Foundation
 
 /// 거래 입력 폼 — 수량/단가/총액 중 2개를 채우면 나머지를 자동 계산.
 public enum TradeFormCalculator {
-    public enum Field: Sendable {
+    public enum Field: Sendable, Hashable {
         case quantity
         case price
         case amount

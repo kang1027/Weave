@@ -46,6 +46,8 @@ final class AppModel: ObservableObject {
     @Published var detailPeriod: ChartPeriod = .sixMonths
     @Published var detailCandles: [Candle] = []
     @Published var isDetailChartLoading = false
+    var detailChartAssetID: UUID?
+    var detailLoadToken = 0
 
     let store: any PortfolioStore
     let quoteService: QuoteService

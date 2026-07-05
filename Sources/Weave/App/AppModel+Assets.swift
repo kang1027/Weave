@@ -36,6 +36,15 @@ extension AppModel {
             quotes[asset.id] = quote
         }
 
+        // quote 대기 중 다른 추가가 끝났을 수 있다 — 한도·중복 재확인.
+        guard !isAtAssetLimit else { return nil }
+        if let existing = document.assets.first(where: {
+            $0.provider == result.provider && $0.providerSymbol == result.providerSymbol
+        }) {
+            route = [.detail(existing.id)]
+            return existing
+        }
+
         document.assets.append(asset)
         persist()
         invalidateHomeChart()
@@ -75,9 +84,12 @@ extension AppModel {
     }
 
     func updateManualValue(assetID: UUID, value: Decimal) {
-        guard let index = document.assets.firstIndex(where: { $0.id == assetID }) else { return }
+        guard value >= 0,
+              let index = document.assets.firstIndex(where: { $0.id == assetID })
+        else { return }
         document.assets[index].manualValue = value
         persist()
+        invalidateHomeChart()
     }
 
     // MARK: - 자산 관리

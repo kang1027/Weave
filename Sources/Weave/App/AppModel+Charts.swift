@@ -90,8 +90,16 @@ extension AppModel {
     func loadDetailChart(assetID: UUID) async {
         guard let asset = asset(id: assetID), !asset.isManual else {
             detailCandles = []
+            detailChartAssetID = nil
             return
         }
+        // 다른 자산으로 전환 시 이전 자산 캔들이 잠깐 보이지 않게 즉시 비운다.
+        if detailChartAssetID != assetID {
+            detailCandles = []
+            detailChartAssetID = assetID
+        }
+        detailLoadToken += 1
+        let token = detailLoadToken
         isDetailChartLoading = true
         defer { isDetailChartLoading = false }
 
@@ -117,6 +125,8 @@ extension AppModel {
         if let from = period.startDate() {
             candles = candles.filter { $0.date >= from }
         }
+        // 더 최신 요청(자산 전환/기간 변경)이 시작됐다면 이 결과는 버린다.
+        guard token == detailLoadToken else { return }
         detailCandles = candles.sorted { $0.date < $1.date }
     }
 

@@ -86,8 +86,11 @@ extension AppModel {
             persist()
             invalidateHomeChart()
             quotes = [:]
+            // 복원된 설정(주기·로테이션·단축키)을 즉시 반영.
+            applyHotkey()
+            restartRefreshLoop()
+            restartRotationLoop()
             Task {
-                await refreshQuotes()
                 await loadHomeChart()
             }
         } catch {

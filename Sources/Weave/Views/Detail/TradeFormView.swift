@@ -16,8 +16,10 @@ struct TradeFormView: View {
     @State private var note = ""
     @State private var error: AppModel.TradeError?
     @State private var isPrefilling = false
-    /// 자동 계산이 서로를 다시 트리거하지 않게 하는 가드.
-    @State private var isAutofilling = false
+    @State private var prefillTask: Task<Void, Never>?
+    /// 프로그램이 방금 써넣은 필드 — 그 필드의 onChange는 자동 계산을 다시 돌리지 않는다.
+    /// (SwiftUI onChange는 다음 업데이트 패스에 발화하므로 Bool 가드로는 못 막는다.)
+    @State private var pendingProgrammatic: Set<TradeFormCalculator.Field> = []
 
     private var asset: Asset? { model.asset(id: assetID) }
 
@@ -30,6 +32,11 @@ struct TradeFormView: View {
             trades: model.document.trades(for: assetID),
             excluding: editing?.id
         )
+    }
+
+    private var sellExceedsHolding: Bool {
+        guard side == .sell, let quantity else { return false }
+        return quantity > availableQuantity
     }
 
     private var canSave: Bool {
@@ -104,7 +111,7 @@ struct TradeFormView: View {
                             Text(model.t("Available: \(MoneyFormatter.quantity(availableQuantity))"))
                                 .font(.system(size: 10.5))
                                 .foregroundStyle(theme.text2)
-                            if case .exceedsHolding = error {
+                            if sellExceedsHolding {
                                 Text(model.t("— exceeds holding"))
                                     .font(.system(size: 10.5, weight: .semibold))
                                     .foregroundStyle(theme.redText)
@@ -119,6 +126,7 @@ struct TradeFormView: View {
             }
         }
         .onAppear(perform: prefillFromEditing)
+        .onDisappear { prefillTask?.cancel() }
         .onChange(of: date) { _, newDate in
             error = nil
             // 편집 로드로 세팅된 날짜(원래 체결일)는 프리필하지 않는다 — 체결가 보존.
@@ -152,6 +160,8 @@ struct TradeFormView: View {
                 .frame(maxWidth: 140)
                 .onChange(of: text.wrappedValue) {
                     error = nil
+                    // 자동 계산이 써넣은 변경이면 여기서 끝 — 사용자 입력만 재계산 트리거.
+                    if pendingProgrammatic.remove(field) != nil { return }
                     autofill(edited: field)
                 }
         }
@@ -178,11 +188,29 @@ struct TradeFormView: View {
 
     // MARK: - 자동 계산 / 프리필
 
-    private func autofill(edited: TradeFormCalculator.Field) {
-        guard !isAutofilling else { return }
-        isAutofilling = true
-        defer { isAutofilling = false }
+    /// 프로그램적 필드 쓰기 — 실제로 값이 바뀔 때만 쓰고, 그 onChange는 무시되게 마킹.
+    private func setFieldText(_ field: TradeFormCalculator.Field, _ newText: String) {
+        switch field {
+        case .quantity:
+            guard quantityText != newText else { return }
+            pendingProgrammatic.insert(.quantity)
+            quantityText = newText
+        case .price:
+            guard priceText != newText else { return }
+            pendingProgrammatic.insert(.price)
+            priceText = newText
+        case .amount:
+            guard amountText != newText else { return }
+            pendingProgrammatic.insert(.amount)
+            amountText = newText
+        }
+    }
 
+    private func plainNumber(_ value: Decimal) -> String {
+        MoneyFormatter.quantity(value).replacingOccurrences(of: ",", with: "")
+    }
+
+    private func autofill(edited: TradeFormCalculator.Field) {
         let values = TradeFormCalculator.autofill(
             .init(
                 quantity: Decimal.clean(quantityText),
@@ -191,39 +219,48 @@ struct TradeFormView: View {
             ),
             edited: edited
         )
-        // 파생 필드만 갱신 — 사용자가 만진 필드는 그대로.
+        // 파생 필드만 갱신 — 사용자가 만진 필드(edited)는 절대 건드리지 않는다.
         if edited != .quantity, let quantity = values.quantity, Decimal.clean(quantityText) != quantity {
-            quantityText = MoneyFormatter.quantity(quantity).replacingOccurrences(of: ",", with: "")
+            setFieldText(.quantity, plainNumber(quantity))
         }
         if edited != .price, let price = values.price, Decimal.clean(priceText) != price {
-            priceText = MoneyFormatter.quantity(price).replacingOccurrences(of: ",", with: "")
+            setFieldText(.price, plainNumber(price))
         }
         if edited != .amount, let amount = values.amount, Decimal.clean(amountText) != amount {
-            amountText = MoneyFormatter.quantity(amount).replacingOccurrences(of: ",", with: "")
+            setFieldText(.amount, plainNumber(amount))
         }
     }
 
     private func prefillFromEditing() {
         guard let editing else { return }
         side = editing.side
-        quantityText = MoneyFormatter.quantity(editing.quantity).replacingOccurrences(of: ",", with: "")
-        priceText = MoneyFormatter.quantity(editing.price).replacingOccurrences(of: ",", with: "")
-        amountText = MoneyFormatter.quantity(editing.amount).replacingOccurrences(of: ",", with: "")
+        setFieldText(.quantity, plainNumber(editing.quantity))
+        setFieldText(.price, plainNumber(editing.price))
+        setFieldText(.amount, plainNumber(editing.amount))
         date = editing.date
         note = editing.note
     }
 
     /// 과거 날짜 선택 → 그날 종가를 단가에 프리필(수정 가능).
+    /// 연속 날짜 변경 시 이전 조회는 취소하고, 대기 중 사용자가 단가를 고쳤으면 덮지 않는다.
     private func prefillClosingPrice() {
+        prefillTask?.cancel()
         guard !Calendar.current.isDateInToday(date) else { return }
+        let requestedDate = date
+        let priceSnapshot = priceText
         isPrefilling = true
-        Task {
-            let close = await model.closingPrice(assetID: assetID, on: date)
+        prefillTask = Task {
+            let close = await model.closingPrice(assetID: assetID, on: requestedDate)
+            guard !Task.isCancelled else { return }
             isPrefilling = false
-            guard let close else { return }
-            isAutofilling = true
-            priceText = MoneyFormatter.quantity(close).replacingOccurrences(of: ",", with: "")
-            isAutofilling = false
+            guard
+                let close,
+                Calendar.current.isDate(date, inSameDayAs: requestedDate),
+                priceText == priceSnapshot
+            else {
+                return
+            }
+            setFieldText(.price, plainNumber(close))
             autofill(edited: .price)
         }
     }

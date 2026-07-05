@@ -36,6 +36,7 @@ Sparkle은 `Vendor/Sparkle` 로컬 패키지로 참조한다(SwiftPM 원격 bina
   비공식 API 스펙이 바뀌면 어댑터만 교체한다.
 - 금액 계산은 `Decimal`, 차트 좌표는 `Double`.
 - 아이콘은 SF Symbols만 사용(이모지 금지), 색은 `Theme` 시맨틱 토큰만 사용.
-- 문자열은 String Catalog(`Localizable.xcstrings`) 경유 — 하드코딩 한글/영어 금지.
+- 문자열은 `Resources/{ko,en}.lproj/Localizable.strings` 경유(키 = 영어 원문) —
+  하드코딩 한글 금지. xcstrings는 `swift build`가 컴파일하지 못해 lproj 방식 사용.
 - 커밋 메시지는 한글, `<type>: <설명>` 형식. 마일스톤/레이어 단위로 쪼갠다.
 - 저장 스키마를 바꿀 땐 `PortfolioDocument.version`을 올리고 마이그레이션을 추가한다.

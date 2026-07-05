@@ -22,6 +22,12 @@ scripts/bundle.sh
 APP="dist/Weave.app"
 ZIP="dist/Weave-${VERSION}.zip"
 
+# ED 공개키가 플레이스홀더면 배포 빌드의 업데이트 채널이 영구히 죽는다 — 하드 가드.
+if /usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$APP/Contents/Info.plist" 2>/dev/null | grep -q "__SPARKLE_ED_PUBLIC_KEY__"; then
+  echo "✗ SUPublicEDKey가 플레이스홀더 상태 — SPARKLE_ED_PUBLIC_KEY 환경변수를 설정하고 다시 실행" >&2
+  exit 1
+fi
+
 echo "▸ codesign"
 if [ -d "$APP/Contents/Frameworks/Sparkle.framework" ]; then
   codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" \

@@ -65,10 +65,12 @@ final class HotkeyManager {
     }
 
     /// 메뉴바 팝오버 토글 — MenuBarExtra는 공개 API가 없어 상태바 버튼 클릭으로 대체.
+    /// 비공개 KVC 의존이라 OS 업데이트로 키가 사라져도 크래시하지 않게 방어한다.
     static func toggleMenuBarWindow() {
         for window in NSApp.windows {
             guard
                 window.className.contains("NSStatusBarWindow"),
+                window.responds(to: NSSelectorFromString("statusItem")),
                 let statusItem = window.value(forKey: "statusItem") as? NSStatusItem,
                 let button = statusItem.button
             else {
