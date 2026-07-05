@@ -63,15 +63,21 @@ public struct YahooProvider: MarketDataProvider {
         if quoteType?.uppercased() == "CRYPTOCURRENCY" { return .crypto }
         if symbol.hasSuffix(".KS") || symbol.hasSuffix(".KQ") { return .koreaStock }
         if symbol.hasSuffix(".T") { return .japanStock }
-        if symbol.contains(".") { return .other }
-        return .usStock
+        if !symbol.contains(".") { return .usStock }
+        // 클래스 주식(BRK.B 등) — 한 글자 서픽스는 미장 티커.
+        let parts = symbol.split(separator: ".")
+        if parts.count == 2, parts[1].count == 1 { return .usStock }
+        return .other
     }
 
     static func displaySymbol(_ symbol: String) -> String {
-        // "005930.KS" → "005930", "7203.T" → "7203", "BTC-USD" → "BTC"
-        let base = symbol.split(separator: ".").first.map(String.init) ?? symbol
-        if base.hasSuffix("-USD") { return String(base.dropLast(4)) }
-        return base
+        // 거래소 서픽스만 제거: "005930.KS" → "005930", "7203.T" → "7203".
+        // "BRK.B" 같은 클래스 주식 심볼은 그대로 둔다.
+        for suffix in [".KS", ".KQ", ".T"] where symbol.hasSuffix(suffix) {
+            return String(symbol.dropLast(suffix.count))
+        }
+        if symbol.hasSuffix("-USD") { return String(symbol.dropLast(4)) }
+        return symbol
     }
 
     /// 검색 단계 추정 통화 — 추가 시 chart meta의 실제 통화로 확정한다.

@@ -82,10 +82,13 @@ public struct NaverProvider: MarketDataProvider {
         else {
             throw ProviderError.invalidResponse
         }
-        let sign: Decimal = item.compareToPreviousPrice.name == "FALLING" ? -1 : 1
+        // fluctuationsRatio는 부호를 포함하지만, 방어적으로 방향 필드와 대조한다.
+        // 하락 계열은 FALLING뿐 아니라 LOWER_LIMIT(하한가)도 있다.
+        let isDown = ["FALLING", "LOWER_LIMIT"].contains(item.compareToPreviousPrice.name)
+        let magnitude = abs(rawPercent)
         return Quote(
             price: price,
-            changePercent: abs(rawPercent) * sign,
+            changePercent: isDown ? -magnitude : magnitude,
             currency: "KRW",
             updatedAt: Date()
         )

@@ -80,20 +80,38 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.hotkey = hotkey
     }
 
-    // 필드가 추가돼도 옛 JSON을 그대로 읽을 수 있게 전부 optional 디코딩.
+    enum CodingKeys: String, CodingKey {
+        case theme, language, baseCurrency, displayCurrencyMode
+        case quoteRefreshSeconds, rotationSeconds, menuBarFormat
+        case privacyMode, launchAtLogin, autoUpdateCheck, hotkey
+    }
+
+    // 필드 추가·미지의 enum 값·타입 불일치가 있어도 문서 전체 로드가 깨지지 않게
+    // 전부 관대하게 디코딩한다(설정 하나 때문에 포트폴리오가 날아가면 안 된다).
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = AppSettings()
-        theme = try c.decodeIfPresent(ThemePreference.self, forKey: .theme) ?? d.theme
-        language = try c.decodeIfPresent(LanguagePreference.self, forKey: .language) ?? d.language
-        baseCurrency = try c.decodeIfPresent(String.self, forKey: .baseCurrency) ?? d.baseCurrency
-        displayCurrencyMode = try c.decodeIfPresent(DisplayCurrencyMode.self, forKey: .displayCurrencyMode) ?? d.displayCurrencyMode
-        quoteRefreshSeconds = try c.decodeIfPresent(Int.self, forKey: .quoteRefreshSeconds) ?? d.quoteRefreshSeconds
-        rotationSeconds = try c.decodeIfPresent(Int.self, forKey: .rotationSeconds) ?? d.rotationSeconds
-        menuBarFormat = try c.decodeIfPresent(MenuBarFormat.self, forKey: .menuBarFormat) ?? d.menuBarFormat
-        privacyMode = try c.decodeIfPresent(Bool.self, forKey: .privacyMode) ?? d.privacyMode
-        launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? d.launchAtLogin
-        autoUpdateCheck = try c.decodeIfPresent(Bool.self, forKey: .autoUpdateCheck) ?? d.autoUpdateCheck
-        hotkey = try c.decodeIfPresent(Hotkey.self, forKey: .hotkey)
+        theme = Self.lenientEnum(c, .theme, d.theme)
+        language = Self.lenientEnum(c, .language, d.language)
+        baseCurrency = (try? c.decodeIfPresent(String.self, forKey: .baseCurrency)) ?? nil ?? d.baseCurrency
+        displayCurrencyMode = Self.lenientEnum(c, .displayCurrencyMode, d.displayCurrencyMode)
+        quoteRefreshSeconds = (try? c.decodeIfPresent(Int.self, forKey: .quoteRefreshSeconds)) ?? nil ?? d.quoteRefreshSeconds
+        rotationSeconds = (try? c.decodeIfPresent(Int.self, forKey: .rotationSeconds)) ?? nil ?? d.rotationSeconds
+        menuBarFormat = Self.lenientEnum(c, .menuBarFormat, d.menuBarFormat)
+        privacyMode = (try? c.decodeIfPresent(Bool.self, forKey: .privacyMode)) ?? nil ?? d.privacyMode
+        launchAtLogin = (try? c.decodeIfPresent(Bool.self, forKey: .launchAtLogin)) ?? nil ?? d.launchAtLogin
+        autoUpdateCheck = (try? c.decodeIfPresent(Bool.self, forKey: .autoUpdateCheck)) ?? nil ?? d.autoUpdateCheck
+        hotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .hotkey)) ?? nil
+    }
+
+    private static func lenientEnum<T: RawRepresentable>(
+        _ container: KeyedDecodingContainer<CodingKeys>,
+        _ key: CodingKeys,
+        _ fallback: T
+    ) -> T where T.RawValue == String {
+        guard let raw = (try? container.decodeIfPresent(String.self, forKey: key)) ?? nil else {
+            return fallback
+        }
+        return T(rawValue: raw) ?? fallback
     }
 }

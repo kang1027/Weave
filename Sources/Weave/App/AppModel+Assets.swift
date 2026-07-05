@@ -38,6 +38,7 @@ extension AppModel {
 
         document.assets.append(asset)
         persist()
+        invalidateHomeChart()
         await refreshFXRates()
         updateMenuBarTitle()
         searchQuery = ""

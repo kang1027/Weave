@@ -25,11 +25,13 @@ public enum ValueSeriesBuilder {
         calendar: Calendar = .current
     ) -> [ValuePoint] {
         let visible = assets.filter { !$0.isHidden }
+        let visibleIDs = Set(visible.map(\.id))
         let tradesByAsset = Dictionary(grouping: trades, by: \.assetID)
 
         // 시작일 = max(요청 시작, 첫 매수일). 첫 매수 이전 구간은 그리지 않는다.
+        // 숨김 자산의 거래는 표시 구간 결정에서도 제외한다.
         let firstBuy = trades
-            .filter { $0.side == .buy }
+            .filter { $0.side == .buy && visibleIDs.contains($0.assetID) }
             .map(\.date)
             .min()
         guard let firstBuy else { return [] }

@@ -114,6 +114,17 @@ import Testing
         #expect(PositionCalculator.availableQuantity(at: at, trades: trades, excluding: editing.id) == 10)
     }
 
+    @Test func firstOversellDetectsBrokenHistory() {
+        // 1일 매수 10 → 10일 매도 10 은 일관.
+        let laterSell = trade(.sell, qty: 10, price: 120, day: 10)
+        let consistent = [trade(.buy, qty: 10, price: 100, day: 1), laterSell]
+        #expect(PositionCalculator.firstOversell(in: consistent) == nil)
+
+        // 5일에 매도 10을 끼워 넣으면 10일 매도가 초과된다.
+        let inserted = consistent + [trade(.sell, qty: 10, price: 110, day: 5)]
+        #expect(PositionCalculator.firstOversell(in: inserted)?.id == laterSell.id)
+    }
+
     @Test func sameDayBuyBeforeSell() {
         // 같은 날짜면 매수를 먼저 재생 — 당일 매수분 매도 허용
         let snapshot = PositionCalculator.snapshot(trades: [

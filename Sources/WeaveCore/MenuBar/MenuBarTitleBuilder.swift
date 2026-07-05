@@ -35,7 +35,7 @@ public enum MenuBarTitleBuilder {
     ) -> String {
         let percent = MoneyFormatter.arrowPercent(dayChangePercent)
         if privacy {
-            return "\(WeaveInfo.appName) \(percent)"
+            return "\(MoneyFormatter.masked) \(percent)"
         }
         return "\(MoneyFormatter.price(totalBase, currency: baseCurrency)) \(percent)"
     }

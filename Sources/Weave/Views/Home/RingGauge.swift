@@ -67,11 +67,12 @@ struct RingGauge: View {
                 hoveredID = nil
             }
         }
-        .overlay(alignment: .top) {
+        // 링 행이 스크롤 콘텐츠 최상단이라 위로 띄우면 잘린다 — 아래로 표시.
+        .overlay(alignment: .bottom) {
             if let hoveredID,
                let segment = segments.first(where: { $0.id == hoveredID }) {
                 TooltipBubble(text: segment.tooltip)
-                    .offset(y: -30)
+                    .offset(y: 32)
                     .allowsHitTesting(false)
                     .zIndex(10)
             }
@@ -100,7 +101,8 @@ struct RingGauge: View {
         let dx = point.x - center.x
         let dy = point.y - center.y
         let distance = (dx * dx + dy * dy).squareRoot()
-        guard abs(distance - radius) <= hoverLineWidth else { return nil }
+        // 히트 밴드 = 실제 스트로크 반폭 + 약간의 여유.
+        guard abs(distance - radius) <= hoverLineWidth / 2 + 2 else { return nil }
         // 12시 기준 시계방향 각도 비율.
         var angle = atan2(dx, -dy)
         if angle < 0 { angle += 2 * .pi }

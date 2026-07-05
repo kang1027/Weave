@@ -25,11 +25,26 @@ public struct JSONPortfolioStore: PortfolioStore {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             return .empty
         }
-        let data = try Data(contentsOf: fileURL)
-        let migrated = try PortfolioMigrator.migrate(data)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(PortfolioDocument.self, from: migrated)
+        do {
+            let data = try Data(contentsOf: fileURL)
+            let migrated = try PortfolioMigrator.migrate(data)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try decoder.decode(PortfolioDocument.self, from: migrated)
+        } catch {
+            // 읽지 못한 문서를 이후 persist()가 빈 문서로 덮어쓰지 않게
+            // 원본을 백업으로 보존한 뒤 실패를 전파한다.
+            backUpUnreadableFile()
+            throw error
+        }
+    }
+
+    private func backUpUnreadableFile() {
+        let stamp = ISO8601DateFormatter().string(from: Date())
+            .replacingOccurrences(of: ":", with: "-")
+        let backupURL = fileURL.deletingLastPathComponent()
+            .appendingPathComponent("portfolio-unreadable-\(stamp).json")
+        try? FileManager.default.copyItem(at: fileURL, to: backupURL)
     }
 
     public func save(_ document: PortfolioDocument) throws {

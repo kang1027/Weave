@@ -113,6 +113,23 @@ import Testing
         #expect(candles[1].close == 110)
     }
 
+    @Test func yahooClassShareKeepsFullSymbolAndUSMarket() {
+        #expect(YahooProvider.market(symbol: "BRK.B", quoteType: "EQUITY") == .usStock)
+        #expect(YahooProvider.displaySymbol("BRK.B") == "BRK.B")
+        #expect(YahooProvider.displaySymbol("005930.KS") == "005930")
+        #expect(YahooProvider.displaySymbol("7203.T") == "7203")
+        #expect(YahooProvider.displaySymbol("BTC-USD") == "BTC")
+    }
+
+    @Test func naverLowerLimitStaysNegative() throws {
+        let json = """
+        {"datas":[{"closePrice":"7,000","fluctuationsRatio":"-29.90",
+          "compareToPreviousPrice":{"name":"LOWER_LIMIT"}}]}
+        """
+        let quote = try NaverProvider.parseQuote(Data(json.utf8))
+        #expect(quote.changePercent == Decimal(string: "-29.90"))
+    }
+
     @Test func yahooSearchMapsMarkets() throws {
         let json = """
         {"quotes":[

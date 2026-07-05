@@ -8,14 +8,20 @@ extension AppModel {
         homeSeries = []
         homeAssetSeries = []
         homeBuyMarkers = []
+        chartGeneration += 1
     }
 
     /// 통합/자산별 시계열 + 매수 마커 재계산. 캔들은 일봉 캐시 사용.
+    /// 홈 진입마다 다시 불려도 같은 날은 캐시 히트라 비용이 거의 없다.
     func loadHomeChart() async {
+        chartLoadToken += 1
+        let token = chartLoadToken
         let assets = visibleAssets
         let period = homeChartPeriod
         guard !assets.isEmpty else {
-            invalidateHomeChart()
+            homeSeries = []
+            homeAssetSeries = []
+            homeBuyMarkers = []
             return
         }
         isHomeChartLoading = true
@@ -71,6 +77,8 @@ extension AppModel {
             }
             .sorted { $0.trade.date < $1.trade.date }
 
+        // 더 최신 로드가 시작됐다면 이 결과는 버린다.
+        guard token == chartLoadToken else { return }
         homeSeries = series
         homeAssetSeries = assetLines
         homeBuyMarkers = markers

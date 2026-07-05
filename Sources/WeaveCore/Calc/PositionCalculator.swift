@@ -94,6 +94,24 @@ public enum PositionCalculator {
         return quantity(onOrBefore: date, trades: filtered)
     }
 
+    /// 히스토리 전체를 재생해 보유량을 초과하는 첫 매도를 찾는다.
+    /// 앞 날짜에 매도를 끼워 넣어 "뒤 매도"가 무효가 되는 케이스를 잡는 데 쓴다.
+    public static func firstOversell(in trades: [Trade]) -> Trade? {
+        var quantity: Decimal = 0
+        for trade in sorted(trades) {
+            switch trade.side {
+            case .buy:
+                quantity += trade.quantity
+            case .sell:
+                if trade.quantity > quantity {
+                    return trade
+                }
+                quantity -= trade.quantity
+            }
+        }
+        return nil
+    }
+
     /// 재생 순서: 날짜 → (같은 날짜면) 매수 먼저 → id 안정 정렬.
     static func sorted(_ trades: [Trade]) -> [Trade] {
         trades.sorted { lhs, rhs in

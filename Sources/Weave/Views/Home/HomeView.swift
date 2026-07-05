@@ -5,6 +5,7 @@ import WeaveCore
 struct HomeView: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
+    @State private var deletionTarget: Asset?
 
     var body: some View {
         let (perAsset, portfolio) = model.computed
@@ -21,7 +22,9 @@ struct HomeView: View {
                     CapsHeader(text: model.t("Assets"))
                     VStack(spacing: 0) {
                         ForEach(perAsset) { metric in
-                            AssetListRow(metric: metric)
+                            AssetListRow(metric: metric) {
+                                deletionTarget = metric.asset
+                            }
                         }
                     }
                 }
@@ -30,9 +33,28 @@ struct HomeView: View {
 
             HomeFooter()
         }
-        .task {
-            if model.homeSeries.isEmpty {
-                await model.loadHomeChart()
+        // 홈 진입·자산/거래 변이·기간 변경마다 재계산 — 같은 날은 캔들 캐시 히트라 저렴.
+        .task(id: "\(model.chartGeneration)|\(model.homeChartPeriod.rawValue)") {
+            await model.loadHomeChart()
+        }
+        .confirmationDialog(
+            model.t("Delete asset?"),
+            isPresented: Binding(
+                get: { deletionTarget != nil },
+                set: { if !$0 { deletionTarget = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(model.t("Delete"), role: .destructive) {
+                if let target = deletionTarget {
+                    model.deleteAsset(id: target.id)
+                }
+                deletionTarget = nil
+            }
+            Button(model.t("Cancel"), role: .cancel) { deletionTarget = nil }
+        } message: {
+            if let target = deletionTarget {
+                Text(model.t("\(target.name) and \(model.tradeCount(assetID: target.id)) trade(s) will be deleted."))
             }
         }
     }
@@ -102,6 +124,7 @@ struct AssetListRow: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
     let metric: AssetMetrics
+    let onDelete: () -> Void
 
     var body: some View {
         Button {
@@ -156,9 +179,7 @@ struct AssetListRow: View {
             Button(model.t("Hide")) {
                 model.toggleHidden(assetID: metric.asset.id)
             }
-            Button(model.t("Delete"), role: .destructive) {
-                model.deleteAsset(id: metric.asset.id)
-            }
+            Button(model.t("Delete"), role: .destructive, action: onDelete)
         }
     }
 
@@ -178,8 +199,9 @@ struct AssetListRow: View {
         }
         guard let quote = metric.quote else { return "—" }
         // 자산 표시 통화 설정: 소스 통화 그대로(기본) / 기준 통화 환산.
-        if model.settings.displayCurrencyMode == .base {
-            let rate = model.fxRates[metric.asset.currency.uppercased()] ?? 1
+        // 환율이 아직 없으면 잘못된 통화로 표기하지 말고 소스 통화 유지.
+        if model.settings.displayCurrencyMode == .base,
+           let rate = model.fxRates[metric.asset.currency.uppercased()] {
             return MoneyFormatter.price(quote.price * rate, currency: model.settings.baseCurrency)
         }
         return MoneyFormatter.price(quote.price, currency: quote.currency)

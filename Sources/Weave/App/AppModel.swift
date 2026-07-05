@@ -37,6 +37,10 @@ final class AppModel: ObservableObject {
     @Published var homeAssetSeries: [AssetLineSeries] = []
     @Published var homeBuyMarkers: [BuyMarker] = []
     @Published var isHomeChartLoading = false
+    /// 자산/거래 변이마다 증가 — 홈 `.task(id:)`가 이를 보고 재로드한다.
+    @Published var chartGeneration = 0
+    /// 늦게 끝난 이전 로드가 최신 결과를 덮어쓰지 않게 하는 토큰.
+    var chartLoadToken = 0
 
     // 상세 차트 상태
     @Published var detailPeriod: ChartPeriod = .sixMonths
@@ -99,7 +103,7 @@ final class AppModel: ObservableObject {
             store: store,
             quoteService: QuoteService(providers: providers),
             candleService: CandleService(providers: providers, cacheDirectory: cacheDir),
-            fxService: FXService(yahoo: yahoo),
+            fxService: FXService(yahoo: yahoo, cacheDirectory: cacheDir),
             searchService: SearchService(providers: providers)
         )
     }

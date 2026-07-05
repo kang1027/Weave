@@ -42,13 +42,13 @@ extension AppModel {
 
     // MARK: - 메뉴바 타이틀
 
-    /// 로테이션 대상: 핀 자산이 있으면 그것만, 없으면 메뉴바 표시가 켜진 자산 순환.
+    /// 로테이션 대상: 핀 자산이 있으면 그것만(메뉴바 토글보다 우선), 없으면 메뉴바 표시가 켜진 자산 순환.
     func updateMenuBarTitle() {
         let candidates = visibleAssets.filter { $0.showInMenuBar && !$0.isManual }
         let privacy = settings.privacyMode
 
         let target: Asset?
-        if let pinned = candidates.first(where: { $0.isPinned }) {
+        if let pinned = visibleAssets.first(where: { $0.isPinned && !$0.isManual }) {
             target = pinned
         } else if candidates.isEmpty {
             target = nil

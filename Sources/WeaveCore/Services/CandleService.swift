@@ -51,7 +51,15 @@ public actor CandleService {
         }
 
         if let running = inflight[key] {
-            return try await running.value
+            do {
+                return try await running.value
+            } catch {
+                // 합류한 요청도 stale 캐시 폴백을 받는다.
+                if let stale = memory[key] ?? loadDisk(key: key) {
+                    return stale.candles
+                }
+                throw error
+            }
         }
 
         guard let dataProvider = providers[provider] else {

@@ -34,9 +34,7 @@ struct ValueHistoryChart: View {
             }
         }
         .padding(.horizontal, 16)
-        .onChange(of: model.homeChartPeriod) {
-            Task { await model.loadHomeChart() }
-        }
+        // 기간 변경 리로드는 HomeView의 .task(id:)가 담당한다.
     }
 
     @ViewBuilder

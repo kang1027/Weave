@@ -8,6 +8,7 @@ extension AppModel {
     }
 
     /// 거래 추가/수정 공통 검증 — 매도는 그 시점 보유 수량 초과 불가.
+    /// 과거 날짜 삽입/수정으로 "이후 매도"가 무효화되는 것도 전체 재생으로 막는다.
     func validateTrade(
         assetID: UUID,
         side: TradeSide,
@@ -17,15 +18,27 @@ extension AppModel {
         editingID: UUID? = nil
     ) -> TradeError? {
         guard quantity > 0, price >= 0 else { return .invalidInput }
+
+        let existing = document.trades(for: assetID).filter { $0.id != editingID }
         if side == .sell {
-            let available = PositionCalculator.availableQuantity(
-                at: date,
-                trades: document.trades(for: assetID),
-                excluding: editingID
-            )
+            let available = PositionCalculator.availableQuantity(at: date, trades: existing)
             if quantity > available {
                 return .exceedsHolding(available: available)
             }
+        }
+
+        // 변경 반영 후 히스토리 전체가 일관된지 확인.
+        // 단, 기존 데이터에 이미 있던 모순까지 새 입력 탓으로 돌리지는 않는다.
+        let candidate = Trade(
+            id: editingID ?? UUID(), assetID: assetID, side: side,
+            quantity: quantity, price: price, date: date
+        )
+        if PositionCalculator.firstOversell(in: existing) == nil,
+           let oversell = PositionCalculator.firstOversell(in: existing + [candidate]) {
+            let available = PositionCalculator.availableQuantity(
+                at: oversell.date, trades: existing
+            )
+            return .exceedsHolding(available: max(0, available))
         }
         return nil
     }

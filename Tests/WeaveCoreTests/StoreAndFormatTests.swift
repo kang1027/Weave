@@ -50,6 +50,33 @@ import Testing
         #expect(doc.settings.privacyMode == false)
     }
 
+    @Test func unknownEnumValuesFallBackWithoutFailingDocument() throws {
+        // 신버전이 추가한 enum 값이 있어도 문서 전체가 깨지면 안 된다.
+        let json = """
+        {"version":1,"assets":[],"trades":[],
+         "settings":{"theme":"midnight","menuBarFormat":"emoji","rotationSeconds":30}}
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let doc = try decoder.decode(PortfolioDocument.self, from: Data(json.utf8))
+        #expect(doc.settings.theme == .system)
+        #expect(doc.settings.menuBarFormat == .full)
+        #expect(doc.settings.rotationSeconds == 30)
+    }
+
+    @Test func unreadableFileIsBackedUpBeforeThrowing() throws {
+        let store = tempStore()
+        try FileManager.default.createDirectory(
+            at: store.fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try Data("not json at all".utf8).write(to: store.fileURL)
+        #expect(throws: Error.self) { try store.load() }
+        let backups = try FileManager.default
+            .contentsOfDirectory(at: store.fileURL.deletingLastPathComponent(), includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("portfolio-unreadable-") }
+        #expect(backups.count == 1)
+    }
+
     @Test func newerSchemaVersionFailsLoud() throws {
         let store = tempStore()
         let json = """
@@ -137,6 +164,14 @@ import Testing
             dayChangePercent: Decimal(string: "1.23")!, privacy: false
         )
         #expect(title == "₩12,345,678 ▲1.23%")
+    }
+
+    @Test func totalTitlePrivacyMasksAmount() {
+        let title = MenuBarTitleBuilder.totalTitle(
+            totalBase: 12_345_678, baseCurrency: "KRW",
+            dayChangePercent: Decimal(string: "1.23")!, privacy: true
+        )
+        #expect(title == "••••• ▲1.23%")
     }
 }
 
