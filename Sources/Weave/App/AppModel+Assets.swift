@@ -67,6 +67,7 @@ extension AppModel {
         )
         document.assets.append(asset)
         persist()
+        invalidateHomeChart()
         Task { await refreshFXRates() }
         route = [.manage]
         return asset
@@ -87,6 +88,7 @@ extension AppModel {
         quotes[id] = nil
         staleAssetIDs.remove(id)
         persist()
+        invalidateHomeChart()
         updateMenuBarTitle()
         // 삭제된 자산 화면이 스택에 있으면 홈으로.
         if route.contains(where: { if case .detail(id) = $0 { return true } else { return false } }) {
@@ -118,6 +120,7 @@ extension AppModel {
 
     func toggleHidden(assetID: UUID) {
         mutateAsset(id: assetID) { $0.isHidden.toggle() }
+        invalidateHomeChart()
         updateMenuBarTitle()
     }
 

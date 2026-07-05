@@ -76,6 +76,12 @@ private struct CombinedChart: View {
 
     @State private var hoveredMarkerID: UUID?
 
+    private var xAxisFormat: Date.FormatStyle {
+        model.homeChartPeriod == .oneMonth
+            ? .dateTime.month(.defaultDigits).day().locale(model.locale)
+            : .dateTime.month(.abbreviated).locale(model.locale)
+    }
+
     private var yDomain: ClosedRange<Double> {
         let values = series.map { $0.value.doubleValue }
         guard let min = values.min(), let max = values.max(), min < max else {
@@ -115,7 +121,7 @@ private struct CombinedChart: View {
         }
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                AxisValueLabel(format: .dateTime.month(.narrow), anchor: .top)
+                AxisValueLabel(format: xAxisFormat, anchor: .top)
                     .font(.system(size: 9))
                     .foregroundStyle(theme.xLabel)
             }
@@ -223,7 +229,14 @@ private struct MarkerDot: View {
 
 private struct PerAssetChart: View {
     @Environment(\.theme) private var theme
+    @EnvironmentObject private var model: AppModel
     let lines: [AssetLineSeries]
+
+    private var xAxisFormat: Date.FormatStyle {
+        model.homeChartPeriod == .oneMonth
+            ? .dateTime.month(.defaultDigits).day().locale(model.locale)
+            : .dateTime.month(.abbreviated).locale(model.locale)
+    }
 
     var body: some View {
         Chart {
@@ -246,7 +259,7 @@ private struct PerAssetChart: View {
         }
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                AxisValueLabel(format: .dateTime.month(.narrow), anchor: .top)
+                AxisValueLabel(format: xAxisFormat, anchor: .top)
                     .font(.system(size: 9))
                     .foregroundStyle(theme.xLabel)
             }

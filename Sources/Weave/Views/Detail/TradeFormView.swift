@@ -119,8 +119,12 @@ struct TradeFormView: View {
             }
         }
         .onAppear(perform: prefillFromEditing)
-        .onChange(of: date) {
+        .onChange(of: date) { _, newDate in
             error = nil
+            // 편집 로드로 세팅된 날짜(원래 체결일)는 프리필하지 않는다 — 체결가 보존.
+            if let editing, Calendar.current.isDate(newDate, inSameDayAs: editing.date) {
+                return
+            }
             prefillClosingPrice()
         }
         .onChange(of: side) { error = nil }
