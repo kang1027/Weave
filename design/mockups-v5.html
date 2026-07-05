@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weave — 테마 전환 데모 (v5)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+/* ===== 테마 변수 ===== */
+body.theme-slate{
+  --page-bg:#22242a;
+  --bg:#2b2d35; --panel:#383a43; --panel-sh:0 0 0 1px rgba(255,255,255,.04);
+  --text:#fff; --text2:#9a9da8; --caps:#8a8d98;
+  --hair:rgba(255,255,255,.09); --ib:rgba(255,255,255,.08);
+  --trk:rgba(255,255,255,.12); --grid:rgba(255,255,255,.07); --refc:rgba(255,255,255,.32); --xlab:#7c7f8a;
+  --seg:rgba(255,255,255,.08); --segon:#4a4d57; --segsh:none;
+  --tt-bg:#3a3c46; --tt-bd:rgba(255,255,255,.14); --pt-bg:#33353e;
+  --hover:rgba(255,255,255,.05); --guide:rgba(255,255,255,.25);
+  --green:#32d74b; --green-t:#32d74b; --red:#ff453a; --red-t:#ff453a;
+  --orange:#ff9f0a; --blue:#0a84ff; --indigo:#8583ff; --agray:#9094a0;
+  --bdg-gray:rgba(255,255,255,.1); --bdg-gray-t:#c7ccd6; --link:#0a84ff;
+  color-scheme:dark;
+}
+body.theme-light{
+  --page-bg:#e4e4e8;
+  --bg:#f4f4f6; --panel:#fff; --panel-sh:0 1px 3px rgba(0,0,0,.07);
+  --text:#1d1d1f; --text2:#6e6e73; --caps:#86868b;
+  --hair:rgba(0,0,0,.08); --ib:rgba(0,0,0,.05);
+  --trk:rgba(0,0,0,.08); --grid:rgba(0,0,0,.07); --refc:rgba(0,0,0,.32); --xlab:#9a9aa0;
+  --seg:rgba(0,0,0,.06); --segon:#fff; --segsh:0 1px 2px rgba(0,0,0,.12);
+  --tt-bg:#fff; --tt-bd:rgba(0,0,0,.1); --pt-bg:#fff;
+  --hover:rgba(0,0,0,.045); --guide:rgba(0,0,0,.28);
+  --green:#34c759; --green-t:#1e9e46; --red:#ff3b30; --red-t:#d70015;
+  --orange:#ff9500; --blue:#007aff; --indigo:#5856d6; --agray:#b0b0b6;
+  --bdg-gray:rgba(0,0,0,.07); --bdg-gray-t:#515154; --link:#007aff;
+  color-scheme:light;
+}
+
+body{background:var(--page-bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","Apple SD Gothic Neo",sans-serif;-webkit-font-smoothing:antialiased;transition:background-color .25s ease,color .25s ease}
+.page-hd{padding:44px 48px 4px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.page-hd h1{font-size:20px;font-weight:700}
+.page-hd p{color:var(--text2);font-size:13px;margin-top:6px}
+.thsw{display:flex;gap:4px;background:var(--seg);border-radius:9px;padding:3px}
+.thsw button{border:none;font:inherit;font-size:12px;font-weight:600;color:var(--text2);padding:6px 14px;border-radius:7px;background:transparent;cursor:pointer}
+.thsw button.on{background:var(--segon);color:var(--text);box-shadow:var(--segsh)}
+.gallery{display:flex;gap:40px;padding:36px 48px 90px;justify-content:center;flex-wrap:wrap;align-items:flex-start}
+.frame{width:360px}
+.label{font-size:12px;color:var(--text2);margin:0 0 10px 2px}
+.label b{color:var(--text);font-weight:700;margin-right:8px}
+.mock{width:360px;height:720px;border-radius:18px;overflow:hidden;position:relative;display:flex;flex-direction:column;background:var(--bg);box-shadow:0 24px 48px rgba(0,0,0,.25),0 0 0 1px var(--hair);transition:background-color .25s ease}
+.scr{display:none;flex-direction:column;flex:1;min-height:0}
+.scr.on{display:flex}
+
+.hd{display:flex;align-items:center;justify-content:space-between;padding:14px 14px 8px}
+.ib{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:13px;background:var(--ib)}
+.ttl{font-size:14px;font-weight:600}
+.cap{display:flex;align-items:center;gap:8px;padding:16px 16px 8px;color:var(--caps);font-size:10px;font-weight:600;letter-spacing:1.3px;text-transform:uppercase;white-space:nowrap}
+.cap::before,.cap::after{content:"";height:1px;flex:1;background:var(--hair)}
+.row{display:flex;align-items:center;gap:10px;padding:9px 16px}
+.ic{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;position:relative;overflow:hidden}
+.ic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.ic img.lg-sam{object-fit:contain;background:#fff;padding:4px}
+.ic.btc{background:color-mix(in srgb,var(--orange) 15%,transparent);color:var(--orange)}
+.ic.eth{background:color-mix(in srgb,var(--indigo) 14%,transparent);color:var(--indigo)}
+.ic.sam{background:color-mix(in srgb,var(--blue) 13%,transparent);color:var(--blue)}
+.meta{flex:1;min-width:0}
+.nm{font-size:13px;font-weight:600}
+.sub{font-size:11px;color:var(--text2);margin-top:1px}
+.right{text-align:right}
+.val{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.up{color:var(--green-t)}.down{color:var(--red-t)}.dim{color:var(--caps)}
+.tv{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.bdg{display:inline-block;min-width:70px;text-align:center;font-size:11.5px;font-weight:700;padding:3.5px 8px;border-radius:6px;color:#fff;font-variant-numeric:tabular-nums}
+.bdg.up{background:var(--green)}
+.bdg.down{background:var(--red)}
+.bdg.gray{background:var(--bdg-gray);color:var(--bdg-gray-t)}
+.stack{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.tseg{display:flex;gap:4px;padding:10px 16px 0}
+.tseg span{flex:1;text-align:center;font-size:11px;font-weight:600;color:var(--text2);padding:4.5px 0;border-radius:6px}
+.tseg .on{background:var(--segon);color:var(--text);box-shadow:var(--segsh)}
+.tseg.mini span{flex:none;padding:3px 12px;font-size:10px;cursor:pointer}
+.ylab{fill:var(--xlab)}
+.area{width:100%;height:auto;display:block}
+svg text{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif}
+.grid{stroke:var(--grid);stroke-width:1}
+.ref{stroke:var(--refc);stroke-width:1;stroke-dasharray:3 3}
+#d-avgt{fill:var(--text2)}
+.xlab{display:flex;justify-content:space-between;padding:5px 2px 0;font-size:9px;color:var(--xlab);font-variant-numeric:tabular-nums}
+.gauge{position:relative;display:flex;align-items:center;justify-content:center}
+.gauge svg{transform:rotate(-90deg);width:100%;height:100%;position:absolute;inset:0}
+.gauge circle{fill:none;stroke-width:8;stroke-linecap:butt}
+.gauge .trk{stroke:var(--trk)}
+.gauge .sg{cursor:pointer;transition:stroke-width .15s ease}
+.gauge .sg:hover{stroke-width:11}
+.gv{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.gv small{font-size:8px;color:var(--caps);letter-spacing:.6px;text-transform:uppercase;font-weight:600;margin-top:1px}
+.g-s{width:64px;height:64px}
+.g-l{width:96px;height:96px}
+.g-s .gv b{font-size:12px}
+.g-l .gv b{font-size:17px}
+.g3{display:flex;align-items:center;justify-content:center;gap:22px;padding:12px 0 4px}
+.panel{margin:0 16px;background:var(--panel);border-radius:12px;padding:12px 12px 10px;box-shadow:var(--panel-sh);transition:background-color .25s ease}
+.ftr{margin-top:auto;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--hair);font-size:11px;color:var(--caps)}
+.ftr .lnk{color:var(--link);font-weight:600}
+.ftr .lnk.g{color:var(--green-t)}
+.click{cursor:pointer;transition:background .12s ease}
+.click:hover{background:var(--hover)}
+.tchip{font-size:9.5px;font-weight:700;padding:2.5px 8px;border-radius:5px;flex-shrink:0}
+.tchip.b{background:color-mix(in srgb,var(--green) 16%,transparent);color:var(--green-t)}
+.tchip.s{background:color-mix(in srgb,var(--red) 14%,transparent);color:var(--red-t)}
+.slabel{font-size:10px;color:var(--caps);font-weight:600;letter-spacing:.8px;text-transform:uppercase;padding:14px 20px 6px}
+.scard{margin:0 14px;background:var(--panel);border-radius:12px;box-shadow:var(--panel-sh);overflow:hidden}
+.scard .row{padding:10px 14px}
+.scard .row+.row{border-top:1px solid var(--hair)}
+.sel{display:inline-flex;align-items:center;gap:6px;background:var(--seg);border-radius:7px;padding:4px 10px;font-size:11.5px;font-weight:600;cursor:pointer;flex-shrink:0;white-space:nowrap}
+.sel i{font-style:normal;font-size:9px;color:var(--text2)}
+.menu{position:absolute;min-width:130px;background:var(--tt-bg);border:1px solid var(--tt-bd);border-radius:9px;box-shadow:0 10px 28px rgba(0,0,0,.3);padding:4px;z-index:50}
+.menu div{padding:6px 10px;font-size:11.5px;font-weight:600;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:7px;white-space:nowrap}
+.menu div:hover{background:var(--hover)}
+.menu div i{font-style:normal;width:11px;color:var(--green-t);flex-shrink:0}
+.sbtn{margin:8px 10px;background:var(--seg);border-radius:8px;text-align:center;padding:8px;font-size:12px;font-weight:600;cursor:pointer}
+.sw{position:relative;width:34px;height:20px;border-radius:10px;background:var(--seg);cursor:pointer;transition:background .15s ease;flex-shrink:0}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s ease;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.sw.on{background:var(--green)}
+.sw.on::after{left:16px}
+body.privacy .tv,body.privacy .val{filter:blur(5px)}
+body.privacy #priv-btn{background:color-mix(in srgb,var(--link) 18%,transparent);color:var(--link)}
+.ib svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#priv-btn .ec{display:none}
+body.privacy #priv-btn .eo{display:none}
+body.privacy #priv-btn .ec{display:block}
+
+/* 자산/차트 색 클래스 */
+.c-btc{stroke:var(--orange)}
+.c-sam{stroke:var(--blue)}
+.c-eth{stroke:var(--indigo)}
+.c-man{stroke:var(--agray)}
+.ln-green{stroke:var(--green)}
+.st-green{stop-color:var(--green)}
+.st-orange{stop-color:var(--orange)}
+.st-indigo{stop-color:var(--indigo)}
+.st-blue{stop-color:var(--blue)}
+
+/* 마커 + hover 툴팁 */
+.chartwrap{position:relative}
+.mkr{position:absolute;top:0;bottom:0;width:16px;pointer-events:none}
+.mkr .pt{position:absolute;left:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:var(--pt-bg);border:1.5px solid var(--c);color:var(--c);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;cursor:pointer;pointer-events:auto;box-shadow:0 2px 6px rgba(0,0,0,.25);transition:transform .15s ease,box-shadow .15s ease;z-index:3}
+.mkr .pt>img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover}
+.mkr .pt>img.lg-sam{object-fit:contain;background:#fff;padding:2.5px}
+.mkr .pt:hover{transform:scale(1.18);box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 22%,transparent),0 2px 6px rgba(0,0,0,.25);z-index:6}
+.mkr .guide{position:absolute;left:7.5px;top:4px;bottom:14px;width:1px;background:transparent;transition:background .15s ease;pointer-events:none}
+.mkr .pt:hover ~ .guide{background:var(--guide)}
+.mkr .pt:hover .tt{opacity:1}
+.tt{position:absolute;bottom:calc(100% + 9px);left:50%;transform:translateX(-50%);background:var(--tt-bg);border:1px solid var(--tt-bd);border-radius:8px;padding:7px 10px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .12s ease;z-index:9;box-shadow:0 8px 24px rgba(0,0,0,.2);text-align:left}
+.tt .t1{font-size:11px;font-weight:700}
+.tt .t2{font-size:10px;color:var(--text2);margin-top:2px}
+.tt .t3{font-size:9.5px;color:var(--xlab);margin-top:4px}
+.tt.el{left:-4px;transform:none}
+.tt.er{left:auto;right:-4px;transform:none}
+</style>
+</head>
+<body class="theme-slate">
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="gg" x1="0" y1="0" x2="0" y2="1"><stop class="st-green" offset="0" stop-opacity=".28"/><stop class="st-green" offset="1" stop-opacity="0"/></linearGradient>
+    <linearGradient id="gdo" x1="0" y1="0" x2="0" y2="1"><stop class="st-orange" offset="0" stop-opacity=".2"/><stop class="st-orange" offset="1" stop-opacity="0"/></linearGradient>
+    <linearGradient id="gdp" x1="0" y1="0" x2="0" y2="1"><stop class="st-indigo" offset="0" stop-opacity=".16"/><stop class="st-indigo" offset="1" stop-opacity="0"/></linearGradient>
+    <linearGradient id="gdb" x1="0" y1="0" x2="0" y2="1"><stop class="st-blue" offset="0" stop-opacity=".16"/><stop class="st-blue" offset="1" stop-opacity="0"/></linearGradient>
+  </defs>
+</svg>
+
+<div class="page-hd">
+  <div>
+    <h1>Weave — 테마 전환 데모 (v5)</h1>
+    <p>테마: 시스템/Slate/Light · ⚙ = 설정 화면(테마·언어·업데이트) · 마커 hover/클릭 인터랙션 동일</p>
+  </div>
+  <div class="thsw">
+    <button id="th-sys" onclick="setThemeMode('system')">시스템</button>
+    <button id="th-slate" class="on" onclick="setThemeMode('slate')">Slate</button>
+    <button id="th-light" onclick="setThemeMode('light')">Light</button>
+  </div>
+</div>
+
+<div class="gallery">
+
+<div class="frame">
+<div class="label"><b>DEMO</b>마커 hover / 클릭, 상세에서 ‹ 로 복귀, ⚙ = 설정</div>
+<div class="mock">
+
+  <!-- ============ HOME ============ -->
+  <div class="scr on" id="scr-home">
+    <div class="hd"><div class="ib">↻</div><div class="ttl">Weave</div><div style="display:flex;gap:6px"><div class="ib click" id="priv-btn" onclick="togglePrivacy()" title="프라이버시 모드"><svg class="eo" viewBox="0 0 24 24"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><svg class="ec" viewBox="0 0 24 24"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><line x1="4" y1="3" x2="20" y2="21"/></svg></div><div class="ib click" onclick="openSettings()">⚙</div></div></div>
+    <div class="g3">
+      <div class="gauge g-s"><svg viewBox="0 0 100 100"><circle class="trk" cx="50" cy="50" r="42"/><circle class="sg c-btc" cx="50" cy="50" r="42" stroke-dasharray="70.2 264"><title>BTC 기여 +₩105,000</title></circle><circle class="sg c-sam" cx="50" cy="50" r="42" stroke-dasharray="30.1 264" stroke-dashoffset="-70.2"><title>삼성전자 기여 +₩45,300</title></circle></svg><div class="gv"><b class="up">+1.2%</b><small>Day</small></div></div>
+      <div class="gauge g-l"><svg viewBox="0 0 100 100"><circle class="trk" cx="50" cy="50" r="42"/><circle class="sg c-btc" cx="50" cy="50" r="42" stroke-dasharray="135.3 264"><title>BTC 기여 +₩1,180,000</title></circle><circle class="sg c-sam" cx="50" cy="50" r="42" stroke-dasharray="28.7 264" stroke-dashoffset="-135.3"><title>삼성전자 기여 +₩250,000</title></circle></svg><div class="gv"><b class="up">+12.4%</b><small>Return</small></div></div>
+      <div class="gauge g-s"><svg viewBox="0 0 100 100"><circle class="trk" cx="50" cy="50" r="42"/><circle class="sg c-btc" cx="50" cy="50" r="42" stroke-dasharray="110.9 264"><title>BTC 42% · ₩5.19M</title></circle><circle class="sg c-sam" cx="50" cy="50" r="42" stroke-dasharray="71.3 264" stroke-dashoffset="-110.9"><title>삼성전자 27% · ₩3.33M</title></circle><circle class="sg c-eth" cx="50" cy="50" r="42" stroke-dasharray="60.7 264" stroke-dashoffset="-182.2"><title>ETH 23% · ₩2.84M</title></circle><circle class="sg c-man" cx="50" cy="50" r="42" stroke-dasharray="21.1 264" stroke-dashoffset="-242.9"><title>Manual 8% · ₩0.99M</title></circle></svg><div class="gv"><b>4</b><small>Assets</small></div></div>
+    </div>
+    <div style="text-align:center;padding:12px 0 2px">
+      <div class="tv">₩12,345,678</div>
+      <div style="margin-top:8px"><span class="bdg up">▲ 1.23%</span></div>
+    </div>
+    <div class="cap">Value History</div>
+    <div class="panel">
+      <div class="tseg mini" style="padding:0 0 10px;justify-content:flex-end"><span id="md-all" class="on" onclick="setMode('all')">통합</span><span id="md-each" onclick="setMode('each')">자산별</span></div>
+      <div class="chartwrap">
+        <svg class="area" viewBox="0 0 304 118">
+          <line class="grid" x1="0" y1="26" x2="304" y2="26"/><line class="grid" x1="0" y1="56" x2="304" y2="56"/><line class="grid" x1="0" y1="86" x2="304" y2="86"/>
+          <g id="hm-all">
+            <path id="hm-fill" d="" fill="url(#gg)"/>
+            <path id="hm-line" class="ln-green" d="" fill="none" stroke-width="2"/>
+          </g>
+          <g id="hm-each" style="display:none">
+            <path id="hm-l-btc" d="" fill="none" style="stroke:var(--orange)" stroke-width="1.8"/>
+            <path id="hm-l-eth" d="" fill="none" style="stroke:var(--indigo)" stroke-width="1.8"/>
+            <path id="hm-l-sam" d="" fill="none" style="stroke:var(--blue)" stroke-width="1.8"/>
+          </g>
+        </svg>
+        <div id="hm-mkrs">
+        <div class="mkr" style="--c:var(--orange);left:40px">
+          <div class="pt" id="hm-pt-btc" onclick="openDetail('btc')">₿<img src="https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/128/color/btc.png" alt="" onerror="this.style.display='none'"><div class="tt el"><div class="t1">BTC 매수 · 0.01 @ $45,000</div><div class="t2">3/15 · 현재 대비 +33.3%</div><div class="t3">클릭하면 Bitcoin 상세로</div></div>
+          </div>
+          <div class="guide"></div>
+        </div>
+        <div class="mkr" style="--c:var(--blue);left:136px">
+          <div class="pt" id="hm-pt-sam" style="font-size:8px" onclick="openDetail('sam')">삼<img class="lg-sam" src="https://upload.wikimedia.org/wikipedia/commons/b/b4/Samsung_wordmark.svg" alt="" onerror="this.style.display='none'"><div class="tt"><div class="t1">삼성전자 매수 · 20주 @ ₩59,800</div><div class="t2">5/30 · 현재 대비 +2.3%</div><div class="t3">클릭하면 삼성전자 상세로</div></div>
+          </div>
+          <div class="guide"></div>
+        </div>
+        <div class="mkr" style="--c:var(--indigo);left:232px">
+          <div class="pt" id="hm-pt-eth" onclick="openDetail('eth')">Ξ<img src="https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/128/color/eth.png" alt="" onerror="this.style.display='none'"><div class="tt er"><div class="t1">ETH 매수 · 0.5 @ $3,520</div><div class="t2">5/11 · 현재 대비 −2.0%</div><div class="t3">클릭하면 Ethereum 상세로</div></div>
+          </div>
+          <div class="guide"></div>
+        </div>
+        </div>
+      </div>
+      <div class="xlab"><span>3월</span><span>4월</span><span>5월</span><span>6월</span><span>7월</span></div>
+      <div class="tseg" style="padding:8px 0 0"><span>1M</span><span class="on">3M</span><span>6M</span><span>1Y</span></div>
+    </div>
+    <div class="cap">Assets</div>
+    <div class="row click" onclick="openDetail('btc')"><div class="ic btc">₿<img src="https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/128/color/btc.png" alt="" onerror="this.style.display='none'"></div><div class="meta"><div class="nm">Bitcoin</div><div class="sub">0.05 BTC · 3회 매수</div></div><div class="stack"><span class="val">$60,000</span><span class="bdg up">+1.23%</span></div></div>
+    <div class="row click" onclick="openDetail('eth')"><div class="ic eth">Ξ<img src="https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/128/color/eth.png" alt="" onerror="this.style.display='none'"></div><div class="meta"><div class="nm">Ethereum</div><div class="sub">1.2 ETH · 2회 매수</div></div><div class="stack"><span class="val">$3,450</span><span class="bdg down">−0.84%</span></div></div>
+    <div class="row click" onclick="openDetail('sam')"><div class="ic sam">삼<img class="lg-sam" src="https://upload.wikimedia.org/wikipedia/commons/b/b4/Samsung_wordmark.svg" alt="" onerror="this.style.display='none'"></div><div class="meta"><div class="nm">삼성전자</div><div class="sub">45주 · 2회 매수</div></div><div class="stack"><span class="val">₩61,200</span><span class="bdg up">+0.66%</span></div></div>
+    <div class="ftr"><span>Weave 0.1.0 · Next refresh in 4m</span><span class="lnk click" style="font-size:13px" title="자산 관리">✎</span></div>
+  </div>
+
+  <!-- ============ ASSET DETAIL ============ -->
+  <div class="scr" id="scr-detail">
+    <div class="hd"><div class="ib click" onclick="goHome()">‹</div><div class="ttl" id="d-name">Bitcoin</div><div class="ib">＋</div></div>
+    <div style="text-align:center;padding:6px 0 0">
+      <div class="tv" style="font-size:24px" id="d-price">$60,000</div>
+      <div style="margin-top:7px"><span class="bdg" id="d-chg">▲ 1.23%</span> <span class="bdg gray" id="d-vsavg">평단 대비 +13.5%</span></div>
+    </div>
+    <div class="chartwrap" style="margin-top:10px">
+      <svg class="area" viewBox="0 0 360 180">
+        <line class="grid" x1="0" y1="34" x2="360" y2="34"/><line class="grid" x1="0" y1="74" x2="360" y2="74"/><line class="grid" x1="0" y1="114" x2="360" y2="114"/><line class="grid" x1="0" y1="154" x2="360" y2="154"/>
+        <line class="ref" id="d-avg" x1="0" y1="96" x2="360" y2="96"/>
+        <text id="d-avgt" x="4" y="92" font-size="8">평단 $52,880</text>
+        <text class="ylab" id="d-y0" x="356" y="30" font-size="9" text-anchor="end"></text>
+        <text class="ylab" id="d-y1" x="356" y="70" font-size="9" text-anchor="end"></text>
+        <text class="ylab" id="d-y2" x="356" y="110" font-size="9" text-anchor="end"></text>
+        <text class="ylab" id="d-y3" x="356" y="150" font-size="9" text-anchor="end"></text>
+        <path id="d-fill" d="" fill="url(#gdo)"/>
+        <path id="d-line" d="" fill="none" style="stroke:var(--orange)" stroke-width="2.2"/>
+      </svg>
+      <div id="d-dots"></div>
+    </div>
+    <div class="xlab" style="padding:5px 16px 0"><span>3월</span><span>4월</span><span>5월</span><span>6월</span><span>7월</span></div>
+    <div class="tseg"><span>1M</span><span>3M</span><span class="on">6M</span><span>1Y</span><span>ALL</span></div>
+    <div class="cap">Trades</div>
+    <div id="d-trades"></div>
+    <div class="ftr"><span id="d-count">3 buys · 1 sell</span><span class="lnk g">+ Add Trade</span></div>
+  </div>
+
+  <!-- ============ SETTINGS ============ -->
+  <div class="scr" id="scr-settings" style="overflow-y:auto">
+    <div class="hd"><div class="ib click" onclick="closeSettings()">‹</div><div class="ttl">설정</div><div class="ib" style="visibility:hidden">⚙</div></div>
+    <div class="slabel">General</div>
+    <div class="scard">
+      <div class="row"><div class="meta"><div class="nm">로그인 시 자동 시작</div></div><div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="row"><div class="meta"><div class="nm">글로벌 단축키</div><div class="sub">팝오버 열기</div></div><span class="sel">단축키 등록</span></div>
+      <div class="row"><div class="meta"><div class="nm">메뉴바 로테이션</div></div><span class="sel" onclick="pickSel(this,['5초','10초','30초','끔'])"><b>10초</b><i>⌄</i></span></div>
+    </div>
+    <div class="slabel">Appearance</div>
+    <div class="scard">
+      <div class="row"><div class="meta"><div class="nm">테마</div></div><span class="sel" onclick="pickTheme(this)"><b id="st-sel">Slate</b><i>⌄</i></span></div>
+      <div class="row"><div class="meta"><div class="nm">언어</div></div><span class="sel" onclick="pickSel(this,['시스템','한국어','English'])"><b>시스템</b><i>⌄</i></span></div>
+    </div>
+    <div class="slabel">Data</div>
+    <div class="scard">
+      <div class="row"><div class="meta"><div class="nm">시세 갱신 주기</div></div><span class="sel" onclick="pickSel(this,['1분','5분','10분','15분'])"><b>5분</b><i>⌄</i></span></div>
+      <div class="row"><div class="meta"><div class="nm">기준 통화</div><div class="sub">총액·통합 차트 합산용</div></div><span class="sel" onclick="pickSel(this,['KRW','USD','JPY'])"><b>KRW</b><i>⌄</i></span></div>
+      <div class="row"><div class="meta"><div class="nm">자산 표시 통화</div><div class="sub">소스 통화면 BTC는 $, 삼성전자는 ₩</div></div><span class="sel" onclick="pickSel(this,['소스 통화','기준 통화'])"><b>소스 통화</b><i>⌄</i></span></div>
+      <div class="sbtn">데이터 백업 / 복원…</div>
+    </div>
+    <div class="slabel">Updates</div>
+    <div class="scard">
+      <div class="row"><div class="meta"><div class="nm">자동 업데이트</div><div class="sub">Sparkle · 매일 확인</div></div><div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="sbtn">지금 업데이트 확인…</div>
+    </div>
+    <div style="height:14px"></div>
+    <div class="ftr"><span>Weave 0.1.0</span><span>Next refresh in 4m</span></div>
+  </div>
+
+</div>
+</div>
+
+</div>
+
+<script>
+const ASSETS = {
+  btc: {
+    name: 'Bitcoin', colorVar: 'var(--orange)', fill: 'url(#gdo)',
+    price: '$60,000', chg: '▲ 1.23%', chgUp: true,
+    avgLabel: '평단 $52,880', vsAvg: '평단 대비 +13.5%',
+    seed: 41, start: 150, drift: -0.55, vol: 4.2,
+    yl: ['$64K', '$58K', '$52K', '$46K'],
+    markers: [
+      { x: 54, s: 'B', t1: '매수 0.01 @ $45,000', t2: '3/15 · 현재 대비 +33.3%' },
+      { x: 162, s: 'B', t1: '매수 0.02 @ $52,000', t2: '5/2 · 현재 대비 +15.4%' },
+      { x: 252, s: 'B', t1: '매수 0.02 @ $58,200', t2: '6/12 · 현재 대비 +3.1%' },
+      { x: 324, s: 'S', t1: '매도 0.005 @ $61,500', t2: '6/25 · 실현손익 +₩89,400' }
+    ],
+    trades: [
+      { side: 's', l: '0.005 BTC @ $61,500', sub: '6/25 · 익절', r: '+₩89,400', rs: '실현손익', up: true },
+      { side: 'b', l: '0.02 BTC @ $58,200', sub: '6/12 · 분할 매수 3차', r: '+3.1%', rs: '현재 대비', up: true },
+      { side: 'b', l: '0.02 BTC @ $52,000', sub: '5/2 · 분할 매수 2차', r: '+15.4%', rs: '현재 대비', up: true },
+      { side: 'b', l: '0.01 BTC @ $45,000', sub: '3/15 · 첫 진입', r: '+33.3%', rs: '현재 대비', up: true }
+    ],
+    count: '3 buys · 1 sell'
+  },
+  eth: {
+    name: 'Ethereum', colorVar: 'var(--indigo)', fill: 'url(#gdp)',
+    price: '$3,450', chg: '▼ 0.84%', chgUp: false,
+    avgLabel: '평단 $3,396', vsAvg: '평단 대비 +1.6%',
+    seed: 53, start: 118, drift: -0.02, vol: 3.4,
+    yl: ['$3.7K', '$3.5K', '$3.3K', '$3.1K'],
+    markers: [
+      { x: 120, s: 'B', t1: '매수 0.7 @ $3,300', t2: '4/2 · 현재 대비 +4.5%' },
+      { x: 210, s: 'B', t1: '매수 0.5 @ $3,520', t2: '5/11 · 현재 대비 −2.0%' }
+    ],
+    trades: [
+      { side: 'b', l: '0.5 ETH @ $3,520', sub: '5/11 · 분할 매수 2차', r: '−2.0%', rs: '현재 대비', up: false },
+      { side: 'b', l: '0.7 ETH @ $3,300', sub: '4/2 · 첫 진입', r: '+4.5%', rs: '현재 대비', up: true }
+    ],
+    count: '2 buys'
+  },
+  sam: {
+    name: '삼성전자', colorVar: 'var(--blue)', fill: 'url(#gdb)',
+    price: '₩61,200', chg: '▲ 0.66%', chgUp: true,
+    avgLabel: '평단 ₩58,522', vsAvg: '평단 대비 +4.6%',
+    seed: 67, start: 132, drift: -0.22, vol: 3,
+    yl: ['₩64K', '₩61K', '₩58K', '₩55K'],
+    markers: [
+      { x: 140, s: 'B', t1: '매수 25주 @ ₩57,500', t2: '4/18 · 현재 대비 +6.4%' },
+      { x: 240, s: 'B', t1: '매수 20주 @ ₩59,800', t2: '5/30 · 현재 대비 +2.3%' }
+    ],
+    trades: [
+      { side: 'b', l: '20주 @ ₩59,800', sub: '5/30 · 분할 매수 2차', r: '+2.3%', rs: '현재 대비', up: true },
+      { side: 'b', l: '25주 @ ₩57,500', sub: '4/18 · 첫 진입', r: '+6.4%', rs: '현재 대비', up: true }
+    ],
+    count: '2 buys'
+  }
+}
+
+// 시드 고정 랜덤워크 — 새로고침해도 같은 차트가 나오게
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0
+    let t = Math.imul(a ^ a >>> 15, 1 | a)
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t
+    return ((t ^ t >>> 14) >>> 0) / 4294967296
+  }
+}
+
+function genSeries(seed, n, start, drift, vol, lo, hi) {
+  const rnd = mulberry32(seed)
+  const ys = [start]
+  for (let i = 1; i < n; i++) {
+    const shock = rnd() < 0.06 ? (rnd() - 0.5) * vol * 4 : 0
+    const y = ys[i - 1] + (rnd() - 0.5) * vol + drift + shock
+    ys.push(Math.min(hi, Math.max(lo, y)))
+  }
+  return ys
+}
+
+function toPath(ys, w) {
+  const step = w / (ys.length - 1)
+  return ys.map((y, i) => `${i ? 'L' : 'M'}${(i * step).toFixed(1)},${y.toFixed(1)}`).join(' ')
+}
+
+function toFill(ys, w, h) {
+  return `${toPath(ys, w)} L${w},${h} L0,${h} Z`
+}
+
+const HOME_W = 304
+const HOME_H = 118
+const homeAll = genSeries(7, 153, 92, -0.38, 3.4, 18, 112)
+const homeEach = {
+  'hm-l-btc': genSeries(11, 153, 82, -0.36, 3.8, 12, 112),
+  'hm-l-eth': genSeries(23, 153, 82, 0.1, 2.8, 12, 112),
+  'hm-l-sam': genSeries(31, 153, 82, -0.14, 2.4, 12, 112)
+}
+
+function initHome() {
+  document.getElementById('hm-fill').setAttribute('d', toFill(homeAll, HOME_W, HOME_H))
+  document.getElementById('hm-line').setAttribute('d', toPath(homeAll, HOME_W))
+  Object.entries(homeEach).forEach(([id, ys]) =>
+    document.getElementById(id).setAttribute('d', toPath(ys, HOME_W)))
+  const yAt = x => homeAll[Math.round(x / 2)]
+  document.getElementById('hm-pt-btc').style.top = yAt(48).toFixed(1) + 'px'
+  document.getElementById('hm-pt-sam').style.top = yAt(144).toFixed(1) + 'px'
+  document.getElementById('hm-pt-eth').style.top = yAt(240).toFixed(1) + 'px'
+}
+
+function setMode(mode) {
+  const each = mode === 'each'
+  document.getElementById('hm-all').style.display = each ? 'none' : ''
+  document.getElementById('hm-each').style.display = each ? '' : 'none'
+  document.getElementById('hm-mkrs').style.display = each ? 'none' : ''
+  document.getElementById('md-all').classList.toggle('on', !each)
+  document.getElementById('md-each').classList.toggle('on', each)
+}
+
+let themeMode = 'slate'
+const darkMq = window.matchMedia('(prefers-color-scheme: dark)')
+
+const THEME_LABELS = { system: '시스템', slate: 'Slate', light: 'Light' }
+
+function applyTheme() {
+  const resolved = themeMode === 'system' ? (darkMq.matches ? 'slate' : 'light') : themeMode
+  document.body.classList.remove('theme-slate', 'theme-light')
+  document.body.classList.add('theme-' + resolved)
+  const marks = { 'th-sys': 'system', 'th-slate': 'slate', 'th-light': 'light' }
+  Object.entries(marks).forEach(([id, mode]) => {
+    document.getElementById(id).classList.toggle('on', mode === themeMode)
+  })
+  document.getElementById('st-sel').textContent = THEME_LABELS[themeMode]
+}
+
+let openMenu = null
+
+function closeMenu() {
+  if (openMenu) {
+    openMenu.remove()
+    openMenu = null
+  }
+}
+
+function showSelect(el, options, onPick) {
+  closeMenu()
+  const current = el.querySelector('b').textContent
+  const menu = document.createElement('div')
+  menu.className = 'menu'
+  options.forEach(opt => {
+    const row = document.createElement('div')
+    row.innerHTML = `<i>${opt === current ? '✓' : ''}</i>${opt}`
+    row.onclick = e => {
+      e.stopPropagation()
+      onPick(opt)
+      closeMenu()
+    }
+    menu.appendChild(row)
+  })
+  const mock = el.closest('.mock')
+  const mockRect = mock.getBoundingClientRect()
+  const elRect = el.getBoundingClientRect()
+  const estHeight = options.length * 27 + 10
+  if (elRect.bottom - mockRect.top + estHeight + 8 > mockRect.height) {
+    menu.style.bottom = (mockRect.bottom - elRect.top + 4) + 'px'
+  } else {
+    menu.style.top = (elRect.bottom - mockRect.top + 4) + 'px'
+  }
+  menu.style.right = (mockRect.right - elRect.right) + 'px'
+  mock.appendChild(menu)
+  openMenu = menu
+}
+
+function pickSel(el, options) {
+  showSelect(el, options, v => { el.querySelector('b').textContent = v })
+}
+
+function pickTheme(el) {
+  showSelect(el, ['시스템', 'Slate', 'Light'], v => {
+    setThemeMode({ '시스템': 'system', 'Slate': 'slate', 'Light': 'light' }[v])
+  })
+}
+
+document.addEventListener('click', e => {
+  if (openMenu && !e.target.closest('.menu') && !e.target.closest('.sel')) closeMenu()
+})
+
+function setThemeMode(mode) {
+  themeMode = mode
+  applyTheme()
+}
+
+darkMq.addEventListener('change', () => { if (themeMode === 'system') applyTheme() })
+
+function togglePrivacy() {
+  document.body.classList.toggle('privacy')
+}
+
+function openSettings() {
+  document.getElementById('scr-home').classList.remove('on')
+  document.getElementById('scr-detail').classList.remove('on')
+  document.getElementById('scr-settings').classList.add('on')
+}
+
+function closeSettings() {
+  document.getElementById('scr-settings').classList.remove('on')
+  document.getElementById('scr-home').classList.add('on')
+}
+
+function edgeClass(x) {
+  if (x < 80) return ' el'
+  if (x > 280) return ' er'
+  return ''
+}
+
+function markerHtml(m) {
+  const colorVar = m.s === 'S' ? 'var(--red)' : 'var(--green)'
+  return `<div class="mkr" style="--c:${colorVar};left:${m.x - 8}px">
+    <div class="pt" style="top:${m.y}px">${m.s}<div class="tt${edgeClass(m.x)}"><div class="t1">${m.t1}</div><div class="t2">${m.t2}</div></div></div>
+    <div class="guide"></div>
+  </div>`
+}
+
+function tradeHtml(t) {
+  const chip = t.side === 's' ? '<span class="tchip s">매도</span>' : '<span class="tchip b">매수</span>'
+  const cls = t.up ? 'up' : 'down'
+  return `<div class="row" style="padding:8px 16px">${chip}
+    <div class="meta"><div class="nm" style="font-size:12.5px">${t.l}</div><div class="sub" style="font-size:10px">${t.sub}</div></div>
+    <div class="right"><div class="val ${cls}" style="font-size:12px">${t.r}</div><div class="sub" style="font-size:10px">${t.rs}</div></div>
+  </div>`
+}
+
+function openDetail(key) {
+  const a = ASSETS[key]
+  document.getElementById('d-name').textContent = a.name
+  document.getElementById('d-price').textContent = a.price
+  const chg = document.getElementById('d-chg')
+  chg.textContent = a.chg
+  chg.className = 'bdg ' + (a.chgUp ? 'up' : 'down')
+  document.getElementById('d-vsavg').textContent = a.vsAvg
+  const ys = genSeries(a.seed, 181, a.start, a.drift, a.vol, 18, 170)
+  const line = document.getElementById('d-line')
+  line.setAttribute('d', toPath(ys, 360))
+  line.style.stroke = a.colorVar
+  const fill = document.getElementById('d-fill')
+  fill.setAttribute('d', toFill(ys, 360, 180))
+  fill.setAttribute('fill', a.fill)
+  const marks = a.markers.map(m => ({ ...m, y: ys[Math.round(m.x / 2)] }))
+  const buys = marks.filter(m => m.s === 'B')
+  const avgY = buys.reduce((sum, m) => sum + m.y, 0) / buys.length
+  const avg = document.getElementById('d-avg')
+  avg.setAttribute('y1', avgY.toFixed(1))
+  avg.setAttribute('y2', avgY.toFixed(1))
+  const avgt = document.getElementById('d-avgt')
+  avgt.setAttribute('y', (avgY - 4).toFixed(1))
+  avgt.textContent = a.avgLabel
+  a.yl.forEach((t, i) => { document.getElementById('d-y' + i).textContent = t })
+  document.getElementById('d-dots').innerHTML = marks.map(markerHtml).join('')
+  document.getElementById('d-trades').innerHTML = a.trades.map(tradeHtml).join('')
+  document.getElementById('d-count').textContent = a.count
+  document.getElementById('scr-home').classList.remove('on')
+  document.getElementById('scr-detail').classList.add('on')
+}
+
+function goHome() {
+  document.getElementById('scr-detail').classList.remove('on')
+  document.getElementById('scr-home').classList.add('on')
+}
+
+initHome()
+</script>
+</body>
+</html>
