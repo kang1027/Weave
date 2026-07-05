@@ -54,6 +54,8 @@ final class AppModel: ObservableObject {
     private var refreshTask: Task<Void, Never>?
     private var rotationTask: Task<Void, Never>?
     private var searchTask: Task<Void, Never>?
+    private var hasStartedBackgroundWork = false
+    var lastRefreshAt: Date?
     var rotationIndex = 0
 
     init(
@@ -201,9 +203,29 @@ final class AppModel: ObservableObject {
 
     // MARK: - 주기 작업 (시세 폴링 · 메뉴바 로테이션)
 
+    /// 팝오버가 열릴 때마다 불리지만 실제 시작은 최초 1회.
+    /// 이후 열림에서는 60초 이상 지난 시세만 즉시 갱신.
     func startBackgroundWork() {
+        guard !hasStartedBackgroundWork else {
+            refreshIfStale()
+            return
+        }
+        hasStartedBackgroundWork = true
         restartRefreshLoop()
         restartRotationLoop()
+        applyHotkey()
+        // 번들 밖에서 바뀌었을 수 있는 자동 시작 상태 동기화.
+        if LaunchAtLogin.isSupported {
+            document.settings.launchAtLogin = LaunchAtLogin.isEnabled
+        }
+        updater.setAutomaticChecks(settings.autoUpdateCheck)
+    }
+
+    func refreshIfStale() {
+        guard let lastRefreshAt else { return }
+        if Date().timeIntervalSince(lastRefreshAt) > 60 {
+            restartRefreshLoop()
+        }
     }
 
     func restartRefreshLoop() {
@@ -211,6 +233,7 @@ final class AppModel: ObservableObject {
         refreshTask = Task { [weak self] in
             while let self, !Task.isCancelled {
                 await self.refreshQuotes()
+                self.lastRefreshAt = Date()
                 let interval = max(60, min(900, self.settings.quoteRefreshSeconds))
                 self.nextRefreshAt = Date().addingTimeInterval(TimeInterval(interval))
                 try? await Task.sleep(for: .seconds(interval))

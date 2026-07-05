@@ -20,7 +20,7 @@ struct RingsRow: View {
                 size: 64,
                 centerText: MoneyFormatter.percent(portfolio.dayChangePercent, fractionDigits: 1),
                 centerColor: theme.upDown(portfolio.dayChangePercent >= 0),
-                caption: model.t("Day")
+                caption: "Day"
             )
 
             RingGauge(
@@ -34,7 +34,7 @@ struct RingsRow: View {
                 size: 96,
                 centerText: MoneyFormatter.percent(portfolio.totalReturnPercent, fractionDigits: 1),
                 centerColor: theme.upDown(portfolio.totalReturnPercent >= 0),
-                caption: model.t("Return")
+                caption: "Return"
             )
 
             RingGauge(
@@ -42,7 +42,7 @@ struct RingsRow: View {
                 size: 64,
                 centerText: "\(portfolio.assetCount)",
                 centerColor: nil,
-                caption: model.t("Assets")
+                caption: "Assets"
             )
         }
         .frame(maxWidth: .infinity)
