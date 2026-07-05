@@ -4,13 +4,16 @@ import WeaveCore
 @main
 struct WeaveApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @StateObject private var model = AppModel.live()
 
     var body: some Scene {
         MenuBarExtra {
             RootView()
+                .environmentObject(model)
                 .frame(width: 360, height: 720)
         } label: {
-            Text(WeaveInfo.appName)
+            Text(model.menuBarTitle)
+                .monospacedDigit()
         }
         .menuBarExtraStyle(.window)
     }
