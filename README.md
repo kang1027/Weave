@@ -13,9 +13,10 @@ macOS 메뉴바 포트폴리오 트래커.
 ## 개발
 
 ```sh
-swift run Weave        # 개발 실행
-swift test             # 단위 테스트
-scripts/bundle.sh      # Weave.app 번들 생성
+scripts/fetch-sparkle.sh  # 최초 1회 — Sparkle 벤더링
+swift run Weave           # 개발 실행
+swift test                # 단위 테스트
+scripts/bundle.sh         # Weave.app 번들 생성
 ```
 
 문서: [기능 명세](docs/FEATURES.md) · [동작 플로우](docs/FLOWS.md)

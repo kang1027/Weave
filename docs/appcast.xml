@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- GitHub Pages(https://kang1027.github.io/Weave/appcast.xml)로 서빙되는 Sparkle 피드.
+     릴리즈마다 item을 추가한다. edSignature는 scripts/release.sh의 sign_update 출력. -->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Weave</title>
+    <link>https://kang1027.github.io/Weave/appcast.xml</link>
+    <language>ko</language>
+    <!--
+    <item>
+      <title>0.1.0</title>
+      <pubDate>Sun, 05 Jul 2026 12:00:00 +0900</pubDate>
+      <sparkle:version>0.1.0</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <link>https://github.com/kang1027/Weave/releases/tag/v0.1.0</link>
+      <enclosure
+        url="https://github.com/kang1027/Weave/releases/download/v0.1.0/Weave-0.1.0.zip"
+        sparkle:edSignature="REPLACE_WITH_SIGN_UPDATE_OUTPUT"
+        length="REPLACE_WITH_ZIP_BYTES"
+        type="application/octet-stream"/>
+    </item>
+    -->
+  </channel>
+</rss>

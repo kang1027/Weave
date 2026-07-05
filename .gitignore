@@ -4,3 +4,5 @@
 dist/
 *.xcodeproj
 xcuserdata/
+Vendor/Sparkle/Sparkle.xcframework/
+Vendor/Sparkle/bin/

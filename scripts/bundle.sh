@@ -1,0 +1,49 @@
+#!/bin/bash
+# Weave.app 번들 생성 — swift build(release) 결과물 + Info.plist + Sparkle.framework.
+# 사용: scripts/bundle.sh
+# 산출: dist/Weave.app
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+VERSION=$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' Sources/WeaveCore/WeaveInfo.swift)
+ED_KEY="${SPARKLE_ED_PUBLIC_KEY:-__SPARKLE_ED_PUBLIC_KEY__}"
+
+echo "▸ swift build -c release (Weave ${VERSION})"
+swift build -c release
+BIN_DIR=$(swift build -c release --show-bin-path)
+
+APP="dist/Weave.app"
+rm -rf dist
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
+
+echo "▸ 실행 파일/리소스 복사"
+cp "$BIN_DIR/Weave" "$APP/Contents/MacOS/Weave"
+# SwiftPM 리소스 번들(String Catalog 등) — Bundle.module이 Resources에서 찾는다.
+if [ -d "$BIN_DIR/Weave_Weave.bundle" ]; then
+  cp -R "$BIN_DIR/Weave_Weave.bundle" "$APP/Contents/Resources/"
+fi
+
+echo "▸ Sparkle.framework 복사"
+SPARKLE_FRAMEWORK=""
+for candidate in \
+  "$BIN_DIR/Sparkle.framework" \
+  "Vendor/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"; do
+  if [ -d "$candidate" ]; then SPARKLE_FRAMEWORK="$candidate"; break; fi
+done
+if [ -z "$SPARKLE_FRAMEWORK" ]; then
+  SPARKLE_FRAMEWORK=$(find .build/artifacts Vendor -name "Sparkle.framework" 2>/dev/null | head -1)
+fi
+if [ -n "$SPARKLE_FRAMEWORK" ]; then
+  cp -R "$SPARKLE_FRAMEWORK" "$APP/Contents/Frameworks/"
+  install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/Weave" 2>/dev/null || true
+else
+  echo "  ⚠ Sparkle.framework를 찾지 못함 — 업데이트 기능 없이 번들됨"
+fi
+
+echo "▸ Info.plist 생성"
+sed -e "s/__VERSION__/${VERSION}/g" \
+    -e "s/__SPARKLE_ED_PUBLIC_KEY__/${ED_KEY}/g" \
+    scripts/Info.plist.template > "$APP/Contents/Info.plist"
+
+echo "✓ dist/Weave.app (${VERSION})"
+echo "  서명/공증/릴리즈는 scripts/release.sh 참고"

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Weave</string>
+    <key>CFBundleDisplayName</key>
+    <string>Weave</string>
+    <key>CFBundleIdentifier</key>
+    <string>app.weave</string>
+    <key>CFBundleExecutable</key>
+    <string>Weave</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>__VERSION__</string>
+    <key>CFBundleVersion</key>
+    <string>__VERSION__</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>© 2026 Weave</string>
+    <key>SUFeedURL</key>
+    <string>https://kang1027.github.io/Weave/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>__SPARKLE_ED_PUBLIC_KEY__</string>
+    <key>SUEnableInstallerLauncherService</key>
+    <false/>
+</dict>
+</plist>

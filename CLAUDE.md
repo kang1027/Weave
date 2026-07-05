@@ -19,11 +19,16 @@ macOS 메뉴바 포트폴리오 트래커. 메뉴바에 핀 자산 시세를 상
 ## 빌드 & 테스트
 
 ```sh
-swift build            # 컴파일 확인
-swift test             # WeaveCore 단위 테스트
-swift run Weave        # 개발 실행 (메뉴바 앱)
-scripts/bundle.sh      # Weave.app 번들 생성
+scripts/fetch-sparkle.sh  # 최초 1회 — Sparkle xcframework 벤더링
+swift build               # 컴파일 확인
+swift test                # WeaveCore 단위 테스트
+swift run Weave           # 개발 실행 (메뉴바 앱)
+scripts/bundle.sh         # Weave.app 번들 생성
+scripts/release.sh        # 서명·공증·zip·EdDSA 서명 (SIGN_IDENTITY 필요)
 ```
+
+Sparkle은 `Vendor/Sparkle` 로컬 패키지로 참조한다(SwiftPM 원격 binaryTarget
+다운로드가 막힌 환경 대응). xcframework 바이너리는 git에 커밋하지 않는다.
 
 ## 컨벤션
 
