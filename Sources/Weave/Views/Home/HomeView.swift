@@ -1,51 +1,100 @@
 import SwiftUI
 import WeaveCore
 
-// M3에서 링/차트/리스트로 채워지는 홈 — M2 시점엔 자산 리스트 + footer만.
+/// 홈 — 헤더 · 링 3개 · 총액 · Value History · Assets 리스트 · footer.
 struct HomeView: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                IconButton(systemName: "arrow.clockwise") {
-                    model.manualRefresh()
-                }
-                Spacer()
-                Text(verbatim: "Weave")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(theme.text)
-                Spacer()
-                HStack(spacing: 6) {
-                    IconButton(
-                        systemName: model.settings.privacyMode ? "eye.slash" : "eye",
-                        isActive: model.settings.privacyMode
-                    ) {
-                        model.settings.privacyMode.toggle()
-                        model.updateMenuBarTitle()
-                    }
-                    IconButton(systemName: "gearshape") {
-                        model.push(.settings)
-                    }
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 14)
-            .padding(.bottom, 8)
+        let (perAsset, portfolio) = model.computed
 
-            CapsHeader(text: model.t("Assets"))
+        VStack(spacing: 0) {
+            header
+
             ScrollView {
                 VStack(spacing: 0) {
-                    ForEach(model.computed.perAsset) { metric in
-                        AssetListRow(metric: metric)
+                    RingsRow(portfolio: portfolio)
+                    totalSection(portfolio)
+                    CapsHeader(text: model.t("Value History"))
+                    ValueHistoryChart()
+                    CapsHeader(text: model.t("Assets"))
+                    VStack(spacing: 0) {
+                        ForEach(perAsset) { metric in
+                            AssetListRow(metric: metric)
+                        }
                     }
                 }
+                .padding(.bottom, 8)
             }
 
-            Spacer(minLength: 0)
             HomeFooter()
         }
+        .task {
+            if model.homeSeries.isEmpty {
+                await model.loadHomeChart()
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack {
+            IconButton(systemName: "arrow.clockwise") {
+                model.manualRefresh()
+            }
+            .help(model.t("Refresh now"))
+            Spacer()
+            Text(verbatim: "Weave")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(theme.text)
+            Spacer()
+            HStack(spacing: 6) {
+                IconButton(
+                    systemName: model.settings.privacyMode ? "eye.slash" : "eye",
+                    isActive: model.settings.privacyMode
+                ) {
+                    model.settings.privacyMode.toggle()
+                    model.updateMenuBarTitle()
+                }
+                .help(model.t("Privacy mode"))
+                IconButton(systemName: "gearshape") {
+                    model.push(.settings)
+                }
+                .help(model.t("Settings"))
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 14)
+        .padding(.bottom, 8)
+    }
+
+    private func totalSection(_ portfolio: PortfolioMetrics) -> some View {
+        VStack(spacing: 8) {
+            Text(
+                model.settings.privacyMode
+                    ? MoneyFormatter.masked
+                    : MoneyFormatter.price(
+                        portfolio.totalValueBase.rounded(scale: 0),
+                        currency: model.settings.baseCurrency
+                    )
+            )
+            .font(.system(size: 26, weight: .bold))
+            .monospacedDigit()
+            .kerning(-0.3)
+            .foregroundStyle(theme.text)
+
+            ChangeBadge(
+                text: badgeText(portfolio.dayChangePercent),
+                style: portfolio.dayChangePercent >= 0 ? .up : .down
+            )
+        }
+        .padding(.top, 12)
+        .padding(.bottom, 2)
+    }
+
+    private func badgeText(_ percent: Decimal) -> String {
+        let arrow = percent >= 0 ? "▲ " : "▼ "
+        return arrow + MoneyFormatter.percent(abs(percent)).dropFirst()
     }
 }
 
@@ -61,10 +110,23 @@ struct AssetListRow: View {
             HStack(spacing: 10) {
                 AssetLogoView(asset: metric.asset)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(metric.asset.name)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(theme.text)
-                        .lineLimit(1)
+                    HStack(spacing: 5) {
+                        Text(metric.asset.name)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(theme.text)
+                            .lineLimit(1)
+                        if metric.asset.isPinned {
+                            Image(systemName: "pin.fill")
+                                .font(.system(size: 8))
+                                .foregroundStyle(theme.text2)
+                        }
+                        if model.staleAssetIDs.contains(metric.asset.id) {
+                            Image(systemName: "wifi.slash")
+                                .font(.system(size: 8))
+                                .foregroundStyle(theme.orange)
+                                .help(model.t("Quote unavailable — showing last value"))
+                        }
+                    }
                     Text(subtitle)
                         .font(.system(size: 11))
                         .foregroundStyle(theme.text2)
@@ -76,7 +138,6 @@ struct AssetListRow: View {
                         .font(.system(size: 13, weight: .semibold))
                         .monospacedDigit()
                         .foregroundStyle(theme.text)
-                        .privacySensitive(model.settings.privacyMode)
                     changeBadge
                 }
             }
