@@ -1,0 +1,237 @@
+import Foundation
+import OSLog
+import SwiftUI
+import WeaveCore
+
+/// 팝오버 내 화면 스택 — 마지막 요소가 현재 화면, 비어 있으면 홈.
+enum Route: Hashable {
+    case manage
+    case detail(UUID)
+    case settings
+    case tradeForm(assetID: UUID, editing: Trade?)
+    case manualAssetForm
+}
+
+@MainActor
+final class AppModel: ObservableObject {
+    @Published var document: PortfolioDocument
+    @Published var quotes: [UUID: Quote] = [:]
+    @Published var fxRates: [String: Decimal] = [:]
+    /// 최근 갱신 라운드에서 시세를 못 받은 자산 — stale 표시용.
+    @Published var staleAssetIDs: Set<UUID> = []
+    @Published var route: [Route] = []
+    @Published var menuBarTitle: String = MenuBarTitleBuilder.placeholder
+    @Published var nextRefreshAt: Date?
+
+    // 검색 (자산 관리 화면)
+    @Published var searchQuery = "" {
+        didSet { scheduleSearch() }
+    }
+    @Published var searchResults: [SearchResult] = []
+    @Published var isSearching = false
+
+    // 홈 차트 상태
+    @Published var homeChartMode: HomeChartMode = .combined
+    @Published var homeChartPeriod: ChartPeriod = .threeMonths
+    @Published var homeSeries: [ValuePoint] = []
+    @Published var homeAssetSeries: [AssetLineSeries] = []
+    @Published var homeBuyMarkers: [BuyMarker] = []
+    @Published var isHomeChartLoading = false
+
+    // 상세 차트 상태
+    @Published var detailPeriod: ChartPeriod = .sixMonths
+    @Published var detailCandles: [Candle] = []
+    @Published var isDetailChartLoading = false
+
+    let store: any PortfolioStore
+    let quoteService: QuoteService
+    let candleService: CandleService
+    let fxService: FXService
+    let searchService: SearchService
+    let updater: UpdaterHandle
+
+    private let logger = Logger(subsystem: "app.weave", category: "AppModel")
+    private var refreshTask: Task<Void, Never>?
+    private var rotationTask: Task<Void, Never>?
+    private var searchTask: Task<Void, Never>?
+    var rotationIndex = 0
+
+    init(
+        store: any PortfolioStore,
+        quoteService: QuoteService,
+        candleService: CandleService,
+        fxService: FXService,
+        searchService: SearchService,
+        updater: UpdaterHandle = UpdaterHandle()
+    ) {
+        self.store = store
+        self.quoteService = quoteService
+        self.candleService = candleService
+        self.fxService = fxService
+        self.searchService = searchService
+        self.updater = updater
+        do {
+            self.document = try store.load()
+        } catch {
+            Logger(subsystem: "app.weave", category: "AppModel")
+                .error("포트폴리오 로드 실패: \(error.localizedDescription)")
+            self.document = .empty
+        }
+    }
+
+    /// 프로덕션 조립 — 스토어/캐시 경로 실패 시 임시 디렉토리 폴백.
+    static func live() -> AppModel {
+        let http = URLSessionHTTPClient()
+        let cacheDir = (try? CandleService.liveCacheDirectory())
+            ?? FileManager.default.temporaryDirectory.appendingPathComponent("WeaveCache")
+        let binance = BinanceProvider(http: http, cacheDirectory: cacheDir)
+        let naver = NaverProvider(http: http)
+        let yahoo = YahooProvider(http: http)
+        let providers: [any MarketDataProvider] = [binance, naver, yahoo]
+        let store: any PortfolioStore = (try? JSONPortfolioStore.live())
+            ?? JSONPortfolioStore(
+                fileURL: FileManager.default.temporaryDirectory
+                    .appendingPathComponent("Weave/portfolio.json")
+            )
+        return AppModel(
+            store: store,
+            quoteService: QuoteService(providers: providers),
+            candleService: CandleService(providers: providers, cacheDirectory: cacheDir),
+            fxService: FXService(yahoo: yahoo),
+            searchService: SearchService(providers: providers)
+        )
+    }
+
+    // MARK: - 파생 상태
+
+    var settings: AppSettings {
+        get { document.settings }
+        set {
+            document.settings = newValue
+            persist()
+        }
+    }
+
+    var visibleAssets: [Asset] { document.assets.filter { !$0.isHidden } }
+
+    var computed: (perAsset: [AssetMetrics], portfolio: PortfolioMetrics) {
+        PortfolioCalculator.compute(
+            assets: document.assets,
+            trades: document.trades,
+            quotes: quotes,
+            fxRates: fxRates,
+            baseCurrency: settings.baseCurrency
+        )
+    }
+
+    func asset(id: UUID) -> Asset? {
+        document.assets.first { $0.id == id }
+    }
+
+    func metrics(id: UUID) -> AssetMetrics? {
+        computed.perAsset.first { $0.id == id }
+    }
+
+    // MARK: - 라우팅
+
+    var currentRoute: Route? { route.last }
+
+    func push(_ newRoute: Route) {
+        route.append(newRoute)
+    }
+
+    func pop() {
+        _ = route.popLast()
+    }
+
+    func popToHome() {
+        route = []
+    }
+
+    // MARK: - 저장
+
+    func persist() {
+        do {
+            try store.save(document)
+        } catch {
+            logger.error("포트폴리오 저장 실패: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - 다국어
+
+    func t(_ key: String.LocalizationValue) -> String {
+        String(localized: key, bundle: L10n.bundle(for: settings.language))
+    }
+
+    var locale: Locale {
+        L10n.locale(for: settings.language)
+    }
+
+    // MARK: - 테마
+
+    func theme(systemScheme: ColorScheme) -> Theme {
+        switch settings.theme {
+        case .system: return systemScheme == .dark ? .slate : .light
+        case .slate: return .slate
+        case .light: return .light
+        }
+    }
+
+    // MARK: - 검색 디바운스
+
+    private func scheduleSearch() {
+        searchTask?.cancel()
+        let query = searchQuery
+        guard query.trimmingCharacters(in: .whitespaces).count >= 2 else {
+            searchResults = []
+            isSearching = false
+            return
+        }
+        isSearching = true
+        searchTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled, let self else { return }
+            let results = await self.searchService.search(query: query)
+            guard !Task.isCancelled, self.searchQuery == query else { return }
+            self.searchResults = results
+            self.isSearching = false
+        }
+    }
+
+    // MARK: - 주기 작업 (시세 폴링 · 메뉴바 로테이션)
+
+    func startBackgroundWork() {
+        restartRefreshLoop()
+        restartRotationLoop()
+    }
+
+    func restartRefreshLoop() {
+        refreshTask?.cancel()
+        refreshTask = Task { [weak self] in
+            while let self, !Task.isCancelled {
+                await self.refreshQuotes()
+                let interval = max(60, min(900, self.settings.quoteRefreshSeconds))
+                self.nextRefreshAt = Date().addingTimeInterval(TimeInterval(interval))
+                try? await Task.sleep(for: .seconds(interval))
+            }
+        }
+    }
+
+    func restartRotationLoop() {
+        rotationTask?.cancel()
+        rotationTask = Task { [weak self] in
+            while let self, !Task.isCancelled {
+                self.updateMenuBarTitle()
+                let interval = self.settings.rotationSeconds
+                if interval <= 0 {
+                    // 로테이션 끔 — 타이틀만 갱신 주기로 유지.
+                    try? await Task.sleep(for: .seconds(30))
+                } else {
+                    try? await Task.sleep(for: .seconds(interval))
+                    self.rotationIndex += 1
+                }
+            }
+        }
+    }
+}
