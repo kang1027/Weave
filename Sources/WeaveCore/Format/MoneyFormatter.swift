@@ -67,7 +67,7 @@ public enum MoneyFormatter {
     public static let masked = "•••••"
 
     /// 숫자 입력 필드용 라이브 포맷 — 숫자·소수점만 남기고 정수부에 천단위 콤마.
-    /// 입력 중인 소수점("123.", "0.0500")은 그대로 보존한다. 멱등.
+    /// 소수부는 1 이상 값이면 2자리, 1 미만(소수 코인 수량)이면 8자리까지. 멱등.
     public static func groupedInputText(_ raw: String) -> String {
         var cleaned = raw.filter { "0123456789.".contains($0) }
         // 소수점은 첫 번째 것만 유지.
@@ -78,11 +78,18 @@ public enum MoneyFormatter {
         }
         guard !cleaned.isEmpty else { return "" }
         let parts = cleaned.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
-        let grouped = groupDigits(String(parts.first ?? ""))
+        let intPart = String(parts.first ?? "")
+        let grouped = groupDigits(intPart)
         if parts.count > 1 {
-            return grouped + "." + parts[1]
+            let maxFraction = maxFractionDigits(integerPart: intPart)
+            return grouped + "." + parts[1].prefix(maxFraction)
         }
         return grouped
+    }
+
+    /// 1 이상이면 소수 2자리로 충분, 1 미만이면 소수 코인 수량을 위해 8자리.
+    private static func maxFractionDigits(integerPart: String) -> Int {
+        integerPart.contains(where: { $0 != "0" }) ? 2 : 8
     }
 
     private static func groupDigits(_ digits: String) -> String {

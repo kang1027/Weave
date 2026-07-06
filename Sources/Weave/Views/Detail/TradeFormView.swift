@@ -220,10 +220,12 @@ struct TradeFormView: View {
                     if pendingProgrammatic.remove(field) != nil { return }
                     // 숫자·소수점만 허용 + 천단위 콤마 자동.
                     var formatted = MoneyFormatter.groupedInputText(newValue)
-                    // 매도 수량이 보유 최대치를 넘으면 최대치로 자동 클램프.
+                    // 매도 수량이 보유 최대치를 넘으면 최대치로 자동 클램프(내림 절삭).
                     if side == .sell, field == .quantity,
                        let entered = Decimal.clean(formatted), entered > availableQuantity {
-                        formatted = MoneyFormatter.quantity(availableQuantity)
+                        formatted = MoneyFormatter.groupedInputText(
+                            MoneyFormatter.quantity(availableQuantity)
+                        )
                     }
                     if formatted != newValue {
                         setFieldText(field, formatted)
@@ -272,15 +274,16 @@ struct TradeFormView: View {
         }
     }
 
-    /// 필드 표시용 숫자 — 천단위 콤마 포함.
+    /// 필드 표시용 숫자 — 천단위 콤마 + 소수 자리 규칙(1 이상 2자리, 미만 8자리).
     private func plainNumber(_ value: Decimal) -> String {
-        MoneyFormatter.quantity(value)
+        MoneyFormatter.quantity(TradeFormCalculator.smartRounded(value))
     }
 
     /// 매도로 전환/날짜 변경 등으로 보유 가능 수량이 줄었을 때 수량을 최대치로 맞춘다.
     private func clampSellQuantity() {
         guard side == .sell, let entered = quantity, entered > availableQuantity else { return }
-        setFieldText(.quantity, MoneyFormatter.quantity(availableQuantity))
+        // 내림 절삭(groupedInputText) — 반올림으로 보유량을 넘기지 않게.
+        setFieldText(.quantity, MoneyFormatter.groupedInputText(MoneyFormatter.quantity(availableQuantity)))
         autofill(edited: .quantity)
     }
 

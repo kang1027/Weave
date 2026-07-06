@@ -138,6 +138,12 @@ import Testing
         #expect(MoneyFormatter.groupedInputText("1.2.3") == "1.23")       // 소수점 하나만
         #expect(MoneyFormatter.groupedInputText("abc12x3") == "123")      // 숫자만
         #expect(MoneyFormatter.groupedInputText("") == "")
+        // 소수 자리: 1 이상은 2자리 절삭, 1 미만은 8자리 허용.
+        #expect(MoneyFormatter.groupedInputText("427.27740075") == "427.27")
+        #expect(MoneyFormatter.groupedInputText("50000.00000011") == "50,000.00")
+        #expect(MoneyFormatter.groupedInputText("0.00054321") == "0.00054321")
+        #expect(TradeFormCalculator.smartRounded(Decimal(string: "117.01999664")!) == Decimal(string: "117.02"))
+        #expect(TradeFormCalculator.smartRounded(Decimal(string: "0.00543219")!) == Decimal(string: "0.00543219"))
         // 멱등 — 재적용해도 동일.
         let once = MoneyFormatter.groupedInputText("1234567.89")
         #expect(MoneyFormatter.groupedInputText(once) == once)

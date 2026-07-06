@@ -27,24 +27,30 @@ public enum TradeFormCalculator {
         switch edited {
         case .quantity:
             if let q = values.quantity, let p = values.price {
-                result.amount = (q * p).rounded(scale: 8)
+                result.amount = smartRounded(q * p)
             } else if let q = values.quantity, let a = values.amount, q > 0 {
-                result.price = (a / q).rounded(scale: 8)
+                result.price = smartRounded(a / q)
             }
         case .price:
             if let p = values.price, let q = values.quantity {
-                result.amount = (p * q).rounded(scale: 8)
+                result.amount = smartRounded(p * q)
             } else if let p = values.price, let a = values.amount, p > 0 {
-                result.quantity = (a / p).rounded(scale: 8)
+                result.quantity = smartRounded(a / p)
             }
         case .amount:
             if let a = values.amount, let p = values.price, p > 0 {
-                result.quantity = (a / p).rounded(scale: 8)
+                result.quantity = smartRounded(a / p)
             } else if let a = values.amount, let q = values.quantity, q > 0 {
-                result.price = (a / q).rounded(scale: 8)
+                result.price = smartRounded(a / q)
             }
         }
         return result
+    }
+
+    /// 파생값 반올림 — 1 이상은 소수 2자리(437.27740075 같은 노이즈 방지),
+    /// 1 미만은 소수 코인 수량을 위해 8자리 유지.
+    public static func smartRounded(_ value: Decimal) -> Decimal {
+        abs(value) >= 1 ? value.rounded(scale: 2) : value.rounded(scale: 8)
     }
 
     /// 매도 검증 — 보유 수량 초과 불가.
