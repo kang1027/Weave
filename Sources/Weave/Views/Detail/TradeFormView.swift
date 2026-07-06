@@ -1,12 +1,15 @@
+import Charts
 import SwiftUI
 import WeaveCore
 
-/// 거래 입력 — 수량/단가/총액 2개 입력 시 자동 계산, 과거 날짜 종가 프리필, 매도 검증.
+/// 거래 입력 — 차트에서 지점 선택(클릭) 시 날짜/단가 매핑,
+/// 수량/단가/총액 2개 입력 시 자동 계산, 과거 날짜 종가 프리필, 매도 검증.
 struct TradeFormView: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
     let assetID: UUID
     let editing: Trade?
+    let prefill: TradePrefill?
 
     @State private var side: TradeSide = .buy
     @State private var quantityText = ""
@@ -17,6 +20,9 @@ struct TradeFormView: View {
     @State private var error: AppModel.TradeError?
     @State private var isPrefilling = false
     @State private var prefillTask: Task<Void, Never>?
+    @State private var showDatePicker = false
+    /// 차트 선택/프리필로 날짜를 바꿀 때 종가 프리필이 단가를 덮지 않게 하는 가드.
+    @State private var suppressDatePrefill = false
     /// 프로그램이 방금 써넣은 필드 — 그 필드의 onChange는 자동 계산을 다시 돌리지 않는다.
     /// (SwiftUI onChange는 다음 업데이트 패스에 발화하므로 Bool 가드로는 못 막는다.)
     @State private var pendingProgrammatic: Set<TradeFormCalculator.Field> = []
@@ -57,6 +63,17 @@ struct TradeFormView: View {
 
             ScrollView {
                 VStack(spacing: 10) {
+                    // 차트에서 지점을 클릭하면 날짜·단가가 아래 폼에 채워진다.
+                    if let asset, model.detailChartAssetID == assetID, !model.detailCandles.isEmpty {
+                        TradePickerChart(
+                            asset: asset,
+                            selectedDate: date,
+                            selectedPrice: price
+                        ) { candle in
+                            applyChartSelection(candle)
+                        }
+                    }
+
                     SegmentedPills(
                         options: [(TradeSide.buy, model.t("Buy")), (TradeSide.sell, model.t("Sell"))],
                         selection: $side
@@ -74,23 +91,7 @@ struct TradeFormView: View {
                             divider
                             numberRow(label: model.t("Total"), text: $amountText, field: .amount)
                             divider
-                            HStack {
-                                Text(model.t("Date"))
-                                    .font(.system(size: 12.5, weight: .semibold))
-                                    .foregroundStyle(theme.text)
-                                Spacer()
-                                DatePicker(
-                                    "", selection: $date,
-                                    in: ...Date(),
-                                    displayedComponents: .date
-                                )
-                                .datePickerStyle(.compact)
-                                .labelsHidden()
-                                if isPrefilling {
-                                    ProgressView().controlSize(.mini)
-                                }
-                            }
-                            .padding(.vertical, 6)
+                            dateRow
                             divider
                             HStack {
                                 Text(model.t("Note"))
@@ -125,10 +126,14 @@ struct TradeFormView: View {
                 .padding(.top, 4)
             }
         }
-        .onAppear(perform: prefillFromEditing)
+        .onAppear(perform: applyInitialValues)
         .onDisappear { prefillTask?.cancel() }
         .onChange(of: date) { _, newDate in
             error = nil
+            if suppressDatePrefill {
+                suppressDatePrefill = false
+                return
+            }
             // 편집 로드로 세팅된 날짜(원래 체결일)는 프리필하지 않는다 — 체결가 보존.
             if let editing, Calendar.current.isDate(newDate, inSameDayAs: editing.date) {
                 return
@@ -141,6 +146,52 @@ struct TradeFormView: View {
     private var divider: some View {
         Divider().overlay(theme.hair)
     }
+
+    // MARK: - 날짜 행 (커스텀 pill + 달력 팝오버)
+
+    private var dateRow: some View {
+        HStack {
+            Text(model.t("Date"))
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(theme.text)
+            Spacer()
+            if isPrefilling {
+                ProgressView().controlSize(.mini)
+            }
+            Button {
+                showDatePicker = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(theme.text2)
+                    Text(date.formatted(.dateTime.year().month().day().locale(model.locale)))
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(theme.text)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(RoundedRectangle(cornerRadius: 7).fill(theme.seg))
+                .contentShape(RoundedRectangle(cornerRadius: 7))
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $showDatePicker, arrowEdge: .bottom) {
+                DatePicker(
+                    "", selection: $date,
+                    in: ...Date(),
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.graphical)
+                .labelsHidden()
+                .padding(10)
+                .frame(width: 240)
+            }
+        }
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - 숫자 입력 행
 
     private func numberRow(
         label: String,
@@ -158,10 +209,15 @@ struct TradeFormView: View {
                 .font(.system(size: 12.5))
                 .monospacedDigit()
                 .frame(maxWidth: 140)
-                .onChange(of: text.wrappedValue) {
+                .onChange(of: text.wrappedValue) { _, newValue in
                     error = nil
                     // 자동 계산이 써넣은 변경이면 여기서 끝 — 사용자 입력만 재계산 트리거.
                     if pendingProgrammatic.remove(field) != nil { return }
+                    // 숫자·소수점·콤마만 허용.
+                    let filtered = newValue.filter { "0123456789.,".contains($0) }
+                    if filtered != newValue {
+                        setFieldText(field, filtered)
+                    }
                     autofill(edited: field)
                 }
         }
@@ -231,14 +287,34 @@ struct TradeFormView: View {
         }
     }
 
-    private func prefillFromEditing() {
-        guard let editing else { return }
-        side = editing.side
-        setFieldText(.quantity, plainNumber(editing.quantity))
-        setFieldText(.price, plainNumber(editing.price))
-        setFieldText(.amount, plainNumber(editing.amount))
-        date = editing.date
-        note = editing.note
+    /// 편집 진입/차트 더블클릭 프리필 초기값 적용.
+    private func applyInitialValues() {
+        if let editing {
+            side = editing.side
+            setFieldText(.quantity, plainNumber(editing.quantity))
+            setFieldText(.price, plainNumber(editing.price))
+            setFieldText(.amount, plainNumber(editing.amount))
+            date = editing.date
+            note = editing.note
+            return
+        }
+        if let prefill {
+            suppressDatePrefill = true
+            date = prefill.date
+            setFieldText(.price, plainNumber(prefill.price))
+            autofill(edited: .price)
+        }
+    }
+
+    /// 차트 지점 클릭 → 날짜·단가 매핑. 수량만 입력하면 되는 상태로.
+    private func applyChartSelection(_ candle: Candle) {
+        prefillTask?.cancel()
+        isPrefilling = false
+        suppressDatePrefill = true
+        date = min(candle.date, Date())
+        setFieldText(.price, plainNumber(candle.close))
+        autofill(edited: .price)
+        error = nil
     }
 
     /// 과거 날짜 선택 → 그날 종가를 단가에 프리필(수정 가능).
@@ -286,6 +362,142 @@ struct TradeFormView: View {
             error = result
         } else {
             model.pop()
+        }
+    }
+}
+
+// MARK: - 지점 선택 차트
+
+/// 거래 폼 상단 미니 차트 — 클릭한 지점의 캔들(날짜·종가)을 폼으로 넘긴다.
+private struct TradePickerChart: View {
+    @Environment(\.theme) private var theme
+    @EnvironmentObject private var model: AppModel
+    let asset: Asset
+    let selectedDate: Date
+    let selectedPrice: Decimal?
+    let onPick: (Candle) -> Void
+
+    @State private var hoveredDate: Date?
+
+    private var candles: [Candle] { model.detailCandles }
+    private var color: Color { theme.paletteColor(asset.colorIndex) }
+
+    private var yDomain: ClosedRange<Double> {
+        let values = candles.map { $0.close.doubleValue }
+        guard let min = values.min(), let max = values.max(), min < max else {
+            let v = values.first ?? 1
+            return (v * 0.9)...(v * 1.1)
+        }
+        let pad = (max - min) * 0.12
+        return (min - pad)...(max + pad)
+    }
+
+    /// 선택된 날짜에 대응하는 캔들(마커 표시용).
+    private var selectedCandle: Candle? {
+        nearestCandle(to: selectedDate)
+    }
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Chart {
+                ForEach(candles, id: \.date) { candle in
+                    LineMark(
+                        x: .value("Date", candle.date),
+                        y: .value("Price", candle.close.doubleValue)
+                    )
+                    .foregroundStyle(color)
+                    .lineStyle(StrokeStyle(lineWidth: 1.8))
+                }
+
+                if let hoveredDate, let candle = nearestCandle(to: hoveredDate) {
+                    RuleMark(x: .value("Date", candle.date))
+                        .foregroundStyle(theme.guide)
+                        .lineStyle(StrokeStyle(lineWidth: 1))
+                }
+
+                if let selected = selectedCandle {
+                    RuleMark(x: .value("Date", selected.date))
+                        .foregroundStyle(color.opacity(0.5))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    PointMark(
+                        x: .value("Date", selected.date),
+                        y: .value("Price", selected.close.doubleValue)
+                    )
+                    .symbolSize(46)
+                    .foregroundStyle(color)
+                }
+            }
+            .chartYScale(domain: yDomain)
+            .chartPlotStyle { $0.clipped() }
+            .chartYAxis {
+                AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
+                    AxisGridLine().foregroundStyle(theme.grid)
+                    AxisValueLabel {
+                        if let doubleValue = value.as(Double.self) {
+                            Text(
+                                MoneyFormatter.compactPrice(
+                                    Decimal.fromDouble(doubleValue), currency: asset.currency
+                                )
+                            )
+                            .font(.system(size: 8.5))
+                            .foregroundStyle(theme.xLabel)
+                        }
+                    }
+                }
+            }
+            .chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+                    AxisValueLabel(
+                        format: .dateTime.month(.defaultDigits).day().locale(model.locale),
+                        anchor: .top
+                    )
+                    .font(.system(size: 8.5))
+                    .foregroundStyle(theme.xLabel)
+                }
+            }
+            .chartOverlay { proxy in
+                GeometryReader { geo in
+                    if let plotAnchor = proxy.plotFrame {
+                        let plot = geo[plotAnchor]
+                        Rectangle()
+                            .fill(.clear)
+                            .contentShape(Rectangle())
+                            .frame(width: plot.width, height: plot.height)
+                            .position(x: plot.midX, y: plot.midY)
+                            .onContinuousHover { phase in
+                                switch phase {
+                                case .active(let point):
+                                    let x = point.x - plot.origin.x
+                                    hoveredDate = proxy.value(atX: x, as: Date.self)
+                                case .ended:
+                                    hoveredDate = nil
+                                }
+                            }
+                            .onTapGesture { location in
+                                let x = location.x - plot.origin.x
+                                guard
+                                    let tapped = proxy.value(atX: x, as: Date.self),
+                                    let candle = nearestCandle(to: tapped)
+                                else {
+                                    return
+                                }
+                                onPick(candle)
+                            }
+                    }
+                }
+            }
+            .frame(height: 120)
+
+            Text(model.t("Tap the chart to fill date & price"))
+                .font(.system(size: 9.5))
+                .foregroundStyle(theme.caps)
+        }
+        .padding(.horizontal, 2)
+    }
+
+    private func nearestCandle(to date: Date) -> Candle? {
+        candles.min {
+            abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
         }
     }
 }

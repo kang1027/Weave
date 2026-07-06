@@ -93,17 +93,16 @@ struct HomeView: View {
     private func totalSection(_ portfolio: PortfolioMetrics) -> some View {
         VStack(spacing: 8) {
             Text(
-                model.settings.privacyMode
-                    ? MoneyFormatter.masked
-                    : MoneyFormatter.price(
-                        portfolio.totalValueBase.rounded(scale: 0),
-                        currency: model.settings.baseCurrency
-                    )
+                MoneyFormatter.price(
+                    portfolio.totalValueBase.rounded(scale: 0),
+                    currency: model.settings.baseCurrency
+                )
             )
             .font(.system(size: 26, weight: .bold))
             .monospacedDigit()
             .kerning(-0.3)
             .foregroundStyle(theme.text)
+            .privacyBlur(model.settings.privacyMode)
 
             ChangeBadge(
                 text: badgeText(portfolio.dayChangePercent),
@@ -161,6 +160,7 @@ struct AssetListRow: View {
                         .font(.system(size: 13, weight: .semibold))
                         .monospacedDigit()
                         .foregroundStyle(theme.text)
+                        .privacyBlur(model.settings.privacyMode)
                     changeBadge
                 }
             }
@@ -193,7 +193,6 @@ struct AssetListRow: View {
     }
 
     private var priceText: String {
-        if model.settings.privacyMode { return MoneyFormatter.masked }
         if metric.asset.isManual {
             return MoneyFormatter.price(metric.value, currency: metric.asset.currency)
         }

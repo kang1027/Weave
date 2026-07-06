@@ -163,6 +163,7 @@ private struct ManagedAssetRow: View {
                     .font(.system(size: 11))
                     .foregroundStyle(theme.text2)
                     .lineLimit(1)
+                    .privacyBlur(model.settings.privacyMode && asset.isManual)
             }
             Spacer(minLength: 6)
 

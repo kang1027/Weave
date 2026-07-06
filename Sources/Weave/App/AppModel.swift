@@ -3,12 +3,18 @@ import OSLog
 import SwiftUI
 import WeaveCore
 
+/// 차트에서 지점을 골라 거래 폼으로 넘길 때의 초기값.
+struct TradePrefill: Hashable {
+    var date: Date
+    var price: Decimal
+}
+
 /// 팝오버 내 화면 스택 — 마지막 요소가 현재 화면, 비어 있으면 홈.
 enum Route: Hashable {
     case manage
     case detail(UUID)
     case settings
-    case tradeForm(assetID: UUID, editing: Trade?)
+    case tradeForm(assetID: UUID, editing: Trade?, prefill: TradePrefill?)
     case manualAssetForm
 }
 

@@ -187,8 +187,22 @@ struct DetailChart: View {
             }
         }
         .simultaneousGesture(magnification)
-        .onTapGesture(count: 2) {
-            withAnimation(.easeOut(duration: 0.2)) { resetWindow() }
+        // 줌/팬 리셋 — 더블클릭은 거래 프리필에 쓰므로 버튼으로.
+        .overlay(alignment: .topTrailing) {
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) { resetWindow() }
+            } label: {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(theme.text2)
+                    .frame(width: 20, height: 20)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(theme.iconBg))
+                    .contentShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
+            .help(model.t("Reset zoom"))
+            .padding(.top, 2)
+            .padding(.trailing, 46)
         }
     }
 
@@ -238,7 +252,7 @@ struct DetailChart: View {
         if let plotAnchor = proxy.plotFrame {
             let plot = geo[plotAnchor]
             ZStack(alignment: .topLeading) {
-                // hover 캐치 레이어.
+                // hover 캐치 레이어 + 더블클릭 → 그 지점 날짜/가격으로 거래 추가.
                 Rectangle()
                     .fill(.clear)
                     .contentShape(Rectangle())
@@ -253,6 +267,23 @@ struct DetailChart: View {
                             hoveredDate = nil
                         }
                     }
+                    .gesture(
+                        SpatialTapGesture(count: 2)
+                            .onEnded { value in
+                                let inPlotX = value.location.x - plot.origin.x
+                                guard
+                                    let date = proxy.value(atX: inPlotX, as: Date.self),
+                                    let candle = nearestCandle(to: date)
+                                else {
+                                    return
+                                }
+                                model.push(.tradeForm(
+                                    assetID: asset.id,
+                                    editing: nil,
+                                    prefill: TradePrefill(date: candle.date, price: candle.close)
+                                ))
+                            }
+                    )
 
                 // B/S 마커 — 팬/줌으로 창 밖에 있으면 숨김.
                 ForEach(visibleTrades) { trade in

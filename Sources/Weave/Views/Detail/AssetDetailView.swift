@@ -33,7 +33,7 @@ struct AssetDetailView: View {
             } trailing: {
                 if !asset.isManual {
                     IconButton(systemName: "plus") {
-                        model.push(.tradeForm(assetID: assetID, editing: nil))
+                        model.push(.tradeForm(assetID: assetID, editing: nil, prefill: nil))
                     }
                     .help(model.t("Add Trade"))
                 }
@@ -96,6 +96,7 @@ struct AssetDetailView: View {
                 .monospacedDigit()
                 .kerning(-0.3)
                 .foregroundStyle(theme.text)
+                .privacyBlur(model.settings.privacyMode)
 
             HStack(spacing: 5) {
                 if let percent = metric?.dayChangePercent {
@@ -120,7 +121,6 @@ struct AssetDetailView: View {
     }
 
     private func priceText(asset: Asset, metric: AssetMetrics?) -> String {
-        if model.settings.privacyMode { return MoneyFormatter.masked }
         if asset.isManual {
             return MoneyFormatter.price(asset.manualValue ?? 0, currency: asset.currency)
         }
@@ -136,14 +136,11 @@ struct AssetDetailView: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(theme.text2)
             Spacer()
-            Text(
-                model.settings.privacyMode
-                    ? MoneyFormatter.masked
-                    : MoneyFormatter.signedPrice(position.realizedPnL, currency: currency)
-            )
-            .font(.system(size: 11.5, weight: .bold))
-            .monospacedDigit()
-            .foregroundStyle(position.realizedPnL >= 0 ? theme.greenText : theme.redText)
+            Text(MoneyFormatter.signedPrice(position.realizedPnL, currency: currency))
+                .font(.system(size: 11.5, weight: .bold))
+                .monospacedDigit()
+                .foregroundStyle(position.realizedPnL >= 0 ? theme.greenText : theme.redText)
+                .privacyBlur(model.settings.privacyMode)
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 4)
@@ -175,7 +172,7 @@ struct AssetDetailView: View {
             Spacer()
             if !asset.isManual {
                 Button {
-                    model.push(.tradeForm(assetID: assetID, editing: nil))
+                    model.push(.tradeForm(assetID: assetID, editing: nil, prefill: nil))
                 } label: {
                     Text(model.t("+ Add Trade"))
                         .font(.system(size: 11.5, weight: .semibold))
@@ -231,10 +228,18 @@ private struct TradeRow: View {
         HStack(spacing: 10) {
             chip
             VStack(alignment: .leading, spacing: 1) {
-                Text(titleText)
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(theme.text)
-                    .lineLimit(1)
+                HStack(spacing: 3) {
+                    Text("\(MoneyFormatter.quantity(trade.quantity)) \(asset.symbol) @")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(theme.text)
+                        .lineLimit(1)
+                    Text(MoneyFormatter.price(trade.price, currency: asset.currency))
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(theme.text)
+                        .lineLimit(1)
+                        .privacyBlur(model.settings.privacyMode)
+                }
                 Text(subText)
                     .font(.system(size: 10))
                     .foregroundStyle(theme.text2)
@@ -246,6 +251,7 @@ private struct TradeRow: View {
                     .font(.system(size: 12, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(rightIsUp ? theme.greenText : theme.redText)
+                    .privacyBlur(model.settings.privacyMode && trade.side == .sell)
                 Text(rightLabel)
                     .font(.system(size: 10))
                     .foregroundStyle(theme.text2)
@@ -257,7 +263,7 @@ private struct TradeRow: View {
         .hoverHighlight()
         .contextMenu {
             Button(model.t("Edit")) {
-                model.push(.tradeForm(assetID: asset.id, editing: trade))
+                model.push(.tradeForm(assetID: asset.id, editing: trade, prefill: nil))
             }
             Button(model.t("Delete"), role: .destructive, action: onDelete)
         }
@@ -274,14 +280,6 @@ private struct TradeRow: View {
                 RoundedRectangle(cornerRadius: 5)
                     .fill((isBuy ? theme.green : theme.red).opacity(0.15))
             )
-    }
-
-    private var titleText: String {
-        let qty = MoneyFormatter.quantity(trade.quantity)
-        let price = model.settings.privacyMode
-            ? MoneyFormatter.masked
-            : MoneyFormatter.price(trade.price, currency: asset.currency)
-        return "\(qty) \(asset.symbol) @ \(price)"
     }
 
     private var subText: String {
@@ -309,7 +307,6 @@ private struct TradeRow: View {
             return MoneyFormatter.percent(percent)
         case .sell:
             guard let pnl = model.realizedPnL(of: trade) else { return "—" }
-            if model.settings.privacyMode { return MoneyFormatter.masked }
             return MoneyFormatter.signedPrice(pnl.rounded(scale: 2), currency: asset.currency)
         }
     }

@@ -28,7 +28,21 @@ extension AppModel {
         defer { isHomeChartLoading = false }
 
         let candlesByAsset = await fetchCandles(assets: assets, interval: .day)
-        let fxSeries = await fetchFXSeries(assets: assets)
+        var fxSeries = await fetchFXSeries(assets: assets)
+        // FX 시계열 조회 실패 통화는 현물 환율로라도 환산 — 자산이 0원으로 증발하는 것 방지.
+        let base = settings.baseCurrency.uppercased()
+        let neededCurrencies = Set(assets.map { $0.currency.uppercased() }).subtracting([base])
+        if !neededCurrencies.allSatisfy({ fxRates[$0] != nil }) {
+            await refreshFXRates()
+        }
+        for currency in Set(assets.map { $0.currency.uppercased() })
+        where currency != base && fxSeries[currency] == nil {
+            if let spot = fxRates[currency] {
+                fxSeries[currency] = [
+                    Candle(date: Date(), open: spot, high: spot, low: spot, close: spot)
+                ]
+            }
+        }
         let now = Date()
         let from = period.startDate(now: now)
 

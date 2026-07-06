@@ -130,6 +130,15 @@ struct MiniToggle: View {
     }
 }
 
+/// 프라이버시 모드 금액 가리기 — 목업(blur 5px)처럼 강한 블러.
+/// 문자열 조립이 필요한 곳(메뉴바 등)은 `MoneyFormatter.masked`를 계속 쓴다.
+extension View {
+    func privacyBlur(_ enabled: Bool) -> some View {
+        blur(radius: enabled ? 6.5 : 0)
+            .allowsHitTesting(!enabled)
+    }
+}
+
 /// hover 시 배경 하이라이트 (`.click`).
 struct HoverHighlight: ViewModifier {
     @Environment(\.theme) private var theme

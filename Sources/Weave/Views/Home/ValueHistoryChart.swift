@@ -110,8 +110,22 @@ private struct CombinedChart: View {
         .chartYScale(domain: yDomain)
         .chartPlotStyle { $0.clipped() }
         .chartYAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) {
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
                 AxisGridLine().foregroundStyle(theme.grid)
+                AxisValueLabel {
+                    if let doubleValue = value.as(Double.self) {
+                        Text(
+                            model.settings.privacyMode
+                                ? "•••"
+                                : MoneyFormatter.compactPrice(
+                                    Decimal.fromDouble(doubleValue),
+                                    currency: model.settings.baseCurrency
+                                )
+                        )
+                        .font(.system(size: 8.5))
+                        .foregroundStyle(theme.xLabel)
+                    }
+                }
             }
         }
         .chartXAxis {
@@ -209,7 +223,22 @@ private struct MarkerDot: View {
         let price = model.settings.privacyMode
             ? MoneyFormatter.masked
             : MoneyFormatter.price(marker.trade.price, currency: marker.asset.currency)
-        return model.t("\(marker.asset.symbol) buy · \(qty) @ \(price)")
+        return model.t("\(marker.asset.symbol) buy · \(qty) @ \(price)") + convertedSuffix
+    }
+
+    /// 자산 통화 ≠ 기준 통화면 현재 환율 환산가를 병기.
+    private var convertedSuffix: String {
+        let assetCurrency = marker.asset.currency.uppercased()
+        let base = model.settings.baseCurrency.uppercased()
+        guard
+            !model.settings.privacyMode,
+            assetCurrency != base,
+            let rate = model.fxRates[assetCurrency]
+        else {
+            return ""
+        }
+        let converted = (marker.trade.price * rate).rounded(scale: 0)
+        return " (≈ \(MoneyFormatter.price(converted, currency: base)))"
     }
 
     private var tooltipSub: String {
@@ -249,8 +278,15 @@ private struct PerAssetChart: View {
         }
         .chartPlotStyle { $0.clipped() }
         .chartYAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) {
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
                 AxisGridLine().foregroundStyle(theme.grid)
+                AxisValueLabel {
+                    if let doubleValue = value.as(Double.self) {
+                        Text(MoneyFormatter.percent(Decimal.fromDouble(doubleValue), fractionDigits: 0))
+                            .font(.system(size: 8.5))
+                            .foregroundStyle(theme.xLabel)
+                    }
+                }
             }
         }
         .chartXAxis {

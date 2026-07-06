@@ -31,8 +31,8 @@ struct RootView: View {
             AssetDetailView(assetID: assetID)
         case .settings:
             SettingsView()
-        case .tradeForm(let assetID, let editing):
-            TradeFormView(assetID: assetID, editing: editing)
+        case .tradeForm(let assetID, let editing, let prefill):
+            TradeFormView(assetID: assetID, editing: editing, prefill: prefill)
         case .manualAssetForm:
             ManualAssetForm()
         case nil:
