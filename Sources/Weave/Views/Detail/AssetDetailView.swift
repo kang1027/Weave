@@ -8,6 +8,7 @@ struct AssetDetailView: View {
     let assetID: UUID
 
     @State private var deletionTarget: Trade?
+    @State private var isHoveringLogo = false
 
     private var trades: [Trade] {
         model.document.trades(for: assetID)
@@ -81,7 +82,27 @@ struct AssetDetailView: View {
             Spacer()
             HStack(spacing: 7) {
                 AssetLogoView(asset: asset, size: 22)
+                    // hover 시 "바꿀 수 있음" 어포던스 — 연필 오버레이 + 확대 + 손 커서.
+                    .overlay {
+                        if isHoveringLogo {
+                            RoundedRectangle(cornerRadius: 22 * 0.29)
+                                .fill(.black.opacity(0.45))
+                            Image(systemName: "pencil")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    .scaleEffect(isHoveringLogo ? 1.15 : 1)
+                    .animation(.easeOut(duration: 0.15), value: isHoveringLogo)
                     .contentShape(RoundedRectangle(cornerRadius: 7))
+                    .onHover { hovering in
+                        isHoveringLogo = hovering
+                        if hovering {
+                            NSCursor.pointingHand.push()
+                        } else {
+                            NSCursor.pop()
+                        }
+                    }
                     .onTapGesture {
                         model.pickCustomLogo(assetID: asset.id)
                     }
