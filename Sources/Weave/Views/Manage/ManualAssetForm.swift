@@ -49,6 +49,13 @@ struct ManualAssetForm: View {
                                 .multilineTextAlignment(.trailing)
                                 .font(.system(size: 12.5))
                                 .monospacedDigit()
+                                .onChange(of: valueText) { _, newValue in
+                                    // 숫자만 + 천단위 콤마 (멱등이라 가드 불필요).
+                                    let formatted = MoneyFormatter.groupedInputText(newValue)
+                                    if formatted != newValue {
+                                        valueText = formatted
+                                    }
+                                }
                         }
                         Divider().overlay(theme.hair)
                         formRow(label: model.t("Include in chart")) {

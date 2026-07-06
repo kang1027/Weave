@@ -127,6 +127,21 @@ import Testing
         #expect(MoneyFormatter.signedPrice(105_000, currency: "KRW") == "+₩105,000")
         #expect(MoneyFormatter.signedPrice(-89_400, currency: "KRW") == "-₩89,400")
     }
+
+    @Test func groupedInputTextAddsThousandsSeparators() {
+        #expect(MoneyFormatter.groupedInputText("303000") == "303,000")
+        #expect(MoneyFormatter.groupedInputText("29997000.5") == "29,997,000.5")
+        #expect(MoneyFormatter.groupedInputText("1234.") == "1,234.")      // 입력 중 소수점 보존
+        #expect(MoneyFormatter.groupedInputText("0.0500") == "0.0500")    // 소수부 그대로
+        #expect(MoneyFormatter.groupedInputText(".5") == ".5")
+        #expect(MoneyFormatter.groupedInputText("1,2,3") == "123")        // 재그룹
+        #expect(MoneyFormatter.groupedInputText("1.2.3") == "1.23")       // 소수점 하나만
+        #expect(MoneyFormatter.groupedInputText("abc12x3") == "123")      // 숫자만
+        #expect(MoneyFormatter.groupedInputText("") == "")
+        // 멱등 — 재적용해도 동일.
+        let once = MoneyFormatter.groupedInputText("1234567.89")
+        #expect(MoneyFormatter.groupedInputText(once) == once)
+    }
 }
 
 @Suite struct MenuBarTitleBuilderTests {

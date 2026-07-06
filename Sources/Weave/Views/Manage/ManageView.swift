@@ -33,9 +33,7 @@ struct ManageView: View {
                                     asset: asset,
                                     onDelete: { deletionTarget = asset },
                                     onEditValue: {
-                                        valueEditText = MoneyFormatter
-                                            .quantity(asset.manualValue ?? 0)
-                                            .replacingOccurrences(of: ",", with: "")
+                                        valueEditText = MoneyFormatter.quantity(asset.manualValue ?? 0)
                                         valueEditTarget = asset
                                     }
                                 )
@@ -65,6 +63,13 @@ struct ManageView: View {
         } message: {
             if let target = deletionTarget {
                 Text(model.t("\(target.name) and \(model.tradeCount(assetID: target.id)) trade(s) will be deleted."))
+            }
+        }
+        .onChange(of: valueEditText) { _, newValue in
+            // 숫자만 + 천단위 콤마 (멱등이라 가드 불필요).
+            let formatted = MoneyFormatter.groupedInputText(newValue)
+            if formatted != newValue {
+                valueEditText = formatted
             }
         }
         .alert(

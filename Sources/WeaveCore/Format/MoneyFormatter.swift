@@ -66,6 +66,37 @@ public enum MoneyFormatter {
     /// 프라이버시 모드 금액 마스킹.
     public static let masked = "•••••"
 
+    /// 숫자 입력 필드용 라이브 포맷 — 숫자·소수점만 남기고 정수부에 천단위 콤마.
+    /// 입력 중인 소수점("123.", "0.0500")은 그대로 보존한다. 멱등.
+    public static func groupedInputText(_ raw: String) -> String {
+        var cleaned = raw.filter { "0123456789.".contains($0) }
+        // 소수점은 첫 번째 것만 유지.
+        if let firstDot = cleaned.firstIndex(of: ".") {
+            let afterDot = cleaned.index(after: firstDot)
+            cleaned = String(cleaned[..<afterDot])
+                + cleaned[afterDot...].replacingOccurrences(of: ".", with: "")
+        }
+        guard !cleaned.isEmpty else { return "" }
+        let parts = cleaned.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
+        let grouped = groupDigits(String(parts.first ?? ""))
+        if parts.count > 1 {
+            return grouped + "." + parts[1]
+        }
+        return grouped
+    }
+
+    private static func groupDigits(_ digits: String) -> String {
+        guard digits.count > 3 else { return digits }
+        var result = ""
+        for (index, character) in digits.enumerated() {
+            if index > 0 && (digits.count - index) % 3 == 0 {
+                result.append(",")
+            }
+            result.append(character)
+        }
+        return result
+    }
+
     private static func decimalScale(for value: Decimal, currency: String) -> Int {
         if ["KRW", "JPY"].contains(currency.uppercased()) { return 0 }
         let a = abs(value)

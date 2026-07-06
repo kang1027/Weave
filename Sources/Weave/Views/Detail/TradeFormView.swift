@@ -134,13 +134,18 @@ struct TradeFormView: View {
                 suppressDatePrefill = false
                 return
             }
+            // 날짜에 따라 매도 가능 수량이 달라진다.
+            clampSellQuantity()
             // 편집 로드로 세팅된 날짜(원래 체결일)는 프리필하지 않는다 — 체결가 보존.
             if let editing, Calendar.current.isDate(newDate, inSameDayAs: editing.date) {
                 return
             }
             prefillClosingPrice()
         }
-        .onChange(of: side) { error = nil }
+        .onChange(of: side) {
+            error = nil
+            clampSellQuantity()
+        }
     }
 
     private var divider: some View {
@@ -213,10 +218,15 @@ struct TradeFormView: View {
                     error = nil
                     // 자동 계산이 써넣은 변경이면 여기서 끝 — 사용자 입력만 재계산 트리거.
                     if pendingProgrammatic.remove(field) != nil { return }
-                    // 숫자·소수점·콤마만 허용.
-                    let filtered = newValue.filter { "0123456789.,".contains($0) }
-                    if filtered != newValue {
-                        setFieldText(field, filtered)
+                    // 숫자·소수점만 허용 + 천단위 콤마 자동.
+                    var formatted = MoneyFormatter.groupedInputText(newValue)
+                    // 매도 수량이 보유 최대치를 넘으면 최대치로 자동 클램프.
+                    if side == .sell, field == .quantity,
+                       let entered = Decimal.clean(formatted), entered > availableQuantity {
+                        formatted = MoneyFormatter.quantity(availableQuantity)
+                    }
+                    if formatted != newValue {
+                        setFieldText(field, formatted)
                     }
                     autofill(edited: field)
                 }
@@ -262,8 +272,16 @@ struct TradeFormView: View {
         }
     }
 
+    /// 필드 표시용 숫자 — 천단위 콤마 포함.
     private func plainNumber(_ value: Decimal) -> String {
-        MoneyFormatter.quantity(value).replacingOccurrences(of: ",", with: "")
+        MoneyFormatter.quantity(value)
+    }
+
+    /// 매도로 전환/날짜 변경 등으로 보유 가능 수량이 줄었을 때 수량을 최대치로 맞춘다.
+    private func clampSellQuantity() {
+        guard side == .sell, let entered = quantity, entered > availableQuantity else { return }
+        setFieldText(.quantity, MoneyFormatter.quantity(availableQuantity))
+        autofill(edited: .quantity)
     }
 
     private func autofill(edited: TradeFormCalculator.Field) {
@@ -397,6 +415,21 @@ private struct TradePickerChart: View {
         nearestCandle(to: selectedDate)
     }
 
+    /// 데이터 범위에 맞춘 x축 라벨 — 수년치 월봉에서 "1/1"만 반복되는 것 방지.
+    private var xTickFormat: Date.FormatStyle {
+        guard let first = candles.first?.date, let last = candles.last?.date else {
+            return .dateTime.month(.defaultDigits).day().locale(model.locale)
+        }
+        let span = last.timeIntervalSince(first)
+        if span > 3 * 365 * 86_400 {
+            return .dateTime.year().locale(model.locale)
+        }
+        if span > 400 * 86_400 {
+            return .dateTime.year(.twoDigits).month(.defaultDigits).locale(model.locale)
+        }
+        return .dateTime.month(.defaultDigits).day().locale(model.locale)
+    }
+
     var body: some View {
         VStack(spacing: 4) {
             Chart {
@@ -447,12 +480,9 @@ private struct TradePickerChart: View {
             }
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 4)) { _ in
-                    AxisValueLabel(
-                        format: .dateTime.month(.defaultDigits).day().locale(model.locale),
-                        anchor: .top
-                    )
-                    .font(.system(size: 8.5))
-                    .foregroundStyle(theme.xLabel)
+                    AxisValueLabel(format: xTickFormat, anchor: .top)
+                        .font(.system(size: 8.5))
+                        .foregroundStyle(theme.xLabel)
                 }
             }
             .chartOverlay { proxy in
