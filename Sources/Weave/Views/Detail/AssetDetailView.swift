@@ -49,13 +49,6 @@ struct AssetDetailView: View {
                         DetailChart(asset: asset, trades: model.document.trades(for: assetID), position: position)
                             .padding(.top, 10)
 
-                        SegmentedPills(
-                            options: CandleInterval.detailCases.map { ($0, $0.label) },
-                            selection: $model.detailInterval
-                        )
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-
                         CapsHeader(text: model.t("Trades"))
                         realizedSummary(position: position, currency: asset.currency)
                         tradesList(asset: asset)

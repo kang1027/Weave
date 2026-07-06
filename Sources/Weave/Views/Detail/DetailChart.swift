@@ -18,6 +18,8 @@ struct DetailChart: View {
     /// 보이는 창의 길이(초). 0이면 아직 초기화 전.
     @State private var visibleSeconds: Double = 0
     @State private var magnifyStartSeconds: Double?
+    @State private var isHoveringChart = false
+    @State private var scrollMonitor: Any?
 
     private var candles: [Candle] { model.detailCandles }
     private var color: Color { theme.paletteColor(asset.colorIndex) }
@@ -66,17 +68,60 @@ struct DetailChart: View {
     }
 
     var body: some View {
-        Group {
-            if candles.isEmpty {
-                placeholder
-            } else {
-                chart
+        VStack(spacing: 8) {
+            Group {
+                if candles.isEmpty {
+                    placeholder
+                } else {
+                    chart
+                }
+            }
+            .frame(height: 190)
+            .padding(.horizontal, 8)
+
+            controlsRow
+                .padding(.horizontal, 16)
+        }
+        .onChange(of: candles) { resetWindow() }
+        .onAppear {
+            resetWindow()
+            installScrollZoomMonitor()
+        }
+        .onDisappear(perform: removeScrollZoomMonitor)
+        .onHover { isHoveringChart = $0 }
+    }
+
+    /// 인터벌 pills + 줌 컨트롤(−/+/리셋) 한 줄.
+    private var controlsRow: some View {
+        HStack(spacing: 6) {
+            SegmentedPills(
+                options: CandleInterval.detailCases.map { ($0, $0.label) },
+                selection: $model.detailInterval
+            )
+            zoomButton(systemName: "minus.magnifyingglass", help: model.t("Zoom out")) {
+                zoom(by: 1.4)
+            }
+            zoomButton(systemName: "plus.magnifyingglass", help: model.t("Zoom in")) {
+                zoom(by: 1 / 1.4)
+            }
+            zoomButton(systemName: "arrow.counterclockwise", help: model.t("Reset zoom")) {
+                withAnimation(.easeOut(duration: 0.2)) { resetWindow() }
             }
         }
-        .frame(height: 190)
-        .padding(.horizontal, 8)
-        .onChange(of: candles) { resetWindow() }
-        .onAppear { resetWindow() }
+    }
+
+    private func zoomButton(systemName: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(theme.text2)
+                .frame(width: 20, height: 20)
+                .background(RoundedRectangle(cornerRadius: 6).fill(theme.iconBg))
+                .contentShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .disabled(candles.isEmpty)
     }
 
     private func resetWindow() {
@@ -84,6 +129,49 @@ struct DetailChart: View {
         let span = max(dataSpanSeconds, minWindowSeconds)
         visibleSeconds = min(defaultWindowSeconds, span)
         scrollX = last.addingTimeInterval(interval.seconds - visibleSeconds)
+    }
+
+    // MARK: - 줌
+
+    /// factor > 1 = 줌아웃, < 1 = 줌인. anchor(커서 위치 날짜)를 창 안 같은 비율 지점에 유지.
+    private func zoom(by factor: Double, anchor: Date? = nil) {
+        let current = effectiveVisibleSeconds
+        let maxWindow = max(dataSpanSeconds, minWindowSeconds)
+        let proposed = min(max(current * factor, minWindowSeconds), maxWindow)
+        guard proposed != current else { return }
+
+        let anchorDate = anchor ?? scrollX.addingTimeInterval(current / 2)
+        let fraction = min(max(anchorDate.timeIntervalSince(scrollX) / current, 0), 1)
+        visibleSeconds = proposed
+        scrollX = anchorDate.addingTimeInterval(-proposed * fraction)
+    }
+
+    /// 차트 위 세로 스크롤 = 줌 (가로 스크롤 = 팬은 차트 내장 동작 유지).
+    private func installScrollZoomMonitor() {
+        guard scrollMonitor == nil else { return }
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
+            guard
+                isHoveringChart,
+                abs(event.scrollingDeltaY) > abs(event.scrollingDeltaX),
+                event.scrollingDeltaY != 0
+            else {
+                return event
+            }
+            let raw = event.hasPreciseScrollingDeltas
+                ? event.scrollingDeltaY
+                : event.scrollingDeltaY * 8
+            // 위로 스크롤 → 줌인. 이벤트당 변화량은 ±30%로 제한.
+            let factor = min(max(1 - raw * 0.006, 0.7), 1.3)
+            zoom(by: factor, anchor: hoveredDate)
+            return nil // 세로 스크롤은 팬으로 넘기지 않는다.
+        }
+    }
+
+    private func removeScrollZoomMonitor() {
+        if let scrollMonitor {
+            NSEvent.removeMonitor(scrollMonitor)
+            self.scrollMonitor = nil
+        }
     }
 
     private var placeholder: some View {
@@ -187,23 +275,6 @@ struct DetailChart: View {
             }
         }
         .simultaneousGesture(magnification)
-        // 줌/팬 리셋 — 더블클릭은 거래 프리필에 쓰므로 버튼으로.
-        .overlay(alignment: .topTrailing) {
-            Button {
-                withAnimation(.easeOut(duration: 0.2)) { resetWindow() }
-            } label: {
-                Image(systemName: "arrow.counterclockwise")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(theme.text2)
-                    .frame(width: 20, height: 20)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(theme.iconBg))
-                    .contentShape(RoundedRectangle(cornerRadius: 6))
-            }
-            .buttonStyle(.plain)
-            .help(model.t("Reset zoom"))
-            .padding(.top, 2)
-            .padding(.trailing, 46)
-        }
     }
 
     /// 핀치 줌 — 창 중앙을 고정한 채 창 길이를 조절.
@@ -285,14 +356,14 @@ struct DetailChart: View {
                             }
                     )
 
-                // B/S 마커 — 팬/줌으로 창 밖에 있으면 숨김.
+                // B/S 마커 — 팬/줌으로 창 밖에 있으면 숨김, 경계에선 잘리지 않게 클램프.
                 ForEach(visibleTrades) { trade in
                     if let x = proxy.position(forX: trade.date),
                        let y = proxy.position(forY: trade.price.doubleValue),
                        x >= 0, x <= plot.width, y >= -9, y <= plot.height + 9 {
                         tradeMarker(trade: trade, plot: plot)
                             .position(
-                                x: plot.origin.x + x,
+                                x: plot.origin.x + min(max(x, 9), plot.width - 9),
                                 y: plot.origin.y + min(max(y, 9), plot.height - 9)
                             )
                     }
