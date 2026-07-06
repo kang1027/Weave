@@ -22,6 +22,8 @@ public struct Asset: Identifiable, Codable, Equatable, Hashable, Sendable {
     public var manualValue: Decimal?
     /// Manual Asset을 통합 차트에 포함할지.
     public var includeInChart: Bool
+    /// 사용자가 업로드한 커스텀 로고 파일명(`Application Support/Weave/logos/` 아래).
+    public var customLogoFileName: String?
     public var createdAt: Date
 
     public var isManual: Bool { provider == .manual }
@@ -40,6 +42,7 @@ public struct Asset: Identifiable, Codable, Equatable, Hashable, Sendable {
         isHidden: Bool = false,
         manualValue: Decimal? = nil,
         includeInChart: Bool = true,
+        customLogoFileName: String? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -55,6 +58,7 @@ public struct Asset: Identifiable, Codable, Equatable, Hashable, Sendable {
         self.isHidden = isHidden
         self.manualValue = manualValue
         self.includeInChart = includeInChart
+        self.customLogoFileName = customLogoFileName
         self.createdAt = createdAt
     }
 }

@@ -28,16 +28,7 @@ struct AssetDetailView: View {
         let position = metric?.position ?? PositionSnapshot()
 
         return VStack(spacing: 0) {
-            ScreenHeader(title: asset.name) {
-                model.pop()
-            } trailing: {
-                if !asset.isManual {
-                    IconButton(systemName: "plus") {
-                        model.push(.tradeForm(assetID: assetID, editing: nil, prefill: nil))
-                    }
-                    .help(model.t("Add Trade"))
-                }
-            }
+            detailHeader(asset: asset)
 
             ScrollView {
                 VStack(spacing: 0) {
@@ -78,6 +69,53 @@ struct AssetDetailView: View {
             }
             Button(model.t("Cancel"), role: .cancel) { deletionTarget = nil }
         }
+    }
+
+    // MARK: - 헤더 (로고 + 이름, 로고 클릭 = 아이콘 변경)
+
+    private func detailHeader(asset: Asset) -> some View {
+        HStack {
+            IconButton(systemName: "chevron.left") {
+                model.pop()
+            }
+            Spacer()
+            HStack(spacing: 7) {
+                AssetLogoView(asset: asset, size: 22)
+                    .contentShape(RoundedRectangle(cornerRadius: 7))
+                    .onTapGesture {
+                        model.pickCustomLogo(assetID: asset.id)
+                    }
+                    .contextMenu {
+                        Button(model.t("Change icon…")) {
+                            model.pickCustomLogo(assetID: asset.id)
+                        }
+                        if asset.customLogoFileName != nil {
+                            Button(model.t("Reset to default icon")) {
+                                model.clearCustomLogo(assetID: asset.id)
+                            }
+                        }
+                    }
+                    .help(model.t("Click to change icon"))
+                Text(asset.name)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(theme.text)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Group {
+                if !asset.isManual {
+                    IconButton(systemName: "plus") {
+                        model.push(.tradeForm(assetID: assetID, editing: nil, prefill: nil))
+                    }
+                    .help(model.t("Add Trade"))
+                } else {
+                    Color.clear.frame(width: 26, height: 26)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 14)
+        .padding(.bottom, 8)
     }
 
     // MARK: - 현재가 + 배지

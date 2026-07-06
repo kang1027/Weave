@@ -10,7 +10,13 @@ struct AssetLogoView: View {
 
     var body: some View {
         Group {
-            if let url = Self.logoURL(for: asset) {
+            if let fileName = asset.customLogoFileName,
+               let custom = LogoStore.image(named: fileName) {
+                // 사용자 업로드 로고 우선.
+                Image(nsImage: custom)
+                    .resizable()
+                    .scaledToFill()
+            } else if let url = Self.logoURL(for: asset) {
                 AsyncImage(url: url) { phase in
                     if let image = phase.image {
                         image.resizable().scaledToFit()

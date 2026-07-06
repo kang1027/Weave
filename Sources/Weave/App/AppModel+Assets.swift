@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import UniformTypeIdentifiers
 import WeaveCore
 
 extension AppModel {
@@ -96,6 +98,7 @@ extension AppModel {
 
     /// 거래 내역까지 통째 삭제 — 확인 다이얼로그는 뷰 책임.
     func deleteAsset(id: UUID) {
+        LogoStore.delete(fileName: asset(id: id)?.customLogoFileName)
         document.assets.removeAll { $0.id == id }
         document.trades.removeAll { $0.assetID == id }
         quotes[id] = nil
@@ -139,6 +142,27 @@ extension AppModel {
 
     func setColor(assetID: UUID, colorIndex: Int) {
         mutateAsset(id: assetID) { $0.colorIndex = colorIndex }
+    }
+
+    // MARK: - 커스텀 로고
+
+    /// 파일 선택 → 리사이즈 PNG 저장 → 자산에 연결. 기존 커스텀 로고는 교체 삭제.
+    func pickCustomLogo(assetID: UUID) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .tiff, .heic, .gif, .image]
+        panel.allowsMultipleSelection = false
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let fileName = try? LogoStore.saveLogo(from: url, assetID: assetID) else { return }
+        let previous = asset(id: assetID)?.customLogoFileName
+        mutateAsset(id: assetID) { $0.customLogoFileName = fileName }
+        LogoStore.delete(fileName: previous)
+    }
+
+    func clearCustomLogo(assetID: UUID) {
+        let previous = asset(id: assetID)?.customLogoFileName
+        mutateAsset(id: assetID) { $0.customLogoFileName = nil }
+        LogoStore.delete(fileName: previous)
     }
 
     private func mutateAsset(id: UUID, save: Bool = true, _ transform: (inout Asset) -> Void) {
