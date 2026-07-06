@@ -92,12 +92,15 @@ struct HomeView: View {
         .padding(.bottom, 8)
     }
 
+    /// 총 평가금 + 원금·손익 라인. (일간 등락은 Day 링이 담당)
     private func totalSection(_ portfolio: PortfolioMetrics) -> some View {
-        VStack(spacing: 8) {
+        let base = model.settings.baseCurrency
+        let pnl = portfolio.unrealizedPnLBase
+        return VStack(spacing: 7) {
             Text(
                 MoneyFormatter.price(
                     portfolio.totalValueBase.rounded(scale: 0),
-                    currency: model.settings.baseCurrency
+                    currency: base
                 )
             )
             .font(.system(size: 26, weight: .bold))
@@ -106,18 +109,31 @@ struct HomeView: View {
             .foregroundStyle(theme.text)
             .privacyBlur(model.settings.privacyMode)
 
-            ChangeBadge(
-                text: badgeText(portfolio.dayChangePercent),
-                style: portfolio.dayChangePercent >= 0 ? .up : .down
-            )
+            HStack(spacing: 5) {
+                Text(model.t("Invested"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.text2)
+                Text(MoneyFormatter.price(portfolio.costBasisBase.rounded(scale: 0), currency: base))
+                    .font(.system(size: 11, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(theme.text2)
+                    .privacyBlur(model.settings.privacyMode)
+                Text(verbatim: "·")
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.caps)
+                Text(MoneyFormatter.signedPrice(pnl.rounded(scale: 0), currency: base))
+                    .font(.system(size: 11, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(theme.upDown(pnl >= 0))
+                    .privacyBlur(model.settings.privacyMode)
+                Text("(\(MoneyFormatter.percent(portfolio.totalReturnPercent)))")
+                    .font(.system(size: 11, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(theme.upDown(pnl >= 0))
+            }
         }
         .padding(.top, 12)
         .padding(.bottom, 2)
-    }
-
-    private func badgeText(_ percent: Decimal) -> String {
-        let arrow = percent >= 0 ? "▲ " : "▼ "
-        return arrow + MoneyFormatter.percent(abs(percent)).dropFirst()
     }
 }
 

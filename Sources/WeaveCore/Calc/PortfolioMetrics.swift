@@ -55,6 +55,8 @@ public struct PortfolioMetrics: Equatable, Sendable {
     public var totalReturnPercent: Decimal
     /// 미실현손익 합(기준통화).
     public var unrealizedPnLBase: Decimal
+    /// 투자 원금 합(기준통화, manual 제외) — 홈 총액 아래 "원금" 표시용.
+    public var costBasisBase: Decimal
     /// Day 링 세그먼트 — 포트폴리오 일간 손익과 같은 부호 종목만.
     public var daySegments: [RingSegment]
     /// Return 링 세그먼트 — 총 손익과 같은 부호 종목만.

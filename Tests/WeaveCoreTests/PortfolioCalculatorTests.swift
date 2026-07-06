@@ -49,6 +49,7 @@ import Testing
         #expect(portfolio.totalValueBase == 78_612_000)
         // 미실현 = 10,000×1300 + 112,000 = 13,112,000, 원가 = 65,500,000
         #expect(portfolio.unrealizedPnLBase == 13_112_000)
+        #expect(portfolio.costBasisBase == 65_500_000)
         let expectedReturn = (Decimal(13_112_000) / Decimal(65_500_000) * 100).rounded(scale: 4)
         #expect(portfolio.totalReturnPercent == expectedReturn)
         // 평가금 내림차순 정렬
