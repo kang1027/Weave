@@ -6,6 +6,7 @@ struct HomeView: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
     @State private var deletionTarget: Asset?
+    @State private var isHoveringTotal = false
 
     var body: some View {
         let (perAsset, portfolio) = model.computed
@@ -15,10 +16,11 @@ struct HomeView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    // zIndex: 링 hover 툴팁이 아래 총액 위에 그려지도록.
+                    // zIndex: 링/총액 hover 툴팁이 아래 형제 뷰 위에 그려지도록.
                     RingsRow(portfolio: portfolio)
                         .zIndex(10)
                     totalSection(portfolio)
+                        .zIndex(9)
                     CapsHeader(text: model.t("Value History"))
                     ValueHistoryChart()
                     CapsHeader(text: model.t("Assets"))
@@ -92,11 +94,11 @@ struct HomeView: View {
         .padding(.bottom, 8)
     }
 
-    /// 총 평가금 + 원금·손익 라인. (일간 등락은 Day 링이 담당)
+    /// 총 평가금 + 손익 라인. 원금은 hover 툴팁으로. (일간 등락은 Day 링이 담당)
     private func totalSection(_ portfolio: PortfolioMetrics) -> some View {
         let base = model.settings.baseCurrency
         let pnl = portfolio.unrealizedPnLBase
-        return VStack(spacing: 7) {
+        return VStack(spacing: 6) {
             Text(
                 MoneyFormatter.price(
                     portfolio.totalValueBase.rounded(scale: 0),
@@ -109,31 +111,34 @@ struct HomeView: View {
             .foregroundStyle(theme.text)
             .privacyBlur(model.settings.privacyMode)
 
-            HStack(spacing: 5) {
-                Text(model.t("Invested"))
-                    .font(.system(size: 11))
-                    .foregroundStyle(theme.text2)
-                Text(MoneyFormatter.price(portfolio.costBasisBase.rounded(scale: 0), currency: base))
-                    .font(.system(size: 11, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(theme.text2)
-                    .privacyBlur(model.settings.privacyMode)
-                Text(verbatim: "·")
-                    .font(.system(size: 11))
-                    .foregroundStyle(theme.caps)
+            HStack(spacing: 4) {
                 Text(MoneyFormatter.signedPrice(pnl.rounded(scale: 0), currency: base))
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .monospacedDigit()
-                    .foregroundStyle(theme.upDown(pnl >= 0))
                     .privacyBlur(model.settings.privacyMode)
                 Text("(\(MoneyFormatter.percent(portfolio.totalReturnPercent)))")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .monospacedDigit()
-                    .foregroundStyle(theme.upDown(pnl >= 0))
             }
+            .foregroundStyle(theme.upDown(pnl >= 0))
         }
         .padding(.top, 12)
         .padding(.bottom, 2)
+        .contentShape(Rectangle())
+        .onHover { isHoveringTotal = $0 }
+        // hover 시 원금 툴팁 — 아래 형제 뷰 위로 그려지게 zIndex는 호출부에서.
+        .overlay(alignment: .bottom) {
+            if isHoveringTotal {
+                TooltipBubble(
+                    text: model.t("Invested")
+                        + " "
+                        + MoneyFormatter.price(portfolio.costBasisBase.rounded(scale: 0), currency: base),
+                    blurText: model.settings.privacyMode
+                )
+                .offset(y: 30)
+                .allowsHitTesting(false)
+            }
+        }
     }
 }
 
