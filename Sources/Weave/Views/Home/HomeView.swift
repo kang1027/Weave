@@ -212,7 +212,10 @@ struct AssetListRow: View {
         }
         let qty = MoneyFormatter.quantity(metric.position.quantity)
         let buys = model.t("\(metric.position.buyCount) buys")
-        return "\(qty) \(metric.asset.symbol) · \(buys)"
+        let holding = metric.asset.hasNumericSymbol
+            ? model.t("\(qty) shares")
+            : "\(qty) \(metric.asset.symbol)"
+        return "\(holding) · \(buys)"
     }
 
     private var priceText: String {

@@ -281,7 +281,7 @@ private struct TradeRow: View {
             chip
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 3) {
-                    Text("\(MoneyFormatter.quantity(trade.quantity)) \(asset.symbol) @")
+                    Text("\(quantityLabel) @")
                         .font(.system(size: 12.5, weight: .semibold))
                         .foregroundStyle(theme.text)
                         .lineLimit(1)
@@ -332,6 +332,13 @@ private struct TradeRow: View {
                 RoundedRectangle(cornerRadius: 5)
                     .fill((isBuy ? theme.green : theme.red).opacity(0.15))
             )
+    }
+
+    private var quantityLabel: String {
+        let qty = MoneyFormatter.quantity(trade.quantity)
+        return asset.hasNumericSymbol
+            ? model.t("\(qty) shares")
+            : "\(qty) \(asset.symbol)"
     }
 
     private var subText: String {
