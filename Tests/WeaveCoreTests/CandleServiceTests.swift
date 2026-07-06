@@ -173,4 +173,17 @@ private struct FakeProvider: MarketDataProvider {
         #expect(result.count == 1)
         #expect(result[0].close == 2)
     }
+
+    @Test func downsampleKeepsBoundsAndLastCandle() {
+        let input = (0..<1000).map { minute in
+            candle(minute: minute, open: 1, high: 1, low: 1, close: Decimal(minute))
+        }
+        let sampled = CandleAggregator.downsample(input, maxPoints: 300)
+        #expect(sampled.count <= 302)
+        #expect(sampled.count >= 300)
+        #expect(sampled.first?.date == input.first?.date)
+        #expect(sampled.last?.date == input.last?.date) // 마지막(현재가) 캔들 보존
+        // 작은 입력은 그대로 통과.
+        #expect(CandleAggregator.downsample(Array(input.prefix(100)), maxPoints: 300).count == 100)
+    }
 }

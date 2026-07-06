@@ -123,12 +123,15 @@ struct TooltipBubble: View {
     @Environment(\.theme) private var theme
     let text: String
     var secondary: String?
+    /// 프라이버시 모드에서 본문(금액)만 블러.
+    var blurText = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(text)
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(theme.text)
+                .privacyBlur(blurText)
             if let secondary {
                 Text(secondary)
                     .font(.system(size: 10))

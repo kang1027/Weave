@@ -29,6 +29,23 @@ public enum CandleFetchLimit {
 
 /// 저인터벌 캔들을 상위 버킷으로 합성 — 소스가 해당 인터벌을 직접 안 줄 때 사용(야후 4H 등).
 public enum CandleAggregator {
+    /// 렌더링용 다운샘플 — 균등 간격으로 추리되 마지막 캔들은 반드시 보존.
+    public static func downsample(_ input: [Candle], maxPoints: Int) -> [Candle] {
+        guard maxPoints > 0, input.count > maxPoints else { return input }
+        let stride = Double(input.count) / Double(maxPoints)
+        var result: [Candle] = []
+        result.reserveCapacity(maxPoints + 1)
+        var cursor = 0.0
+        while Int(cursor) < input.count {
+            result.append(input[Int(cursor)])
+            cursor += stride
+        }
+        if result.last?.date != input.last?.date, let last = input.last {
+            result.append(last)
+        }
+        return result
+    }
+
     public static func aggregate(_ candles: [Candle], bucketSeconds: TimeInterval) -> [Candle] {
         guard bucketSeconds > 0, !candles.isEmpty else { return candles }
         let sorted = candles.sorted { $0.date < $1.date }
