@@ -86,7 +86,7 @@ extension AppModel {
 
     // MARK: - 상세 차트
 
-    /// 상세 화면 캔들 — 기간에 맞는 주기 + ALL은 5년 초과 시 월봉.
+    /// 상세 화면 캔들 — 선택 인터벌(15m~월봉) 그대로 조회, 탐색은 차트 팬/줌 담당.
     func loadDetailChart(assetID: UUID) async {
         guard let asset = asset(id: assetID), !asset.isManual else {
             detailCandles = []
@@ -103,31 +103,33 @@ extension AppModel {
         isDetailChartLoading = true
         defer { isDetailChartLoading = false }
 
-        let period = detailPeriod
-        var interval = period.interval
-        var candles = (try? await candleService.candles(
+        let interval = detailInterval
+        let candles = await fetchDetailCandles(asset: asset, interval: interval)
+
+        // 더 최신 요청(자산 전환/인터벌 변경)이 시작됐다면 이 결과는 버린다.
+        guard token == detailLoadToken else { return }
+        detailCandles = candles.sorted { $0.date < $1.date }
+    }
+
+    /// 네이버(국장)는 인트라데이가 없어 야후 `.KS`/`.KQ`로 브릿지한다.
+    private func fetchDetailCandles(asset: Asset, interval: CandleInterval) async -> [Candle] {
+        if asset.provider == .naver, interval.isIntraday {
+            for suffix in [".KS", ".KQ"] {
+                if let candles = try? await candleService.candles(
+                    provider: .yahoo,
+                    providerSymbol: asset.providerSymbol + suffix,
+                    interval: interval
+                ), !candles.isEmpty {
+                    return candles
+                }
+            }
+            return []
+        }
+        return (try? await candleService.candles(
             provider: asset.provider,
             providerSymbol: asset.providerSymbol,
             interval: interval
         )) ?? []
-
-        if period == .all, let first = candles.first,
-           Date().timeIntervalSince(first.date) > 5 * 365 * 86_400 {
-            // 5년 초과분은 월봉으로.
-            interval = .month
-            candles = (try? await candleService.candles(
-                provider: asset.provider,
-                providerSymbol: asset.providerSymbol,
-                interval: .month
-            )) ?? candles
-        }
-
-        if let from = period.startDate() {
-            candles = candles.filter { $0.date >= from }
-        }
-        // 더 최신 요청(자산 전환/기간 변경)이 시작됐다면 이 결과는 버린다.
-        guard token == detailLoadToken else { return }
-        detailCandles = candles.sorted { $0.date < $1.date }
     }
 
     // MARK: - 캔들/환율 일괄 조회

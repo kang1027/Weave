@@ -74,12 +74,6 @@ private struct CombinedChart: View {
 
     @State private var hoveredMarkerID: UUID?
 
-    private var xAxisFormat: Date.FormatStyle {
-        model.homeChartPeriod == .oneMonth
-            ? .dateTime.month(.defaultDigits).day().locale(model.locale)
-            : .dateTime.month(.abbreviated).locale(model.locale)
-    }
-
     private var yDomain: ClosedRange<Double> {
         let values = series.map { $0.value.doubleValue }
         guard let min = values.min(), let max = values.max(), min < max else {
@@ -93,9 +87,11 @@ private struct CombinedChart: View {
     var body: some View {
         Chart {
             ForEach(Array(series.enumerated()), id: \.offset) { _, point in
+                // yStart를 도메인 하단에 고정 — 기본값(0)이면 필이 플롯 밖까지 뻗는다.
                 AreaMark(
                     x: .value("Date", point.date),
-                    y: .value("Value", point.value.doubleValue)
+                    yStart: .value("Base", yDomain.lowerBound),
+                    yEnd: .value("Value", point.value.doubleValue)
                 )
                 .foregroundStyle(
                     LinearGradient(
@@ -112,16 +108,20 @@ private struct CombinedChart: View {
             }
         }
         .chartYScale(domain: yDomain)
+        .chartPlotStyle { $0.clipped() }
         .chartYAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) {
                 AxisGridLine().foregroundStyle(theme.grid)
             }
         }
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                AxisValueLabel(format: xAxisFormat, anchor: .top)
-                    .font(.system(size: 9))
-                    .foregroundStyle(theme.xLabel)
+            AxisMarks(values: ChartAxis.xValues(for: model.homeChartPeriod)) { _ in
+                AxisValueLabel(
+                    format: ChartAxis.xFormat(for: model.homeChartPeriod, locale: model.locale),
+                    anchor: .top
+                )
+                .font(.system(size: 9))
+                .foregroundStyle(theme.xLabel)
             }
         }
         .chartOverlay { proxy in
@@ -137,8 +137,11 @@ private struct CombinedChart: View {
             let plot = geo[plotAnchor]
             ZStack(alignment: .topLeading) {
                 ForEach(markers) { marker in
-                    if let x = proxy.position(forX: Calendar.current.startOfDay(for: marker.trade.date)),
-                       let y = proxy.position(forY: marker.seriesValue.doubleValue) {
+                    if let rawX = proxy.position(forX: Calendar.current.startOfDay(for: marker.trade.date)),
+                       let rawY = proxy.position(forY: marker.seriesValue.doubleValue) {
+                        // 구간 경계의 마커가 패널 밖으로 반쯤 잘리지 않게 클램프.
+                        let x = min(max(rawX, 9), plot.width - 9)
+                        let y = min(max(rawY, 9), plot.height - 9)
                         MarkerDot(
                             marker: marker,
                             isHovered: hoveredMarkerID == marker.id,
@@ -230,12 +233,6 @@ private struct PerAssetChart: View {
     @EnvironmentObject private var model: AppModel
     let lines: [AssetLineSeries]
 
-    private var xAxisFormat: Date.FormatStyle {
-        model.homeChartPeriod == .oneMonth
-            ? .dateTime.month(.defaultDigits).day().locale(model.locale)
-            : .dateTime.month(.abbreviated).locale(model.locale)
-    }
-
     var body: some View {
         Chart {
             ForEach(lines) { line in
@@ -250,17 +247,45 @@ private struct PerAssetChart: View {
                 }
             }
         }
+        .chartPlotStyle { $0.clipped() }
         .chartYAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) {
                 AxisGridLine().foregroundStyle(theme.grid)
             }
         }
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                AxisValueLabel(format: xAxisFormat, anchor: .top)
-                    .font(.system(size: 9))
-                    .foregroundStyle(theme.xLabel)
+            AxisMarks(values: ChartAxis.xValues(for: model.homeChartPeriod)) { _ in
+                AxisValueLabel(
+                    format: ChartAxis.xFormat(for: model.homeChartPeriod, locale: model.locale),
+                    anchor: .top
+                )
+                .font(.system(size: 9))
+                .foregroundStyle(theme.xLabel)
             }
+        }
+    }
+}
+
+/// 기간별 x축 눈금 — automatic은 같은 달에 눈금을 두 번 찍어 "Jun Jun Jul"이 된다.
+/// 달력 단위 stride로 고정한다.
+enum ChartAxis {
+    static func xValues(for period: ChartPeriod) -> AxisMarkValues {
+        switch period {
+        case .oneMonth: return .stride(by: .day, count: 7)
+        case .threeMonths, .sixMonths: return .stride(by: .month, count: 1)
+        case .oneYear: return .stride(by: .month, count: 2)
+        case .all: return .stride(by: .year, count: 1)
+        }
+    }
+
+    static func xFormat(for period: ChartPeriod, locale: Locale) -> Date.FormatStyle {
+        switch period {
+        case .oneMonth:
+            return .dateTime.month(.defaultDigits).day().locale(locale)
+        case .threeMonths, .sixMonths, .oneYear:
+            return .dateTime.month(.abbreviated).locale(locale)
+        case .all:
+            return .dateTime.year().locale(locale)
         }
     }
 }

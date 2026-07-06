@@ -45,7 +45,7 @@ public actor CandleService {
 
         if let cached = memory[key] ?? loadDisk(key: key) {
             memory[key] = cached
-            if calendar.isDate(cached.fetchedAt, inSameDayAs: now()) {
+            if isFresh(cached, interval: interval) {
                 return cached.candles
             }
         }
@@ -94,6 +94,18 @@ public actor CandleService {
         )) ?? []
         for file in files where file.pathExtension == "json" {
             try? FileManager.default.removeItem(at: file)
+        }
+    }
+
+    /// 일봉 이상은 하루 1회, 인트라데이는 짧은 TTL로 갱신.
+    private func isFresh(_ cached: CachedSeries, interval: CandleInterval) -> Bool {
+        let age = now().timeIntervalSince(cached.fetchedAt)
+        switch interval {
+        case .m15: return age < 5 * 60
+        case .h1: return age < 15 * 60
+        case .h4: return age < 30 * 60
+        case .day, .week, .month:
+            return calendar.isDate(cached.fetchedAt, inSameDayAs: now())
         }
     }
 

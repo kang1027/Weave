@@ -50,8 +50,8 @@ struct AssetDetailView: View {
                             .padding(.top, 10)
 
                         SegmentedPills(
-                            options: ChartPeriod.allCases.map { ($0, $0.rawValue) },
-                            selection: $model.detailPeriod
+                            options: CandleInterval.detailCases.map { ($0, $0.label) },
+                            selection: $model.detailInterval
                         )
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
@@ -66,7 +66,7 @@ struct AssetDetailView: View {
 
             footer(asset: asset, position: position)
         }
-        .task(id: model.detailPeriod) {
+        .task(id: model.detailInterval) {
             await model.loadDetailChart(assetID: assetID)
         }
         .confirmationDialog(

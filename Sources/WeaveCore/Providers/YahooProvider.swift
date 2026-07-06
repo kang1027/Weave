@@ -124,12 +124,19 @@ public struct YahooProvider: MarketDataProvider {
     public func candles(providerSymbol: String, interval: CandleInterval) async throws -> [Candle] {
         let (range, yahooInterval): (String, String)
         switch interval {
+        case .m15: (range, yahooInterval) = ("1mo", "15m")   // 야후 15m 한도 60일
+        case .h1: (range, yahooInterval) = ("3mo", "1h")
+        case .h4: (range, yahooInterval) = ("6mo", "1h")     // 4h 미지원 — 1h 합성
         case .day: (range, yahooInterval) = ("2y", "1d")
         case .week: (range, yahooInterval) = ("10y", "1wk")
         case .month: (range, yahooInterval) = ("max", "1mo")
         }
         let data = try await chartData(symbol: providerSymbol, range: range, interval: yahooInterval)
-        return try Self.parseCandles(data)
+        let candles = try Self.parseCandles(data)
+        if interval == .h4 {
+            return CandleAggregator.aggregate(candles, bucketSeconds: interval.seconds)
+        }
+        return candles
     }
 
     static func parseCandles(_ data: Data) throws -> [Candle] {

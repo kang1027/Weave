@@ -23,5 +23,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 메뉴바 전용 앱 — Dock 아이콘을 숨긴다. (dev 실행에서도 동일하게 동작)
         NSApp.setActivationPolicy(.accessory)
+
+        // 개발용: 스크린샷 자동화를 위해 실행 직후 팝오버를 연다.
+        if ProcessInfo.processInfo.environment["WEAVE_OPEN_POPOVER"] == "1" {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                HotkeyManager.toggleMenuBarWindow()
+            }
+        }
     }
 }

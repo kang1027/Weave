@@ -70,6 +70,9 @@ public struct BinanceProvider: MarketDataProvider {
     public func candles(providerSymbol: String, interval: CandleInterval) async throws -> [Candle] {
         let binanceInterval: String
         switch interval {
+        case .m15: binanceInterval = "15m"
+        case .h1: binanceInterval = "1h"
+        case .h4: binanceInterval = "4h"
         case .day: binanceInterval = "1d"
         case .week: binanceInterval = "1w"
         case .month: binanceInterval = "1M"

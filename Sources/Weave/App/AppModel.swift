@@ -43,7 +43,7 @@ final class AppModel: ObservableObject {
     var chartLoadToken = 0
 
     // 상세 차트 상태
-    @Published var detailPeriod: ChartPeriod = .sixMonths
+    @Published var detailInterval: CandleInterval = .day
     @Published var detailCandles: [Candle] = []
     @Published var isDetailChartLoading = false
     var detailChartAssetID: UUID?

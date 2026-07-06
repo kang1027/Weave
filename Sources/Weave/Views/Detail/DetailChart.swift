@@ -2,7 +2,8 @@ import Charts
 import SwiftUI
 import WeaveCore
 
-/// 상세 실캔들 차트 — 종가 라인+그라디언트, 평단 점선, B/S 마커, hover 크로스헤어.
+/// 상세 차트 — 종가 라인+그라디언트, 평단 점선, B/S 마커, 크로스헤어.
+/// 가로 드래그/스크롤 = 팬, 핀치 = 줌, 더블클릭 = 최신 구간 리셋.
 struct DetailChart: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
@@ -12,21 +13,49 @@ struct DetailChart: View {
 
     @State private var hoveredDate: Date?
     @State private var hoveredTradeID: UUID?
+    /// 보이는 창의 왼쪽 끝(x 스크롤 위치).
+    @State private var scrollX = Date.distantPast
+    /// 보이는 창의 길이(초). 0이면 아직 초기화 전.
+    @State private var visibleSeconds: Double = 0
+    @State private var magnifyStartSeconds: Double?
 
     private var candles: [Candle] { model.detailCandles }
     private var color: Color { theme.paletteColor(asset.colorIndex) }
+    private var interval: CandleInterval { model.detailInterval }
 
+    // MARK: - 창(window) 계산
+
+    /// 기본 창 = 캔들 90개.
+    private var defaultWindowSeconds: Double { interval.seconds * 90 }
+    private var minWindowSeconds: Double { interval.seconds * 15 }
+
+    private var dataSpanSeconds: Double {
+        guard let first = candles.first?.date, let last = candles.last?.date else { return 0 }
+        return last.timeIntervalSince(first) + interval.seconds
+    }
+
+    private var effectiveVisibleSeconds: Double {
+        visibleSeconds > 0 ? visibleSeconds : min(defaultWindowSeconds, max(dataSpanSeconds, minWindowSeconds))
+    }
+
+    private var windowEnd: Date { scrollX.addingTimeInterval(effectiveVisibleSeconds) }
+
+    private var visibleCandles: [Candle] {
+        let window = candles.filter { $0.date >= scrollX && $0.date <= windowEnd }
+        return window.isEmpty ? candles : window
+    }
+
+    /// y 도메인은 보이는 구간에 맞춰 자동 피팅(바이낸스식).
     private var yDomain: ClosedRange<Double> {
-        var values = candles.map { $0.close.doubleValue }
-        values.append(contentsOf: visibleTrades.map { $0.price.doubleValue })
-        if position.quantity > 0, position.averageCost > 0 {
-            values.append(position.averageCost.doubleValue)
-        }
+        var values = visibleCandles.map { $0.close.doubleValue }
+        values.append(contentsOf: visibleTrades
+            .filter { $0.date >= scrollX && $0.date <= windowEnd }
+            .map { $0.price.doubleValue })
         guard let min = values.min(), let max = values.max(), min < max else {
             let v = values.first ?? 1
             return (v * 0.9)...(v * 1.1)
         }
-        let pad = (max - min) * 0.1
+        let pad = (max - min) * 0.12
         return (min - pad)...(max + pad)
     }
 
@@ -46,6 +75,15 @@ struct DetailChart: View {
         }
         .frame(height: 190)
         .padding(.horizontal, 8)
+        .onChange(of: candles) { resetWindow() }
+        .onAppear { resetWindow() }
+    }
+
+    private func resetWindow() {
+        guard let last = candles.last?.date else { return }
+        let span = max(dataSpanSeconds, minWindowSeconds)
+        visibleSeconds = min(defaultWindowSeconds, span)
+        scrollX = last.addingTimeInterval(interval.seconds - visibleSeconds)
     }
 
     private var placeholder: some View {
@@ -61,12 +99,16 @@ struct DetailChart: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    // MARK: - 차트
+
     private var chart: some View {
         Chart {
             ForEach(candles, id: \.date) { candle in
+                // yStart를 도메인 하단에 고정 — 기본값(0)이면 필이 플롯 밖까지 뻗는다.
                 AreaMark(
                     x: .value("Date", candle.date),
-                    y: .value("Price", candle.close.doubleValue)
+                    yStart: .value("Base", yDomain.lowerBound),
+                    yEnd: .value("Price", candle.close.doubleValue)
                 )
                 .foregroundStyle(
                     LinearGradient(
@@ -111,7 +153,11 @@ struct DetailChart: View {
                 .foregroundStyle(color)
             }
         }
+        .chartScrollableAxes(.horizontal)
+        .chartXVisibleDomain(length: effectiveVisibleSeconds)
+        .chartScrollPosition(x: $scrollX)
         .chartYScale(domain: yDomain)
+        .chartPlotStyle { $0.clipped() }
         .chartYAxis {
             AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
                 AxisGridLine().foregroundStyle(theme.grid)
@@ -129,8 +175,8 @@ struct DetailChart: View {
             }
         }
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                AxisValueLabel(format: xLabelFormat, anchor: .top)
+            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+                AxisValueLabel(format: xFormat, anchor: .top)
                     .font(.system(size: 9))
                     .foregroundStyle(theme.xLabel)
             }
@@ -140,12 +186,42 @@ struct DetailChart: View {
                 crosshairAndMarkers(proxy: proxy, geo: geo)
             }
         }
+        .simultaneousGesture(magnification)
+        .onTapGesture(count: 2) {
+            withAnimation(.easeOut(duration: 0.2)) { resetWindow() }
+        }
     }
 
-    private var xLabelFormat: Date.FormatStyle {
-        model.detailPeriod == .all
-            ? .dateTime.year(.twoDigits).locale(model.locale)
-            : .dateTime.month(.narrow).locale(model.locale)
+    /// 핀치 줌 — 창 중앙을 고정한 채 창 길이를 조절.
+    private var magnification: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                if magnifyStartSeconds == nil {
+                    magnifyStartSeconds = effectiveVisibleSeconds
+                }
+                guard let base = magnifyStartSeconds, value.magnification > 0 else { return }
+                let center = scrollX.addingTimeInterval(effectiveVisibleSeconds / 2)
+                let maxWindow = max(dataSpanSeconds, minWindowSeconds)
+                let proposed = min(max(base / value.magnification, minWindowSeconds), maxWindow)
+                visibleSeconds = proposed
+                scrollX = center.addingTimeInterval(-proposed / 2)
+            }
+            .onEnded { _ in magnifyStartSeconds = nil }
+    }
+
+    /// 보이는 창 길이에 맞춘 x축 라벨 포맷.
+    private var xFormat: Date.FormatStyle {
+        let window = effectiveVisibleSeconds
+        if window <= 2 * 86_400 {
+            return .dateTime.hour().minute().locale(model.locale)
+        }
+        if window <= 120 * 86_400 {
+            return .dateTime.month(.defaultDigits).day().locale(model.locale)
+        }
+        if window <= 730 * 86_400 {
+            return .dateTime.month(.abbreviated).locale(model.locale)
+        }
+        return .dateTime.year().locale(model.locale)
     }
 
     private var avgLabel: String {
@@ -178,12 +254,16 @@ struct DetailChart: View {
                         }
                     }
 
-                // B/S 마커.
+                // B/S 마커 — 팬/줌으로 창 밖에 있으면 숨김.
                 ForEach(visibleTrades) { trade in
                     if let x = proxy.position(forX: trade.date),
-                       let y = proxy.position(forY: trade.price.doubleValue) {
+                       let y = proxy.position(forY: trade.price.doubleValue),
+                       x >= 0, x <= plot.width, y >= -9, y <= plot.height + 9 {
                         tradeMarker(trade: trade, plot: plot)
-                            .position(x: plot.origin.x + x, y: plot.origin.y + y)
+                            .position(
+                                x: plot.origin.x + x,
+                                y: plot.origin.y + min(max(y, 9), plot.height - 9)
+                            )
                     }
                 }
 
@@ -196,9 +276,7 @@ struct DetailChart: View {
                         text: model.settings.privacyMode
                             ? MoneyFormatter.masked
                             : MoneyFormatter.price(candle.close, currency: asset.currency),
-                        secondary: candle.date.formatted(
-                            .dateTime.year().month().day().locale(model.locale)
-                        )
+                        secondary: crosshairDateText(candle.date)
                     )
                     .position(
                         x: plot.origin.x + min(max(x, 52), plot.width - 52),
@@ -208,6 +286,15 @@ struct DetailChart: View {
                 }
             }
         }
+    }
+
+    private func crosshairDateText(_ date: Date) -> String {
+        if interval.isIntraday {
+            return date.formatted(
+                .dateTime.month(.defaultDigits).day().hour().minute().locale(model.locale)
+            )
+        }
+        return date.formatted(.dateTime.year().month().day().locale(model.locale))
     }
 
     private func tradeMarker(trade: Trade, plot: CGRect) -> some View {

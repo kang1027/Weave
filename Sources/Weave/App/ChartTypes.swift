@@ -28,14 +28,6 @@ enum ChartPeriod: String, CaseIterable, Identifiable {
         }
     }
 
-    /// 기간 매핑: 1M/3M/6M/1Y = 일봉, ALL = 주봉(5년 초과분은 월봉 — 조회 후 판단).
-    var interval: CandleInterval {
-        switch self {
-        case .all: return .week
-        default: return .day
-        }
-    }
-
     func startDate(now: Date = Date(), calendar: Calendar = .current) -> Date? {
         guard let months else { return nil }
         return calendar.date(byAdding: .month, value: -months, to: now)

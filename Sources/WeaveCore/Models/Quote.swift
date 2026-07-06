@@ -33,7 +33,43 @@ public struct Candle: Codable, Equatable, Sendable {
 }
 
 public enum CandleInterval: String, Codable, Sendable, CaseIterable {
+    case m15 = "15m"
+    case h1 = "1h"
+    case h4 = "4h"
     case day
     case week
     case month
+
+    /// 캔들 하나가 덮는 시간(월봉은 근사값 — 축 계산용).
+    public var seconds: TimeInterval {
+        switch self {
+        case .m15: return 15 * 60
+        case .h1: return 3_600
+        case .h4: return 4 * 3_600
+        case .day: return 86_400
+        case .week: return 7 * 86_400
+        case .month: return 30 * 86_400
+        }
+    }
+
+    public var isIntraday: Bool {
+        switch self {
+        case .m15, .h1, .h4: return true
+        case .day, .week, .month: return false
+        }
+    }
+
+    /// 상세 차트 인터벌 pills 순서.
+    public static let detailCases: [CandleInterval] = [.m15, .h1, .h4, .day, .week, .month]
+
+    public var label: String {
+        switch self {
+        case .m15: return "15m"
+        case .h1: return "1H"
+        case .h4: return "4H"
+        case .day: return "1D"
+        case .week: return "1W"
+        case .month: return "1M"
+        }
+    }
 }
