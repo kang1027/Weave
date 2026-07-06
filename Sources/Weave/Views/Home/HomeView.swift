@@ -15,7 +15,9 @@ struct HomeView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
+                    // zIndex: 링 hover 툴팁이 아래 총액 위에 그려지도록.
                     RingsRow(portfolio: portfolio)
+                        .zIndex(10)
                     totalSection(portfolio)
                     CapsHeader(text: model.t("Value History"))
                     ValueHistoryChart()

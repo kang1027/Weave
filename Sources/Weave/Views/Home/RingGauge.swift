@@ -77,6 +77,8 @@ struct RingGauge: View {
                     .zIndex(10)
             }
         }
+        // 툴팁이 이웃 링/아래 형제 뷰에 가려지지 않게 hover 중엔 위로.
+        .zIndex(hoveredID != nil ? 50 : 0)
     }
 
     private struct Positioned: Identifiable {
