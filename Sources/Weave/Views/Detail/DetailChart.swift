@@ -190,12 +190,15 @@ struct DetailChart: View {
         scrollX = last.addingTimeInterval(interval.seconds - visibleSeconds)
     }
 
+    /// 창 오른쪽 끝은 마지막 캔들을 넘지 않는다 — 미래 빈 구간 금지.
+    /// 창이 데이터 전체보다 크면 우측 정렬(최신이 항상 오른쪽 끝).
     private func clampScroll(_ proposed: Date) -> Date {
         guard let first = candles.first?.date, let last = candles.last?.date else { return proposed }
         let window = effectiveVisibleSeconds
+        // windowEnd ≤ 마지막 캔들 + 캔들 1개 폭.
+        let maxX = last.addingTimeInterval(interval.seconds - window)
         let minX = first.addingTimeInterval(-window * 0.1)
-        let maxX = last.addingTimeInterval(interval.seconds - window * 0.4)
-        guard minX <= maxX else { return minX }
+        guard minX <= maxX else { return maxX }
         return min(max(proposed, minX), maxX)
     }
 
