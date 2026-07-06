@@ -13,6 +13,8 @@ struct DetailChart: View {
     let asset: Asset
     let trades: [Trade]
     let position: PositionSnapshot
+    /// B/S 마커 클릭 → Trades 리스트의 해당 행 포커스.
+    var onSelectTrade: (UUID) -> Void = { _ in }
 
     @State private var hoveredDate: Date?
     @State private var hoveredTradeID: UUID?
@@ -348,34 +350,36 @@ struct DetailChart: View {
             let x = xPosition(for: candle.date)
             let y = yPosition(for: candle.close.doubleValue)
 
-            Rectangle()
-                .fill(theme.guide)
-                .frame(width: 1, height: plotFrame.height)
-                .offset(x: x, y: plotFrame.minY)
-                .allowsHitTesting(false)
+            // zIndex: 가격 툴팁이 B/S 마커 뒤로 숨지 않게 마커보다 위.
+            ZStack(alignment: .topLeading) {
+                Rectangle()
+                    .fill(theme.guide)
+                    .frame(width: 1, height: plotFrame.height)
+                    .offset(x: x, y: plotFrame.minY)
 
-            DashedHLine()
-                .stroke(theme.guide.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
-                .frame(width: plotFrame.width, height: 1)
-                .offset(x: plotFrame.minX, y: y)
-                .allowsHitTesting(false)
+                DashedHLine()
+                    .stroke(theme.guide.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
+                    .frame(width: plotFrame.width, height: 1)
+                    .offset(x: plotFrame.minX, y: y)
 
-            Circle()
-                .fill(color)
-                .frame(width: 7, height: 7)
-                .offset(x: x - 3.5, y: y - 3.5)
-                .allowsHitTesting(false)
+                Circle()
+                    .fill(color)
+                    .frame(width: 7, height: 7)
+                    .offset(x: x - 3.5, y: y - 3.5)
 
-            TooltipBubble(
-                text: MoneyFormatter.price(candle.close, currency: asset.currency),
-                secondary: crosshairDateText(candle.date),
-                blurText: model.settings.privacyMode
-            )
-            .position(
-                x: min(max(x, plotFrame.minX + 52), plotFrame.maxX - 52),
-                y: plotFrame.minY + 18
-            )
+                TooltipBubble(
+                    text: MoneyFormatter.price(candle.close, currency: asset.currency),
+                    secondary: crosshairDateText(candle.date),
+                    blurText: model.settings.privacyMode
+                )
+                .position(
+                    x: min(max(x, plotFrame.minX + 52), plotFrame.maxX - 52),
+                    y: plotFrame.minY + 18
+                )
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .allowsHitTesting(false)
+            .zIndex(20)
         }
     }
 
@@ -386,13 +390,24 @@ struct DetailChart: View {
             let y = yPosition(for: trade.price.doubleValue)
             if x >= plotFrame.minX, x <= plotFrame.maxX,
                y >= plotFrame.minY - 9, y <= plotFrame.maxY + 9 {
-                tradeMarker(trade: trade)
+                let clampedX = min(max(x, plotFrame.minX + 9), plotFrame.maxX - 9)
+                tradeMarker(trade: trade, tooltipShift: tooltipShift(atX: clampedX))
                     .position(
-                        x: min(max(x, plotFrame.minX + 9), plotFrame.maxX - 9),
+                        x: clampedX,
                         y: min(max(y, plotFrame.minY + 9), plotFrame.maxY - 9)
                     )
             }
         }
+    }
+
+    /// 마커 툴팁이 플롯 밖으로 잘리지 않게 좌우로 밀어줄 오프셋.
+    private func tooltipShift(atX x: CGFloat) -> CGFloat {
+        let halfWidth: CGFloat = 105
+        let rightOverhang = (x + halfWidth) - plotFrame.maxX
+        if rightOverhang > 0 { return -rightOverhang }
+        let leftOverhang = plotFrame.minX - (x - halfWidth)
+        if leftOverhang > 0 { return leftOverhang }
+        return 0
     }
 
     private func crosshairDateText(_ date: Date) -> String {
@@ -409,7 +424,7 @@ struct DetailChart: View {
         return model.t("Avg \(price)")
     }
 
-    private func tradeMarker(trade: Trade) -> some View {
+    private func tradeMarker(trade: Trade, tooltipShift: CGFloat) -> some View {
         let isBuy = trade.side == .buy
         let markerColor = isBuy ? theme.green : theme.red
         let isHovered = hoveredTradeID == trade.id
@@ -423,7 +438,7 @@ struct DetailChart: View {
                 .foregroundStyle(markerColor)
             if isHovered {
                 TooltipBubble(text: markerTitle(trade), secondary: markerSub(trade))
-                    .offset(y: -32)
+                    .offset(x: tooltipShift, y: -32)
                     .allowsHitTesting(false)
                     .zIndex(30)
             }
@@ -431,8 +446,12 @@ struct DetailChart: View {
         .scaleEffect(isHovered ? 1.18 : 1)
         .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
         .animation(.easeOut(duration: 0.15), value: isHovered)
+        .zIndex(isHovered ? 25 : 0)
         .onHover { hovering in
             hoveredTradeID = hovering ? trade.id : nil
+        }
+        .onTapGesture {
+            onSelectTrade(trade.id)
         }
     }
 

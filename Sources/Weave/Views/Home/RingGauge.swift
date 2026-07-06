@@ -17,6 +17,8 @@ struct RingGauge: View {
     let centerText: String
     let centerColor: Color?
     let caption: String
+    /// 지정하면 내장 툴팁 대신 부모가 툴팁을 그린다(가장자리 클리핑 회피용).
+    var onHoverSegment: ((Segment?) -> Void)? = nil
 
     @State private var hoveredID: String?
 
@@ -60,16 +62,23 @@ struct RingGauge: View {
         .frame(width: size, height: size)
         .contentShape(Circle())
         .onContinuousHover { phase in
+            let newID: String?
             switch phase {
             case .active(let point):
-                hoveredID = segmentID(at: point)
+                newID = segmentID(at: point)
             case .ended:
-                hoveredID = nil
+                newID = nil
+            }
+            if newID != hoveredID {
+                hoveredID = newID
+                onHoverSegment?(segments.first { $0.id == newID })
             }
         }
         // 링 행이 스크롤 콘텐츠 최상단이라 위로 띄우면 잘린다 — 아래로 표시.
+        // (부모가 툴팁을 그리는 경우엔 생략)
         .overlay(alignment: .bottom) {
-            if let hoveredID,
+            if onHoverSegment == nil,
+               let hoveredID,
                let segment = segments.first(where: { $0.id == hoveredID }) {
                 TooltipBubble(text: segment.tooltip)
                     .offset(y: 32)

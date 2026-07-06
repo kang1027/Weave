@@ -7,6 +7,9 @@ struct RingsRow: View {
     @EnvironmentObject private var model: AppModel
     let portfolio: PortfolioMetrics
 
+    /// hover 중인 세그먼트 툴팁 텍스트 + 링 인덱스(0=Day, 1=Return, 2=Assets).
+    @State private var hoveredTooltip: (text: String, ring: Int)?
+
     var body: some View {
         HStack(spacing: 22) {
             RingGauge(
@@ -20,7 +23,8 @@ struct RingsRow: View {
                 size: 64,
                 centerText: MoneyFormatter.percent(portfolio.dayChangePercent, fractionDigits: 1),
                 centerColor: theme.upDown(portfolio.dayChangePercent >= 0),
-                caption: "Day"
+                caption: "Day",
+                onHoverSegment: { hoveredTooltip = $0.map { ($0.tooltip, 0) } }
             )
 
             RingGauge(
@@ -34,7 +38,8 @@ struct RingsRow: View {
                 size: 96,
                 centerText: MoneyFormatter.percent(portfolio.totalReturnPercent, fractionDigits: 1),
                 centerColor: theme.upDown(portfolio.totalReturnPercent >= 0),
-                caption: "Return"
+                caption: "Return",
+                onHoverSegment: { hoveredTooltip = $0.map { ($0.tooltip, 1) } }
             )
 
             RingGauge(
@@ -42,12 +47,30 @@ struct RingsRow: View {
                 size: 64,
                 centerText: "\(portfolio.assetCount)",
                 centerColor: nil,
-                caption: "Assets"
+                caption: "Assets",
+                onHoverSegment: { hoveredTooltip = $0.map { ($0.tooltip, 2) } }
             )
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 12)
         .padding(.bottom, 4)
+        // 툴팁은 행 레벨에서 — 링 위치에 따라 좌/중/우 정렬해 팝오버 밖으로 잘리지 않게.
+        .overlay(alignment: tooltipAlignment) {
+            if let hoveredTooltip {
+                TooltipBubble(text: hoveredTooltip.text)
+                    .offset(y: 30)
+                    .padding(.horizontal, 10)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+
+    private var tooltipAlignment: Alignment {
+        switch hoveredTooltip?.ring {
+        case 0: return .bottomLeading
+        case 2: return .bottomTrailing
+        default: return .bottom
+        }
     }
 
     /// Day/Return — 채움 비율(fill)을 세그먼트 기여 비율로 분할.

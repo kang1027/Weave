@@ -9,6 +9,7 @@ struct AssetDetailView: View {
 
     @State private var deletionTarget: Trade?
     @State private var isHoveringLogo = false
+    @State private var highlightedTradeID: UUID?
 
     private var trades: [Trade] {
         model.document.trades(for: assetID)
@@ -31,22 +32,31 @@ struct AssetDetailView: View {
         return VStack(spacing: 0) {
             detailHeader(asset: asset)
 
-            ScrollView {
-                VStack(spacing: 0) {
-                    priceSection(asset: asset, metric: metric, position: position)
+            ScrollViewReader { scrollProxy in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        priceSection(asset: asset, metric: metric, position: position)
 
-                    if asset.isManual {
-                        manualSection(asset: asset)
-                    } else {
-                        DetailChart(asset: asset, trades: model.document.trades(for: assetID), position: position)
+                        if asset.isManual {
+                            manualSection(asset: asset)
+                        } else {
+                            DetailChart(
+                                asset: asset,
+                                trades: model.document.trades(for: assetID),
+                                position: position,
+                                onSelectTrade: { tradeID in
+                                    focusTrade(tradeID, using: scrollProxy)
+                                }
+                            )
                             .padding(.top, 10)
 
-                        CapsHeader(text: model.t("Trades"))
-                        realizedSummary(position: position, currency: asset.currency)
-                        tradesList(asset: asset)
+                            CapsHeader(text: model.t("Trades"))
+                            realizedSummary(position: position, currency: asset.currency)
+                            tradesList(asset: asset)
+                        }
                     }
+                    .padding(.bottom, 8)
                 }
-                .padding(.bottom, 8)
             }
 
             footer(asset: asset, position: position)
@@ -208,9 +218,30 @@ struct AssetDetailView: View {
         } else {
             VStack(spacing: 0) {
                 ForEach(trades) { trade in
-                    TradeRow(trade: trade, asset: asset) {
+                    TradeRow(
+                        trade: trade,
+                        asset: asset,
+                        isHighlighted: highlightedTradeID == trade.id
+                    ) {
                         deletionTarget = trade
                     }
+                    .id(trade.id)
+                }
+            }
+        }
+    }
+
+    /// 차트 B/S 마커 클릭 → 해당 거래 행으로 스크롤 + 잠깐 하이라이트.
+    private func focusTrade(_ tradeID: UUID, using scrollProxy: ScrollViewProxy) {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            scrollProxy.scrollTo(tradeID, anchor: .center)
+            highlightedTradeID = tradeID
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(1.6))
+            if highlightedTradeID == tradeID {
+                withAnimation(.easeOut(duration: 0.4)) {
+                    highlightedTradeID = nil
                 }
             }
         }
@@ -274,6 +305,7 @@ private struct TradeRow: View {
     @EnvironmentObject private var model: AppModel
     let trade: Trade
     let asset: Asset
+    var isHighlighted = false
     let onDelete: () -> Void
 
     var body: some View {
@@ -312,6 +344,7 @@ private struct TradeRow: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .contentShape(Rectangle())
+        .background(theme.link.opacity(isHighlighted ? 0.16 : 0))
         .hoverHighlight()
         .contextMenu {
             Button(model.t("Edit")) {
