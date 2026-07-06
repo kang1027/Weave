@@ -9,6 +9,9 @@ struct RingsRow: View {
 
     /// hover 중인 세그먼트 툴팁 텍스트 + 링 인덱스(0=Day, 1=Return, 2=Assets).
     @State private var hoveredTooltip: (text: String, ring: Int)?
+    /// 행 좌표계 기준 커서 위치 — 툴팁을 마우스 옆에 붙이기 위함.
+    @State private var cursor = CGPoint.zero
+    @State private var tooltipSize = CGSize.zero
 
     var body: some View {
         HStack(spacing: 22) {
@@ -54,23 +57,32 @@ struct RingsRow: View {
         .frame(maxWidth: .infinity)
         .padding(.top, 12)
         .padding(.bottom, 4)
-        // 툴팁은 행 레벨에서 — 링 위치에 따라 좌/중/우 정렬해 팝오버 밖으로 잘리지 않게.
-        .overlay(alignment: tooltipAlignment) {
+        // 커서 위치 추적 — 툴팁을 마우스 바로 아래에 붙인다.
+        .onContinuousHover { phase in
+            if case .active(let point) = phase {
+                cursor = point
+            }
+        }
+        .overlay(alignment: .topLeading) {
             if let hoveredTooltip {
-                TooltipBubble(text: hoveredTooltip.text)
-                    .offset(y: 30)
-                    .padding(.horizontal, 10)
-                    .allowsHitTesting(false)
+                GeometryReader { geo in
+                    TooltipBubble(text: hoveredTooltip.text)
+                        .onGeometryChange(for: CGSize.self, of: \.size) { tooltipSize = $0 }
+                        .position(
+                            x: clampedTooltipX(rowWidth: geo.size.width),
+                            y: cursor.y + 14 + tooltipSize.height / 2
+                        )
+                }
+                .allowsHitTesting(false)
             }
         }
     }
 
-    private var tooltipAlignment: Alignment {
-        switch hoveredTooltip?.ring {
-        case 0: return .bottomLeading
-        case 2: return .bottomTrailing
-        default: return .bottom
-        }
+    /// 툴팁이 팝오버 좌우로 잘리지 않게 커서 x를 중심으로 클램프.
+    private func clampedTooltipX(rowWidth: CGFloat) -> CGFloat {
+        let half = tooltipSize.width / 2
+        guard rowWidth > tooltipSize.width + 12 else { return rowWidth / 2 }
+        return min(max(cursor.x, half + 6), rowWidth - half - 6)
     }
 
     /// Day/Return — 채움 비율(fill)을 세그먼트 기여 비율로 분할.

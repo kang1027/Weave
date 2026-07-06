@@ -346,6 +346,10 @@ private struct TradeRow: View {
         .contentShape(Rectangle())
         .background(theme.link.opacity(isHighlighted ? 0.16 : 0))
         .hoverHighlight()
+        // 더블클릭 = 수정 (우클릭 컨텍스트 메뉴와 동일 동작).
+        .onTapGesture(count: 2) {
+            model.push(.tradeForm(assetID: asset.id, editing: trade, prefill: nil))
+        }
         .contextMenu {
             Button(model.t("Edit")) {
                 model.push(.tradeForm(assetID: asset.id, editing: trade, prefill: nil))
