@@ -15,6 +15,10 @@ struct DetailChart: View {
     let position: PositionSnapshot
     /// B/S 마커 클릭 → Trades 리스트의 해당 행 포커스.
     var onSelectTrade: (UUID) -> Void = { _ in }
+    /// 거래 행 클릭 → 차트의 해당 마커 포커스 요청(처리 후 nil로 리셋).
+    @Binding var focusRequest: UUID?
+
+    @State private var focusedTradeID: UUID?
 
     @State private var hoveredDate: Date?
     @State private var hoveredTradeID: UUID?
@@ -100,12 +104,36 @@ struct DetailChart: View {
                 .padding(.horizontal, 16)
         }
         .onChange(of: candles) { resetWindow() }
+        .onChange(of: focusRequest) { _, request in
+            guard let request else { return }
+            focusMarker(tradeID: request)
+            focusRequest = nil
+        }
         .onAppear {
             resetWindow()
             installScrollZoomMonitor()
         }
         .onDisappear(perform: removeScrollZoomMonitor)
         .onHover { isHoveringChart = $0 }
+    }
+
+    /// 거래 행 클릭 → 해당 마커가 창 밖이면 그 시점을 중앙으로 팬하고 잠깐 강조.
+    private func focusMarker(tradeID: UUID) {
+        guard let trade = trades.first(where: { $0.id == tradeID }) else { return }
+        if trade.date < scrollX || trade.date > windowEnd {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                scrollX = clampScroll(
+                    trade.date.addingTimeInterval(-effectiveVisibleSeconds / 2)
+                )
+            }
+        }
+        focusedTradeID = tradeID
+        Task {
+            try? await Task.sleep(for: .seconds(1.8))
+            if focusedTradeID == tradeID {
+                withAnimation(.easeOut(duration: 0.3)) { focusedTradeID = nil }
+            }
+        }
     }
 
     private var placeholder: some View {
@@ -344,6 +372,7 @@ struct DetailChart: View {
     private var crosshair: some View {
         if dragStartScrollX == nil,
            hoveredTradeID == nil,
+           focusedTradeID == nil,
            let hoveredDate,
            let candle = nearestCandle(to: hoveredDate),
            candle.date >= scrollX, candle.date <= windowEnd {
@@ -427,7 +456,7 @@ struct DetailChart: View {
     private func tradeMarker(trade: Trade, tooltipShift: CGFloat) -> some View {
         let isBuy = trade.side == .buy
         let markerColor = isBuy ? theme.green : theme.red
-        let isHovered = hoveredTradeID == trade.id
+        let isEmphasized = hoveredTradeID == trade.id || focusedTradeID == trade.id
         return ZStack {
             Circle()
                 .fill(theme.pointBg)
@@ -436,17 +465,20 @@ struct DetailChart: View {
             Text(isBuy ? "B" : "S")
                 .font(.system(size: 9, weight: .heavy))
                 .foregroundStyle(markerColor)
-            if isHovered {
+            if isEmphasized {
                 TooltipBubble(text: markerTitle(trade), secondary: markerSub(trade))
                     .offset(x: tooltipShift, y: -32)
                     .allowsHitTesting(false)
                     .zIndex(30)
             }
         }
-        .scaleEffect(isHovered ? 1.18 : 1)
-        .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
-        .animation(.easeOut(duration: 0.15), value: isHovered)
-        .zIndex(isHovered ? 25 : 0)
+        .scaleEffect(isEmphasized ? 1.18 : 1)
+        .shadow(
+            color: isEmphasized ? markerColor.opacity(0.5) : .black.opacity(0.25),
+            radius: isEmphasized ? 5 : 3, y: 1
+        )
+        .animation(.easeOut(duration: 0.15), value: isEmphasized)
+        .zIndex(isEmphasized ? 25 : 0)
         .onHover { hovering in
             hoveredTradeID = hovering ? trade.id : nil
         }

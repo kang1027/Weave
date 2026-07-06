@@ -10,6 +10,8 @@ struct AssetDetailView: View {
     @State private var deletionTarget: Trade?
     @State private var isHoveringLogo = false
     @State private var highlightedTradeID: UUID?
+    /// 거래 행 클릭 → 차트 마커 포커스 요청.
+    @State private var chartFocusTradeID: UUID?
 
     private var trades: [Trade] {
         model.document.trades(for: assetID)
@@ -46,13 +48,15 @@ struct AssetDetailView: View {
                                 position: position,
                                 onSelectTrade: { tradeID in
                                     focusTrade(tradeID, using: scrollProxy)
-                                }
+                                },
+                                focusRequest: $chartFocusTradeID
                             )
                             .padding(.top, 10)
+                            .id("detail-chart")
 
                             CapsHeader(text: model.t("Trades"))
                             realizedSummary(position: position, currency: asset.currency)
-                            tradesList(asset: asset)
+                            tradesList(asset: asset, scrollProxy: scrollProxy)
                         }
                     }
                     .padding(.bottom, 8)
@@ -209,7 +213,7 @@ struct AssetDetailView: View {
     }
 
     @ViewBuilder
-    private func tradesList(asset: Asset) -> some View {
+    private func tradesList(asset: Asset, scrollProxy: ScrollViewProxy) -> some View {
         if trades.isEmpty {
             Text(model.t("No trades yet — tap + to record your first buy."))
                 .font(.system(size: 11.5))
@@ -221,10 +225,18 @@ struct AssetDetailView: View {
                     TradeRow(
                         trade: trade,
                         asset: asset,
-                        isHighlighted: highlightedTradeID == trade.id
-                    ) {
-                        deletionTarget = trade
-                    }
+                        isHighlighted: highlightedTradeID == trade.id,
+                        onFocusMarker: {
+                            // 행 클릭 → 차트가 보이게 스크롤 + 해당 마커 포커스.
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                scrollProxy.scrollTo("detail-chart", anchor: .center)
+                            }
+                            chartFocusTradeID = trade.id
+                        },
+                        onDelete: {
+                            deletionTarget = trade
+                        }
+                    )
                     .id(trade.id)
                 }
             }
@@ -306,6 +318,7 @@ private struct TradeRow: View {
     let trade: Trade
     let asset: Asset
     var isHighlighted = false
+    var onFocusMarker: () -> Void = {}
     let onDelete: () -> Void
 
     var body: some View {
@@ -346,10 +359,16 @@ private struct TradeRow: View {
         .contentShape(Rectangle())
         .background(theme.link.opacity(isHighlighted ? 0.16 : 0))
         .hoverHighlight()
-        // 더블클릭 = 수정 (우클릭 컨텍스트 메뉴와 동일 동작).
-        .onTapGesture(count: 2) {
-            model.push(.tradeForm(assetID: asset.id, editing: trade, prefill: nil))
-        }
+        // 더블클릭 = 수정, 단일 클릭 = 차트 마커 포커스. (exclusively로 구분)
+        .gesture(
+            TapGesture(count: 2)
+                .onEnded {
+                    model.push(.tradeForm(assetID: asset.id, editing: trade, prefill: nil))
+                }
+                .exclusively(
+                    before: TapGesture().onEnded { onFocusMarker() }
+                )
+        )
         .contextMenu {
             Button(model.t("Edit")) {
                 model.push(.tradeForm(assetID: asset.id, editing: trade, prefill: nil))
