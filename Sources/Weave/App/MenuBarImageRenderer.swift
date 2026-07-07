@@ -88,19 +88,21 @@ enum MenuBarImageRenderer {
         let topRowHeight = max(ceil(ts.height), badgeSize)
         let bottomRowHeight = ceil(bs.height)
         let height = topRowHeight + bottomRowHeight
-        let width = max(badgeSize + gap + ceil(ts.width), ceil(bs.width)) + 2
+        let topContentWidth = badgeSize + gap + ceil(ts.width)
+        let width = max(topContentWidth, ceil(bs.width)) + 2
 
         return draw(width: width, height: height) {
-            // 하단(가격 등락%) — 좌측 정렬.
-            bottom.draw(at: NSPoint(x: 0, y: (bottomRowHeight - ceil(bs.height)) / 2))
-            // 상단 배지 + 이름 — 배지는 이름 왼쪽에만.
+            // 하단(가격 등락%) — 가로 중앙.
+            bottom.draw(at: NSPoint(x: (width - ceil(bs.width)) / 2, y: (bottomRowHeight - ceil(bs.height)) / 2))
+            // 상단 배지 + 이름 — 한 덩어리로 가로 중앙, 배지는 이름 왼쪽.
+            let topStart = (width - topContentWidth) / 2
             if let badge {
                 drawBadge(
                     badge, logo: logo,
-                    in: NSRect(x: 0, y: bottomRowHeight + (topRowHeight - badgeSize) / 2, width: badgeSize, height: badgeSize)
+                    in: NSRect(x: topStart, y: bottomRowHeight + (topRowHeight - badgeSize) / 2, width: badgeSize, height: badgeSize)
                 )
             }
-            top.draw(at: NSPoint(x: badgeSize + gap, y: bottomRowHeight + (topRowHeight - ceil(ts.height)) / 2))
+            top.draw(at: NSPoint(x: topStart + badgeSize + gap, y: bottomRowHeight + (topRowHeight - ceil(ts.height)) / 2))
         }
     }
 
