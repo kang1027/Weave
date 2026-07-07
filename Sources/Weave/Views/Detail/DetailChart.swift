@@ -19,6 +19,7 @@ struct DetailChart: View {
     @Binding var focusRequest: UUID?
 
     @State private var focusedTradeID: UUID?
+    @State private var panAnimationTask: Task<Void, Never>?
 
     @State private var hoveredDate: Date?
     @State private var hoveredTradeID: UUID?
@@ -113,26 +114,64 @@ struct DetailChart: View {
             resetWindow()
             installScrollZoomMonitor()
         }
-        .onDisappear(perform: removeScrollZoomMonitor)
+        .onDisappear {
+            removeScrollZoomMonitor()
+            panAnimationTask?.cancel()
+        }
         .onHover { isHoveringChart = $0 }
     }
 
-    /// 거래 행 클릭 → 해당 마커가 창 밖이면 그 시점을 중앙으로 팬하고 잠깐 강조.
+    /// 거래 행 클릭 → 해당 마커가 창 밖이면 그 시점까지 좌/우로 스르륵 팬하고 잠깐 강조.
     private func focusMarker(tradeID: UUID) {
         guard let trade = trades.first(where: { $0.id == tradeID }) else { return }
         if trade.date < scrollX || trade.date > windowEnd {
-            withAnimation(.easeInOut(duration: 0.25)) {
-                scrollX = clampScroll(
-                    trade.date.addingTimeInterval(-effectiveVisibleSeconds / 2)
-                )
+            let target = clampScroll(
+                trade.date.addingTimeInterval(-effectiveVisibleSeconds / 2)
+            )
+            animatePan(to: target) {
+                highlightMarker(tradeID)
             }
+        } else {
+            highlightMarker(tradeID)
         }
+    }
+
+    private func highlightMarker(_ tradeID: UUID) {
         focusedTradeID = tradeID
         Task {
             try? await Task.sleep(for: .seconds(1.8))
             if focusedTradeID == tradeID {
                 withAnimation(.easeOut(duration: 0.3)) { focusedTradeID = nil }
             }
+        }
+    }
+
+    /// 창을 목표 지점까지 easeOut으로 트윈 — 데이터 재조회 없이 이미 가진 캔들 위에서 이동.
+    /// 사용자 팬/줌이 들어오면 즉시 중단.
+    private func animatePan(to target: Date, completion: @escaping () -> Void = {}) {
+        panAnimationTask?.cancel()
+        let start = scrollX
+        let delta = target.timeIntervalSince(start)
+        guard abs(delta) > 1 else {
+            completion()
+            return
+        }
+        // 멀리 갈수록 조금 더 길게 (0.4s ~ 0.8s).
+        let windows = abs(delta) / max(effectiveVisibleSeconds, 1)
+        let duration = min(0.8, 0.4 + windows * 0.05)
+        let steps = max(Int(duration * 60), 12)
+
+        panAnimationTask = Task {
+            for step in 1...steps {
+                guard !Task.isCancelled else { return }
+                let progress = Double(step) / Double(steps)
+                let eased = 1 - pow(1 - progress, 3) // easeOut cubic
+                scrollX = start.addingTimeInterval(delta * eased)
+                try? await Task.sleep(for: .milliseconds(Int(duration * 1000) / steps))
+            }
+            guard !Task.isCancelled else { return }
+            scrollX = target
+            completion()
         }
     }
 
@@ -214,6 +253,7 @@ struct DetailChart: View {
     // MARK: - 팬/줌
 
     private func resetWindow() {
+        panAnimationTask?.cancel()
         guard let last = candles.last?.date else { return }
         let span = max(dataSpanSeconds, minWindowSeconds)
         visibleSeconds = min(defaultWindowSeconds, span)
@@ -234,6 +274,7 @@ struct DetailChart: View {
 
     /// factor > 1 = 줌아웃, < 1 = 줌인. anchor(커서 날짜)를 창 안 같은 비율 지점에 유지.
     private func zoom(by factor: Double, anchor: Date? = nil) {
+        panAnimationTask?.cancel()
         let current = effectiveVisibleSeconds
         let maxWindow = max(dataSpanSeconds, minWindowSeconds)
         let proposed = min(max(current * factor, minWindowSeconds), maxWindow)
@@ -266,6 +307,7 @@ struct DetailChart: View {
         guard scrollMonitor == nil else { return }
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
             guard isHoveringChart, !candles.isEmpty else { return event }
+            panAnimationTask?.cancel()
             let deltaX = event.scrollingDeltaX
             let deltaY = event.scrollingDeltaY
             if abs(deltaY) > abs(deltaX), deltaY != 0 {
@@ -342,7 +384,10 @@ struct DetailChart: View {
     private var dragPan: some Gesture {
         DragGesture(minimumDistance: 2)
             .onChanged { value in
-                if dragStartScrollX == nil { dragStartScrollX = scrollX }
+                if dragStartScrollX == nil {
+                    panAnimationTask?.cancel()
+                    dragStartScrollX = scrollX
+                }
                 guard let start = dragStartScrollX else { return }
                 let secondsPerPixel = effectiveVisibleSeconds / max(plotFrame.width, 1)
                 scrollX = clampScroll(
