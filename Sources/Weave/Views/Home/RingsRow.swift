@@ -16,34 +16,31 @@ struct RingsRow: View {
     var body: some View {
         HStack(spacing: 22) {
             RingGauge(
-                segments: scaledSegments(
-                    portfolio.daySegments,
-                    fill: RingScale.lapRatio(
-                        percent: portfolio.dayChangePercent,
-                        fullAt: Decimal(model.settings.dayRingFullPercent)
-                    )
+                segments: signedGauge(
+                    percent: portfolio.dayChangePercent,
+                    fullAt: model.settings.dayRingFullPercent,
+                    tooltip: dayCenterTooltip
                 ),
                 size: 64,
                 centerText: MoneyFormatter.percent(portfolio.dayChangePercent, fractionDigits: 1),
                 centerColor: theme.upDown(portfolio.dayChangePercent >= 0),
                 caption: "Day",
-                onHoverTooltip: { hoveredTooltip = $0.map { ($0, 0) } }
+                centerTooltip: dayCenterTooltip,
+                onHoverTooltip: { hoveredTooltip = $0.flatMap { $0.isEmpty ? nil : ($0, 0) } }
             )
 
             RingGauge(
-                segments: scaledSegments(
-                    portfolio.returnSegments,
-                    fill: RingScale.lapRatio(
-                        percent: portfolio.totalReturnPercent,
-                        fullAt: Decimal(model.settings.returnRingFullPercent)
-                    )
+                segments: signedGauge(
+                    percent: portfolio.totalReturnPercent,
+                    fullAt: model.settings.returnRingFullPercent,
+                    tooltip: returnCenterTooltip
                 ),
                 size: 96,
                 centerText: MoneyFormatter.percent(portfolio.totalReturnPercent, fractionDigits: 1),
                 centerColor: theme.upDown(portfolio.totalReturnPercent >= 0),
                 caption: "Return",
                 centerTooltip: returnCenterTooltip,
-                onHoverTooltip: { hoveredTooltip = $0.map { ($0, 1) } }
+                onHoverTooltip: { hoveredTooltip = $0.flatMap { $0.isEmpty ? nil : ($0, 1) } }
             )
 
             RingGauge(
@@ -52,7 +49,7 @@ struct RingsRow: View {
                 centerText: "\(portfolio.assetCount)",
                 centerColor: nil,
                 caption: "Assets",
-                onHoverTooltip: { hoveredTooltip = $0.map { ($0, 2) } }
+                onHoverTooltip: { hoveredTooltip = $0.flatMap { $0.isEmpty ? nil : ($0, 2) } }
             )
         }
         .frame(maxWidth: .infinity)
@@ -86,16 +83,17 @@ struct RingsRow: View {
         return min(max(cursor.x, half + 6), rowWidth - half - 6)
     }
 
-    /// Day/Return — 채움 비율(fill)을 세그먼트 기여 비율로 분할.
-    private func scaledSegments(_ segments: [RingSegment], fill: Double) -> [RingGauge.Segment] {
-        segments.map { segment in
-            RingGauge.Segment(
-                id: segment.id,
-                fraction: fill * segment.fraction,
-                color: color(for: segment),
-                tooltip: contributionTooltip(segment)
-            )
-        }
+    /// Day/Return — 부호 단색 단일 게이지(자산색 미사용 → 멀티랩 밝기와 안 헷갈림).
+    /// 채움 = lapRatio라 만점 초과 시 여러 바퀴가 된다.
+    private func signedGauge(percent: Decimal, fullAt: Int, tooltip: String?) -> [RingGauge.Segment] {
+        let ratio = RingScale.lapRatio(percent: percent, fullAt: Decimal(fullAt))
+        guard ratio > 0 else { return [] }
+        return [RingGauge.Segment(
+            id: "gauge",
+            fraction: ratio,
+            color: theme.upDown(percent >= 0),
+            tooltip: tooltip ?? ""
+        )]
     }
 
     /// Assets 도넛 — 전체 원을 비중대로.
@@ -126,15 +124,13 @@ struct RingsRow: View {
         return model.t("Total P&L \(amount)")
     }
 
-    private func contributionTooltip(_ segment: RingSegment) -> String {
-        if model.settings.privacyMode {
-            return segment.label
-        }
-        let amount = MoneyFormatter.signedPrice(
-            segment.amountBase.rounded(scale: 0),
+    /// Day 링 중앙/트랙 호버 시 — 일간 변동액(기준통화).
+    private var dayCenterTooltip: String? {
+        guard !model.settings.privacyMode else { return nil }
+        return MoneyFormatter.signedPrice(
+            portfolio.dayChangeAmountBase.rounded(scale: 0),
             currency: model.settings.baseCurrency
         )
-        return model.t("\(segment.label) contribution \(amount)")
     }
 
     private func color(for segment: RingSegment) -> Color {
