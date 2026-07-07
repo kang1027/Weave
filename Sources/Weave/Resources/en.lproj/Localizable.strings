@@ -144,3 +144,5 @@
 "Fills at this daily move; over it wraps a new lap" = "Fills at this daily move; over it wraps a new lap";
 "Fills at this total return; over it wraps a new lap" = "Fills at this total return; over it wraps a new lap";
 "Inline" = "Inline";
+"Switch asset" = "Switch asset";
+"Cycle menu bar asset" = "Cycle menu bar asset";

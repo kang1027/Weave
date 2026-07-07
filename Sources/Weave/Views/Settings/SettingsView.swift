@@ -27,7 +27,19 @@ struct SettingsView: View {
                             title: model.t("Global shortcut"),
                             subtitle: model.t("Open the popover")
                         ) {
-                            HotkeyRecorderButton()
+                            HotkeyRecorderButton(
+                                hotkey: model.settings.hotkey,
+                                onChange: { model.setHotkey($0) }
+                            )
+                        }
+                        SettingsRow(
+                            title: model.t("Switch asset"),
+                            subtitle: model.t("Cycle menu bar asset")
+                        ) {
+                            HotkeyRecorderButton(
+                                hotkey: model.settings.switchAssetHotkey,
+                                onChange: { model.setSwitchAssetHotkey($0) }
+                            )
                         }
                         SettingsRow(title: model.t("Menu bar rotation")) {
                             SelectPill(
@@ -375,6 +387,8 @@ private struct NativePopUp<T: Hashable>: NSViewRepresentable {
 struct HotkeyRecorderButton: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
+    let hotkey: Hotkey?
+    let onChange: (Hotkey?) -> Void
     @State private var isRecording = false
     @State private var monitor: Any?
 
@@ -401,9 +415,9 @@ struct HotkeyRecorderButton: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            if model.settings.hotkey != nil {
+            if hotkey != nil {
                 Button(model.t("Remove shortcut")) {
-                    model.setHotkey(nil)
+                    onChange(nil)
                 }
             }
         }
@@ -412,7 +426,7 @@ struct HotkeyRecorderButton: View {
 
     private var labelText: String {
         if isRecording { return model.t("Press keys…") }
-        if let hotkey = model.settings.hotkey {
+        if let hotkey {
             return HotkeyTranslator.display(hotkey)
         }
         return model.t("Record shortcut")
@@ -430,7 +444,7 @@ struct HotkeyRecorderButton: View {
             }
             let modifiers = HotkeyTranslator.carbonModifiers(from: event.modifierFlags)
             guard modifiers != 0 else { return nil }
-            model.setHotkey(Hotkey(keyCode: UInt32(event.keyCode), modifiers: modifiers))
+            onChange(Hotkey(keyCode: UInt32(event.keyCode), modifiers: modifiers))
             return nil
         }
     }

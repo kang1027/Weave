@@ -36,6 +36,12 @@ public struct Hotkey: Codable, Equatable, Hashable, Sendable {
         self.keyCode = keyCode
         self.modifiers = modifiers
     }
+
+    /// Carbon 수식키: cmdKey 256(0x100), optionKey 2048(0x800). keyCode: G=5, B=11.
+    /// 팝오버 열기 기본 — ⌥⌘G.
+    public static let defaultToggle = Hotkey(keyCode: 5, modifiers: 256 | 2048)
+    /// 자산 전환 기본 — ⌥⌘B.
+    public static let defaultSwitchAsset = Hotkey(keyCode: 11, modifiers: 256 | 2048)
 }
 
 public struct AppSettings: Codable, Equatable, Sendable {
@@ -52,7 +58,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var privacyMode: Bool
     public var launchAtLogin: Bool
     public var autoUpdateCheck: Bool
+    /// 팝오버 열기 단축키.
     public var hotkey: Hotkey?
+    /// 메뉴바 자산 전환 단축키.
+    public var switchAssetHotkey: Hotkey?
     /// Day 링이 꽉 차는 절대 등락%(만점). 초과분은 색을 달리해 다음 바퀴로.
     public var dayRingFullPercent: Int
     /// Return 링이 꽉 차는 절대 수익률%(만점).
@@ -69,7 +78,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         privacyMode: Bool = false,
         launchAtLogin: Bool = false,
         autoUpdateCheck: Bool = true,
-        hotkey: Hotkey? = nil,
+        hotkey: Hotkey? = Hotkey.defaultToggle,
+        switchAssetHotkey: Hotkey? = Hotkey.defaultSwitchAsset,
         dayRingFullPercent: Int = 2,
         returnRingFullPercent: Int = 25
     ) {
@@ -84,6 +94,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.launchAtLogin = launchAtLogin
         self.autoUpdateCheck = autoUpdateCheck
         self.hotkey = hotkey
+        self.switchAssetHotkey = switchAssetHotkey
         self.dayRingFullPercent = dayRingFullPercent
         self.returnRingFullPercent = returnRingFullPercent
     }
@@ -91,7 +102,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     enum CodingKeys: String, CodingKey {
         case theme, language, baseCurrency, displayCurrencyMode
         case quoteRefreshSeconds, rotationSeconds, menuBarFormat
-        case privacyMode, launchAtLogin, autoUpdateCheck, hotkey
+        case privacyMode, launchAtLogin, autoUpdateCheck, hotkey, switchAssetHotkey
         case dayRingFullPercent, returnRingFullPercent
     }
 
@@ -110,7 +121,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         privacyMode = (try? c.decodeIfPresent(Bool.self, forKey: .privacyMode)) ?? nil ?? d.privacyMode
         launchAtLogin = (try? c.decodeIfPresent(Bool.self, forKey: .launchAtLogin)) ?? nil ?? d.launchAtLogin
         autoUpdateCheck = (try? c.decodeIfPresent(Bool.self, forKey: .autoUpdateCheck)) ?? nil ?? d.autoUpdateCheck
-        hotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .hotkey)) ?? nil
+        hotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .hotkey)) ?? nil ?? d.hotkey
+        switchAssetHotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .switchAssetHotkey)) ?? nil ?? d.switchAssetHotkey
         dayRingFullPercent = (try? c.decodeIfPresent(Int.self, forKey: .dayRingFullPercent)) ?? nil ?? d.dayRingFullPercent
         returnRingFullPercent = (try? c.decodeIfPresent(Int.self, forKey: .returnRingFullPercent)) ?? nil ?? d.returnRingFullPercent
     }

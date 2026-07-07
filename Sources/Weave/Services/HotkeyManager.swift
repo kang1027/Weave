@@ -3,24 +3,49 @@ import Carbon.HIToolbox
 import WeaveCore
 
 /// 글로벌 단축키 — Carbon RegisterEventHotKey 기반(접근성 권한 불필요).
-/// 트리거 시 메뉴바 팝오버를 여닫는다.
+/// id별로 여러 단축키를 등록하고, 트리거되면 해당 액션을 호출한다.
 @MainActor
 final class HotkeyManager {
     static let shared = HotkeyManager()
 
-    private var hotKeyRef: EventHotKeyRef?
-    private var eventHandler: EventHandlerRef?
-    var onTrigger: (() -> Void)?
-
-    private init() {}
-
-    func apply(_ hotkey: Hotkey?) {
-        unregister()
-        guard let hotkey else { return }
-        register(hotkey)
+    /// 단축키 id — 등록/디스패치 식별용.
+    enum Action: UInt32 {
+        case togglePopover = 1
+        case switchAsset = 2
     }
 
-    private func register(_ hotkey: Hotkey) {
+    private struct Registration {
+        var ref: EventHotKeyRef?
+        var action: () -> Void
+    }
+
+    private var eventHandler: EventHandlerRef?
+    private var registrations: [UInt32: Registration] = [:]
+
+    private init() { installHandler() }
+
+    /// 주어진 id의 단축키를 (재)등록. hotkey가 nil이면 해제만 한다.
+    func register(_ id: Action, hotkey: Hotkey?, action: @escaping () -> Void) {
+        if let existing = registrations[id.rawValue]?.ref {
+            UnregisterEventHotKey(existing)
+        }
+        registrations[id.rawValue] = nil
+        guard let hotkey else { return }
+
+        var ref: EventHotKeyRef?
+        let hotKeyID = EventHotKeyID(signature: OSType(0x5756_4B59), id: id.rawValue) // "WVKY"
+        RegisterEventHotKey(
+            hotkey.keyCode, hotkey.modifiers, hotKeyID,
+            GetApplicationEventTarget(), 0, &ref
+        )
+        registrations[id.rawValue] = Registration(ref: ref, action: action)
+    }
+
+    private func trigger(id: UInt32) {
+        registrations[id]?.action()
+    }
+
+    private func installHandler() {
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
             eventKind: UInt32(kEventHotKeyPressed)
@@ -28,12 +53,17 @@ final class HotkeyManager {
         let selfPointer = Unmanaged.passUnretained(self).toOpaque()
         InstallEventHandler(
             GetApplicationEventTarget(),
-            { _, _, userData in
-                guard let userData else { return noErr }
+            { _, event, userData in
+                guard let userData, let event else { return noErr }
+                var hotKeyID = EventHotKeyID()
+                GetEventParameter(
+                    event, EventParamName(kEventParamDirectObject),
+                    EventParamType(typeEventHotKeyID), nil,
+                    MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID
+                )
                 let manager = Unmanaged<HotkeyManager>.fromOpaque(userData).takeUnretainedValue()
-                Task { @MainActor in
-                    manager.onTrigger?()
-                }
+                let id = hotKeyID.id
+                Task { @MainActor in manager.trigger(id: id) }
                 return noErr
             },
             1,
@@ -41,27 +71,6 @@ final class HotkeyManager {
             selfPointer,
             &eventHandler
         )
-
-        let hotKeyID = EventHotKeyID(signature: OSType(0x5756_4B59), id: 1) // "WVKY"
-        RegisterEventHotKey(
-            hotkey.keyCode,
-            hotkey.modifiers,
-            hotKeyID,
-            GetApplicationEventTarget(),
-            0,
-            &hotKeyRef
-        )
-    }
-
-    func unregister() {
-        if let hotKeyRef {
-            UnregisterEventHotKey(hotKeyRef)
-            self.hotKeyRef = nil
-        }
-        if let eventHandler {
-            RemoveEventHandler(eventHandler)
-            self.eventHandler = nil
-        }
     }
 
     /// 메뉴바 팝오버 토글 — MenuBarExtra는 공개 API가 없어 상태바 버튼 클릭으로 대체.

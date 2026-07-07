@@ -32,11 +32,18 @@ extension AppModel {
         applyHotkey()
     }
 
+    func setSwitchAssetHotkey(_ hotkey: Hotkey?) {
+        settings.switchAssetHotkey = hotkey
+        applyHotkey()
+    }
+
     func applyHotkey() {
-        HotkeyManager.shared.onTrigger = {
+        HotkeyManager.shared.register(.togglePopover, hotkey: settings.hotkey) {
             HotkeyManager.toggleMenuBarWindow()
         }
-        HotkeyManager.shared.apply(settings.hotkey)
+        HotkeyManager.shared.register(.switchAsset, hotkey: settings.switchAssetHotkey) { [weak self] in
+            self?.advanceMenuBarAsset()
+        }
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {

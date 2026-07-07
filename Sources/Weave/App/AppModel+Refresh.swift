@@ -40,6 +40,12 @@ extension AppModel {
         restartRefreshLoop()
     }
 
+    /// 메뉴바 자산을 다음 것으로 전환(단축키). 로테이션 타이머도 리셋한다.
+    func advanceMenuBarAsset() {
+        rotationIndex += 1
+        restartRotationLoop()
+    }
+
     // MARK: - 메뉴바 타이틀
 
     /// 로테이션 대상: 핀 자산이 있으면 그것만(메뉴바 토글보다 우선), 없으면 메뉴바 표시가 켜진 자산 순환.
