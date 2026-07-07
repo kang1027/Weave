@@ -259,7 +259,7 @@ private struct CombinedChart: View {
         let price = model.settings.privacyMode
             ? MoneyFormatter.masked
             : MoneyFormatter.price(marker.trade.price, currency: marker.asset.currency)
-        return model.t("\(marker.asset.symbol) buy · \(qty) @ \(price)") + convertedSuffix(marker)
+        return model.t("\(marker.asset.name) buy · \(qty) @ \(price)") + convertedSuffix(marker)
     }
 
     /// 자산 통화 ≠ 기준 통화면 현재 환율 환산가를 병기.
@@ -490,9 +490,13 @@ private struct PerAssetChart: View {
             }
         }
         // 선 근처(≈16pt)에 있을 때만 하이라이트.
+        // 날짜는 그 종목의 실제 데이터 포인트에 스냅 — Combined처럼 규격에 맞춰 표시.
         if let best, best.dist <= 16 {
             hoveredLineID = best.id
-            hoveredDate = date
+            let line = lines.first { $0.id == best.id }
+            hoveredDate = line?.points.min {
+                abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
+            }?.date ?? date
         } else {
             hoveredLineID = nil
             hoveredDate = nil
