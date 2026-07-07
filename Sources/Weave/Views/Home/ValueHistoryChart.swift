@@ -26,6 +26,10 @@ struct ValueHistoryChart: View {
                 chartBody
                     .frame(height: 118)
 
+                if model.homeChartMode == .perAsset, !model.homeAssetSeries.isEmpty {
+                    assetLegend
+                }
+
                 SegmentedPills(
                     options: ChartPeriod.homeCases.map { ($0, $0.rawValue) },
                     selection: $model.homeChartPeriod
@@ -61,6 +65,25 @@ struct ValueHistoryChart: View {
             .font(.system(size: 11))
             .foregroundStyle(theme.text2)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// 자산별 모드 범례 — 라인 색과 종목명 매핑(ASSETS 리스트 점과 동일 색).
+    private var assetLegend: some View {
+        HStack(spacing: 10) {
+            ForEach(model.homeAssetSeries) { line in
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(theme.paletteColor(line.asset.colorIndex))
+                        .frame(width: 6, height: 6)
+                    Text(line.asset.name)
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundStyle(theme.text2)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 8)
     }
 }
 

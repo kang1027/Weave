@@ -157,6 +157,10 @@ struct AssetListRow: View {
                 AssetLogoView(asset: metric.asset)
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 5) {
+                        // Value History(자산별) 라인과 같은 색 점 — 범례 역할.
+                        Circle()
+                            .fill(theme.paletteColor(metric.asset.colorIndex))
+                            .frame(width: 7, height: 7)
                         Text(metric.asset.name)
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(theme.text)
