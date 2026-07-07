@@ -285,6 +285,8 @@ private struct PerAssetChart: View {
     @EnvironmentObject private var model: AppModel
     let lines: [AssetLineSeries]
 
+    @State private var hoveredDate: Date?
+
     var body: some View {
         Chart {
             ForEach(lines) { line in
@@ -296,6 +298,23 @@ private struct PerAssetChart: View {
                     )
                     .foregroundStyle(theme.paletteColor(line.asset.colorIndex))
                     .lineStyle(StrokeStyle(lineWidth: 1.8))
+                }
+            }
+
+            // hover 크로스헤어 — 세로 가이드 + 각 종목 라인 위 포인트.
+            if let hoveredDate {
+                RuleMark(x: .value("Date", hoveredDate))
+                    .foregroundStyle(theme.guide)
+                    .lineStyle(StrokeStyle(lineWidth: 1))
+                ForEach(lines) { line in
+                    if let point = nearestPoint(line, to: hoveredDate) {
+                        PointMark(
+                            x: .value("Date", point.date),
+                            y: .value("Percent", point.percent)
+                        )
+                        .symbolSize(38)
+                        .foregroundStyle(theme.paletteColor(line.asset.colorIndex))
+                    }
                 }
             }
         }
@@ -321,6 +340,75 @@ private struct PerAssetChart: View {
                 .font(.system(size: 9))
                 .foregroundStyle(theme.xLabel)
             }
+        }
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                if let plotAnchor = proxy.plotFrame {
+                    let plot = geo[plotAnchor]
+                    ZStack(alignment: .topLeading) {
+                        Rectangle()
+                            .fill(.clear)
+                            .contentShape(Rectangle())
+                            .frame(width: plot.width, height: plot.height)
+                            .position(x: plot.midX, y: plot.midY)
+                            .onContinuousHover { phase in
+                                switch phase {
+                                case .active(let point):
+                                    hoveredDate = proxy.value(atX: point.x - plot.origin.x, as: Date.self)
+                                case .ended:
+                                    hoveredDate = nil
+                                }
+                            }
+                        if let hoveredDate, let x = proxy.position(forX: hoveredDate) {
+                            hoverTooltip(at: hoveredDate)
+                                .fixedSize()
+                                .position(
+                                    x: min(max(plot.origin.x + x, plot.origin.x + 60), plot.maxX - 60),
+                                    y: plot.origin.y + 28
+                                )
+                                .allowsHitTesting(false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// hover 시점의 종목별 색·이름·수익률 툴팁.
+    private func hoverTooltip(at date: Date) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(lines) { line in
+                if let point = nearestPoint(line, to: date) {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(theme.paletteColor(line.asset.colorIndex))
+                            .frame(width: 6, height: 6)
+                        Text(line.asset.name)
+                            .font(.system(size: 9.5, weight: .medium))
+                            .foregroundStyle(theme.text)
+                            .lineLimit(1)
+                        Spacer(minLength: 10)
+                        Text(MoneyFormatter.percent(Decimal.fromDouble(point.percent)))
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(theme.upDown(point.percent >= 0))
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(theme.tooltipBg)
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(theme.tooltipBorder))
+                .shadow(color: .black.opacity(0.2), radius: 10, y: 6)
+        )
+    }
+
+    private func nearestPoint(_ line: AssetLineSeries, to date: Date) -> (date: Date, percent: Double)? {
+        line.points.min {
+            abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
         }
     }
 }
