@@ -44,26 +44,31 @@ public enum MenuBarTitleBuilder {
 
     // MARK: - 이미지 렌더용 구성요소
 
-    /// 한 줄 = 색 없는 앞부분 + 색칠할 등락%(옵션).
+    /// 한 줄 = 앞부분 + 색칠할 등락%(옵션).
     public struct Line: Equatable, Sendable {
         public var text: String
         /// 초록/빨강으로 색칠할 등락% 토큰(앞 공백 포함). 없으면 nil.
         public var percent: String?
+        /// text(가격 등)도 등락 색으로 칠할지. false면 시스템 기본색.
+        public var textColored: Bool
 
-        public init(text: String, percent: String? = nil) {
+        public init(text: String, percent: String? = nil, textColored: Bool = false) {
             self.text = text
             self.percent = percent
+            self.textColored = textColored
         }
     }
 
-    /// 1줄 왼쪽 배지(inline 포맷) — 팔레트 색 원 + 이니셜.
+    /// 왼쪽 배지(로고) — 커스텀 로고가 있으면 그 이미지, 없으면 팔레트 색 이니셜.
     public struct Badge: Equatable, Sendable {
         public var initial: String
         public var colorIndex: Int
+        public var customLogoFileName: String?
 
-        public init(initial: String, colorIndex: Int) {
+        public init(initial: String, colorIndex: Int, customLogoFileName: String?) {
             self.initial = initial
             self.colorIndex = colorIndex
+            self.customLogoFileName = customLogoFileName
         }
     }
 
@@ -90,8 +95,9 @@ public enum MenuBarTitleBuilder {
         privacy: Bool
     ) -> MenuBarParts {
         let name = displayName(asset)
+        // full·inline은 로고 배지 표시(compact는 이름/등락%만).
+        let badge = (format == .full || format == .inline) ? assetBadge(asset) : nil
         guard let quote else {
-            let badge = format == .inline ? Badge(initial: badgeInitial(asset), colorIndex: asset.colorIndex) : nil
             return MenuBarParts(line1: Line(text: name), isUp: true, badge: badge)
         }
         let price = privacy
@@ -102,11 +108,12 @@ public enum MenuBarTitleBuilder {
 
         switch format {
         case .full:
-            // 이름(위) / 가격 등락%(아래)
+            // [로고] 이름(위) / 가격 등락%(아래, 색)
             return MenuBarParts(
                 line1: Line(text: name),
-                line2: Line(text: price, percent: " " + percent),
-                isUp: isUp
+                line2: Line(text: price, percent: " " + percent, textColored: true),
+                isUp: isUp,
+                badge: badge
             )
         case .compact:
             // 이름(위) / 등락%(아래)
@@ -116,11 +123,11 @@ public enum MenuBarTitleBuilder {
                 isUp: isUp
             )
         case .inline:
-            // [로고 배지] 가격 등락%  (1줄)
+            // [로고] 가격 등락%  (1줄, 가격도 색)
             return MenuBarParts(
-                line1: Line(text: price, percent: " " + percent),
+                line1: Line(text: price, percent: " " + percent, textColored: true),
                 isUp: isUp,
-                badge: Badge(initial: badgeInitial(asset), colorIndex: asset.colorIndex)
+                badge: badge
             )
         }
     }
@@ -134,7 +141,7 @@ public enum MenuBarTitleBuilder {
     ) -> MenuBarParts {
         let price = privacy ? MoneyFormatter.masked : MoneyFormatter.price(totalBase, currency: baseCurrency)
         return MenuBarParts(
-            line1: Line(text: price, percent: " " + MoneyFormatter.arrowPercent(dayChangePercent)),
+            line1: Line(text: price, percent: " " + MoneyFormatter.arrowPercent(dayChangePercent), textColored: true),
             isUp: dayChangePercent >= 0
         )
     }
@@ -147,7 +154,11 @@ public enum MenuBarTitleBuilder {
         return isNumericSymbol ? asset.name : asset.symbol.uppercased()
     }
 
-    private static func badgeInitial(_ asset: Asset) -> String {
-        String(asset.name.prefix(1)).uppercased()
+    private static func assetBadge(_ asset: Asset) -> Badge {
+        Badge(
+            initial: String(asset.name.prefix(1)).uppercased(),
+            colorIndex: asset.colorIndex,
+            customLogoFileName: asset.customLogoFileName
+        )
     }
 }

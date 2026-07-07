@@ -3,11 +3,12 @@ import WeaveCore
 
 /// 메뉴바 라벨을 NSImage로 렌더 — MenuBarExtra의 Text 라벨은 색을 무시(단색)하고
 /// 2줄 표현도 안 되기 때문. 비-template 이미지라 색이 그대로 유지된다.
-/// 앞부분은 labelColor(시스템 외관 추종), 등락%만 초록/빨강.
+/// 이름은 labelColor(시스템 외관 추종), 가격·등락%는 등락 색.
+@MainActor
 enum MenuBarImageRenderer {
     private static let up = hex(0x32D74B)
     private static let down = hex(0xFF453A)
-    /// 자산 팔레트(슬레이트) — inline 배지 색.
+    /// 자산 팔레트(슬레이트) — 로고 없는 배지 색.
     private static let palette: [NSColor] = [
         hex(0xFF9F0A), hex(0x0A84FF), hex(0x8583FF), hex(0xFF375F),
         hex(0x64D2FF), hex(0xBF5AF2), hex(0xFFD60A), hex(0x66D4CF)
@@ -15,10 +16,10 @@ enum MenuBarImageRenderer {
 
     static func image(_ parts: MenuBarTitleBuilder.MenuBarParts) -> NSImage {
         let change = parts.isUp ? up : down
-        if let line2 = parts.line2 {
-            return render(twoLine(parts.line1, line2, change: change), badge: nil)
-        }
-        return render(oneLine(parts.line1, change: change), badge: parts.badge)
+        let attributed = parts.line2 != nil
+            ? twoLine(parts.line1, parts.line2!, change: change)
+            : oneLine(parts.line1, change: change)
+        return render(attributed, badge: parts.badge)
     }
 
     // MARK: - 텍스트 구성
@@ -27,7 +28,7 @@ enum MenuBarImageRenderer {
         let base = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium)
         let result = NSMutableAttributedString(
             string: line.text,
-            attributes: [.font: base, .foregroundColor: NSColor.labelColor]
+            attributes: [.font: base, .foregroundColor: line.textColored ? change : NSColor.labelColor]
         )
         if let percent = line.percent {
             result.append(NSAttributedString(
@@ -71,7 +72,11 @@ enum MenuBarImageRenderer {
         if !line.text.isEmpty {
             result.append(NSAttributedString(
                 string: line.text,
-                attributes: [.font: textFont, .foregroundColor: NSColor.labelColor, .paragraphStyle: para]
+                attributes: [
+                    .font: textFont,
+                    .foregroundColor: line.textColored ? change : NSColor.labelColor,
+                    .paragraphStyle: para
+                ]
             ))
         }
         if let percent = line.percent {
@@ -91,7 +96,7 @@ enum MenuBarImageRenderer {
         )
         let textWidth = ceil(textBounds.width)
         let textHeight = ceil(textBounds.height)
-        let badgeSize: CGFloat = badge != nil ? 13 : 0
+        let badgeSize: CGFloat = badge != nil ? 15 : 0
         let gap: CGFloat = badge != nil ? 4 : 0
         let width = badgeSize + gap + textWidth + 2
         let height = max(textHeight, badgeSize)
@@ -100,20 +105,8 @@ enum MenuBarImageRenderer {
         image.lockFocus()
 
         if let badge {
-            let rect = NSRect(x: 0, y: (height - badgeSize) / 2, width: badgeSize, height: badgeSize)
-            color(for: badge.colorIndex).setFill()
-            NSBezierPath(ovalIn: rect).fill()
-            let initial = NSAttributedString(
-                string: badge.initial,
-                attributes: [
-                    .font: NSFont.systemFont(ofSize: 7.5, weight: .bold),
-                    .foregroundColor: NSColor.white
-                ]
-            )
-            let size = initial.size()
-            initial.draw(at: NSPoint(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2))
+            drawBadge(badge, in: NSRect(x: 0, y: (height - badgeSize) / 2, width: badgeSize, height: badgeSize))
         }
-
         attributed.draw(
             with: NSRect(x: badgeSize + gap, y: (height - textHeight) / 2, width: textWidth, height: textHeight),
             options: [.usesLineFragmentOrigin]
@@ -122,6 +115,48 @@ enum MenuBarImageRenderer {
         image.unlockFocus()
         image.isTemplate = false
         return image
+    }
+
+    private static func drawBadge(_ badge: MenuBarTitleBuilder.Badge, in rect: NSRect) {
+        let radius = rect.width * 0.29
+        let clip = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+
+        if let fileName = badge.customLogoFileName, let logo = LogoStore.image(named: fileName) {
+            NSGraphicsContext.saveGraphicsState()
+            clip.addClip()
+            drawAspectFill(logo, in: rect)
+            NSGraphicsContext.restoreGraphicsState()
+        } else {
+            color(for: badge.colorIndex).setFill()
+            clip.fill()
+            let initial = NSAttributedString(
+                string: badge.initial,
+                attributes: [
+                    .font: NSFont.systemFont(ofSize: 8, weight: .bold),
+                    .foregroundColor: NSColor.white
+                ]
+            )
+            let size = initial.size()
+            initial.draw(at: NSPoint(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2))
+        }
+    }
+
+    /// 배지 사각형을 꽉 채우도록 종횡비 유지 스케일(넘치는 부분은 클립됨).
+    private static func drawAspectFill(_ image: NSImage, in rect: NSRect) {
+        let source = image.size
+        guard source.width > 0, source.height > 0 else {
+            image.draw(in: rect)
+            return
+        }
+        let scale = max(rect.width / source.width, rect.height / source.height)
+        let scaled = NSSize(width: source.width * scale, height: source.height * scale)
+        let drawRect = NSRect(
+            x: rect.midX - scaled.width / 2,
+            y: rect.midY - scaled.height / 2,
+            width: scaled.width,
+            height: scaled.height
+        )
+        image.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1)
     }
 
     private static func color(for colorIndex: Int) -> NSColor {
