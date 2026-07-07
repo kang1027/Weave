@@ -43,6 +43,10 @@ final class AppModel: ObservableObject {
     @Published var homeAssetSeries: [AssetLineSeries] = []
     @Published var homeBuyMarkers: [BuyMarker] = []
     @Published var isHomeChartLoading = false
+    /// Assets 리스트 % 배지 기간(1D/1W/1M/1Y).
+    @Published var assetReturnPeriod: AssetReturnPeriod = .day
+    /// 자산별 일봉 — 기간 수익률 계산용(홈 차트 로드 시 채워짐).
+    var homeAssetCandles: [UUID: [Candle]] = [:]
     /// 자산/거래 변이마다 증가 — 홈 `.task(id:)`가 이를 보고 재로드한다.
     @Published var chartGeneration = 0
     /// 늦게 끝난 이전 로드가 최신 결과를 덮어쓰지 않게 하는 토큰.

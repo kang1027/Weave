@@ -96,6 +96,29 @@ extension AppModel {
         homeSeries = series
         homeAssetSeries = assetLines
         homeBuyMarkers = markers
+        homeAssetCandles = candlesByAsset
+    }
+
+    /// Assets 리스트 % 배지 — 선택 기간(1D/1W/1M/1Y) 기준 수익률(소스 통화, FX 무관).
+    /// 1D는 시세의 24h 변동을 그대로, 그 이상은 일봉 종가 대비로 계산한다.
+    func assetReturnPercent(_ metric: AssetMetrics) -> Decimal? {
+        if assetReturnPeriod == .day {
+            return metric.dayChangePercent
+        }
+        guard
+            !metric.asset.isManual,
+            let candles = homeAssetCandles[metric.asset.id], !candles.isEmpty,
+            let current = metric.quote?.price ?? candles.last?.close, current > 0
+        else {
+            return nil
+        }
+        let cutoff = Calendar.current.date(
+            byAdding: .day, value: -assetReturnPeriod.days, to: Date()
+        ) ?? Date()
+        // 기준 시점 이전 마지막 종가. 이력이 기간보다 짧으면 최초 종가로 폴백.
+        let past = candles.last(where: { $0.date <= cutoff })?.close ?? candles.first?.close
+        guard let past, past > 0 else { return nil }
+        return ((current - past) / past * 100).rounded(scale: 2)
     }
 
     // MARK: - 상세 차트

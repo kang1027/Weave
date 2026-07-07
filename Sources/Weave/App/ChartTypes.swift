@@ -6,6 +6,26 @@ enum HomeChartMode: String, CaseIterable {
     case perAsset
 }
 
+/// Assets 리스트 % 배지 기준 기간.
+enum AssetReturnPeriod: String, CaseIterable, Identifiable {
+    case day = "1D"
+    case week = "1W"
+    case month = "1M"
+    case year = "1Y"
+
+    var id: String { rawValue }
+
+    /// 비교 기준 시점까지의 일수(day는 전날 대비라 별도 처리).
+    var days: Int {
+        switch self {
+        case .day: return 1
+        case .week: return 7
+        case .month: return 30
+        case .year: return 365
+        }
+    }
+}
+
 enum ChartPeriod: String, CaseIterable, Identifiable {
     case oneMonth = "1M"
     case threeMonths = "3M"

@@ -24,6 +24,17 @@ struct HomeView: View {
                     CapsHeader(text: model.t("Value History"))
                     ValueHistoryChart()
                     CapsHeader(text: model.t("Assets"))
+                    // % 배지 기간 필터 — 1D(전날 대비)/1W/1M/1Y.
+                    HStack {
+                        Spacer()
+                        SegmentedPills(
+                            options: AssetReturnPeriod.allCases.map { ($0, $0.rawValue) },
+                            selection: $model.assetReturnPeriod,
+                            fillsWidth: false
+                        )
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 2)
                     VStack(spacing: 0) {
                         ForEach(perAsset) { metric in
                             AssetListRow(metric: metric) {
@@ -256,7 +267,7 @@ struct AssetListRow: View {
 
     @ViewBuilder
     private var changeBadge: some View {
-        if let percent = metric.dayChangePercent {
+        if let percent = model.assetReturnPercent(metric) {
             ChangeBadge(
                 text: MoneyFormatter.percent(percent),
                 style: percent >= 0 ? .up : .down
