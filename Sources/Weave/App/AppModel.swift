@@ -40,7 +40,7 @@ final class AppModel: ObservableObject {
 
     // 홈 차트 상태
     @Published var homeChartMode: HomeChartMode = .combined
-    @Published var homeChartPeriod: ChartPeriod = .threeMonths
+    @Published var homeChartPeriod: ChartPeriod = .oneMonth
     @Published var homeSeries: [ValuePoint] = []
     @Published var homeAssetSeries: [AssetLineSeries] = []
     @Published var homeBuyMarkers: [BuyMarker] = []

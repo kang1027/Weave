@@ -26,31 +26,25 @@ enum AssetReturnPeriod: String, CaseIterable, Identifiable {
     }
 }
 
+/// 홈 Value History 표시 구간 — ASSETS 리스트 % 필터와 동일한 1D/1W/1M/1Y.
 enum ChartPeriod: String, CaseIterable, Identifiable {
+    case oneDay = "1D"
+    case oneWeek = "1W"
     case oneMonth = "1M"
-    case threeMonths = "3M"
-    case sixMonths = "6M"
     case oneYear = "1Y"
-    case all = "ALL"
 
     var id: String { rawValue }
 
-    /// 홈 차트는 ALL 미지원(1M~1Y), 상세는 전부.
-    static let homeCases: [ChartPeriod] = [.oneMonth, .threeMonths, .sixMonths, .oneYear]
+    static let homeCases: [ChartPeriod] = allCases
 
-    var months: Int? {
-        switch self {
-        case .oneMonth: return 1
-        case .threeMonths: return 3
-        case .sixMonths: return 6
-        case .oneYear: return 12
-        case .all: return nil
-        }
-    }
-
+    /// 표시 구간 시작 시점 — 실제 시작은 max(이 값, 첫 매수일)로 클램프된다.
     func startDate(now: Date = Date(), calendar: Calendar = .current) -> Date? {
-        guard let months else { return nil }
-        return calendar.date(byAdding: .month, value: -months, to: now)
+        switch self {
+        case .oneDay: return calendar.date(byAdding: .day, value: -1, to: now)
+        case .oneWeek: return calendar.date(byAdding: .day, value: -7, to: now)
+        case .oneMonth: return calendar.date(byAdding: .month, value: -1, to: now)
+        case .oneYear: return calendar.date(byAdding: .year, value: -1, to: now)
+        }
     }
 }
 
