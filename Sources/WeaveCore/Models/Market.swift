@@ -7,6 +7,10 @@ public enum Market: String, Codable, Sendable, CaseIterable {
     case usStock
     case japanStock
     case other
+
+    /// 24시간 거래 시장만 인트라데이(15m/1H/4H)가 의미 있다.
+    /// 주식은 장중에만 거래돼 야간·주말 슬롯이 비므로 상세 차트에서 1D부터 노출한다.
+    public var supportsIntraday: Bool { self == .crypto }
 }
 
 /// 시세 데이터 소스. Naver/Yahoo는 비공식 API라 어댑터 교체를 전제로 한다.

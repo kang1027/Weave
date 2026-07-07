@@ -120,6 +120,10 @@ struct DetailChart: View {
             focusRequest = nil
         }
         .onAppear {
+            // 주식인데 인트라데이가 선택돼 있으면(크립토서 넘어온 경우) 1D로 스냅.
+            if !asset.market.supportsIntraday, interval.isIntraday {
+                model.detailInterval = .day
+            }
             resetWindow()
             installScrollZoomMonitor()
         }
@@ -235,10 +239,17 @@ struct DetailChart: View {
 
     // MARK: - 컨트롤 (인터벌 pills + 줌)
 
+    /// 크립토는 전체, 주식은 인트라데이 제외(1D부터) — 장중만 거래라 갭이 심함.
+    private var intervalOptions: [CandleInterval] {
+        asset.market.supportsIntraday
+            ? CandleInterval.detailCases
+            : CandleInterval.detailCases.filter { !$0.isIntraday }
+    }
+
     private var controlsRow: some View {
         HStack(spacing: 6) {
             SegmentedPills(
-                options: CandleInterval.detailCases.map { ($0, $0.label) },
+                options: intervalOptions.map { ($0, $0.label) },
                 selection: $model.detailInterval
             )
             zoomButton(systemName: "minus.magnifyingglass", help: model.t("Zoom out")) {
