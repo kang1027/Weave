@@ -228,19 +228,52 @@ private struct CombinedChart: View {
                     }
                 }
 
-                // 값 툴팁 — 날짜·평가액·등락률(마커 hover 중이 아닐 때).
-                if hoveredMarkerID == nil, let hoveredDate, let point = nearestPoint(to: hoveredDate),
-                   let x = proxy.position(forX: point.date) {
-                    valueTooltip(point)
-                        .fixedSize()
-                        .position(
-                            x: min(max(plot.origin.x + x, plot.origin.x + 56), plot.maxX - 56),
-                            y: plot.origin.y + 20
-                        )
-                        .allowsHitTesting(false)
+                // 툴팁 — 상단 고정 + 폭 측정 클램프라 패널 밖으로 잘리지 않는다.
+                // 마커 hover 우선, 아니면 hover 지점 값 툴팁.
+                if let marker = hoveredMarkerID.flatMap({ id in markers.first(where: { $0.id == id }) }),
+                   let x = proxy.position(forX: Calendar.current.startOfDay(for: marker.trade.date)) {
+                    ClampedTooltip(anchorX: plot.origin.x + x, top: plot.origin.y + 6, bounds: plot) {
+                        TooltipBubble(text: markerTitle(marker), secondary: markerSub(marker))
+                    }
+                } else if hoveredMarkerID == nil, let hoveredDate, let point = nearestPoint(to: hoveredDate),
+                          let x = proxy.position(forX: point.date) {
+                    ClampedTooltip(anchorX: plot.origin.x + x, top: plot.origin.y + 6, bounds: plot) {
+                        valueTooltip(point)
+                    }
                 }
             }
         }
+    }
+
+    // MARK: 마커 툴팁 텍스트
+
+    private func markerTitle(_ marker: BuyMarker) -> String {
+        let qty = MoneyFormatter.quantity(marker.trade.quantity)
+        let price = model.settings.privacyMode
+            ? MoneyFormatter.masked
+            : MoneyFormatter.price(marker.trade.price, currency: marker.asset.currency)
+        return model.t("\(marker.asset.symbol) buy · \(qty) @ \(price)") + convertedSuffix(marker)
+    }
+
+    /// 자산 통화 ≠ 기준 통화면 현재 환율 환산가를 병기.
+    private func convertedSuffix(_ marker: BuyMarker) -> String {
+        let assetCurrency = marker.asset.currency.uppercased()
+        let base = model.settings.baseCurrency.uppercased()
+        guard
+            !model.settings.privacyMode,
+            assetCurrency != base,
+            let rate = model.fxRates[assetCurrency]
+        else {
+            return ""
+        }
+        let converted = marker.trade.price * rate
+        return " (≈ \(MoneyFormatter.price(converted, currency: base)))"
+    }
+
+    private func markerSub(_ marker: BuyMarker) -> String {
+        let date = marker.trade.date.formatted(.dateTime.month(.defaultDigits).day().locale(model.locale))
+        guard let vs = marker.vsCurrentPercent else { return date }
+        return "\(date) · " + model.t("vs now \(MoneyFormatter.percent(vs))")
     }
 
     private func nearestPoint(to date: Date) -> ValuePoint? {
@@ -314,50 +347,7 @@ private struct MarkerDot: View {
                 .onTapGesture {
                     model.push(.detail(marker.asset.id))
                 }
-
-            if isHovered {
-                TooltipBubble(text: tooltipTitle, secondary: tooltipSub)
-                    .offset(x: tooltipOffset, y: -34)
-                    .allowsHitTesting(false)
-                    .zIndex(20)
-            }
         }
-    }
-
-    private var tooltipTitle: String {
-        let qty = MoneyFormatter.quantity(marker.trade.quantity)
-        let price = model.settings.privacyMode
-            ? MoneyFormatter.masked
-            : MoneyFormatter.price(marker.trade.price, currency: marker.asset.currency)
-        return model.t("\(marker.asset.symbol) buy · \(qty) @ \(price)") + convertedSuffix
-    }
-
-    /// 자산 통화 ≠ 기준 통화면 현재 환율 환산가를 병기.
-    private var convertedSuffix: String {
-        let assetCurrency = marker.asset.currency.uppercased()
-        let base = model.settings.baseCurrency.uppercased()
-        guard
-            !model.settings.privacyMode,
-            assetCurrency != base,
-            let rate = model.fxRates[assetCurrency]
-        else {
-            return ""
-        }
-        let converted = marker.trade.price * rate
-        return " (≈ \(MoneyFormatter.price(converted, currency: base)))"
-    }
-
-    private var tooltipSub: String {
-        let date = marker.trade.date.formatted(.dateTime.month(.defaultDigits).day().locale(model.locale))
-        guard let vs = marker.vsCurrentPercent else { return date }
-        return "\(date) · " + model.t("vs now \(MoneyFormatter.percent(vs))")
-    }
-
-    /// 차트 가장자리에서 툴팁이 잘리지 않게 좌우로 밀어준다.
-    private var tooltipOffset: CGFloat {
-        if position.x < 70 { return 55 }
-        if position.x > plotSize.width - 70 { return -55 }
-        return 0
     }
 }
 
@@ -368,7 +358,13 @@ private struct PerAssetChart: View {
     @EnvironmentObject private var model: AppModel
     let lines: [AssetLineSeries]
 
+    // 선(라인)에 커서를 올렸을 때만 그 종목 하나를 하이라이트한다.
+    @State private var hoveredLineID: UUID?
     @State private var hoveredDate: Date?
+
+    private var hoveredLine: AssetLineSeries? {
+        hoveredLineID.flatMap { id in lines.first(where: { $0.id == id }) }
+    }
 
     private var spanDays: Double {
         let dates = lines.flatMap { $0.points.map(\.date) }
@@ -385,26 +381,27 @@ private struct PerAssetChart: View {
                         y: .value("Percent", point.percent),
                         series: .value("Asset", line.asset.name)
                     )
-                    .foregroundStyle(theme.paletteColor(line.asset.colorIndex))
-                    .lineStyle(StrokeStyle(lineWidth: 1.8))
+                    // hover 중인 종목만 강조, 나머지는 흐리게.
+                    .foregroundStyle(
+                        theme.paletteColor(line.asset.colorIndex)
+                            .opacity(hoveredLineID == nil || hoveredLineID == line.id ? 1 : 0.28)
+                    )
+                    .lineStyle(StrokeStyle(lineWidth: hoveredLineID == line.id ? 2.4 : 1.8))
                 }
             }
 
-            // hover 크로스헤어 — 세로 가이드 + 각 종목 라인 위 포인트.
-            if let hoveredDate {
+            // hover 크로스헤어 — 세로 가이드 + 그 종목 라인 위 포인트(선에 올렸을 때만).
+            if let hoveredDate, let line = hoveredLine,
+               let point = interpolated(line, at: hoveredDate) {
                 RuleMark(x: .value("Date", hoveredDate))
                     .foregroundStyle(theme.guide)
                     .lineStyle(StrokeStyle(lineWidth: 1))
-                ForEach(lines) { line in
-                    if let point = nearestPoint(line, to: hoveredDate) {
-                        PointMark(
-                            x: .value("Date", point.date),
-                            y: .value("Percent", point.percent)
-                        )
-                        .symbolSize(38)
-                        .foregroundStyle(theme.paletteColor(line.asset.colorIndex))
-                    }
-                }
+                PointMark(
+                    x: .value("Date", point.date),
+                    y: .value("Percent", point.percent)
+                )
+                .symbolSize(38)
+                .foregroundStyle(theme.paletteColor(line.asset.colorIndex))
             }
         }
         .chartPlotStyle { $0.clipped() }
@@ -445,19 +442,16 @@ private struct PerAssetChart: View {
                             .onContinuousHover { phase in
                                 switch phase {
                                 case .active(let point):
-                                    hoveredDate = proxy.value(atX: point.x - plot.origin.x, as: Date.self)
+                                    updateHover(point: point, proxy: proxy, plot: plot)
                                 case .ended:
+                                    hoveredLineID = nil
                                     hoveredDate = nil
                                 }
                             }
-                        if let hoveredDate, let x = proxy.position(forX: hoveredDate) {
-                            hoverTooltip(at: hoveredDate)
-                                .fixedSize()
-                                .position(
-                                    x: min(max(plot.origin.x + x, plot.origin.x + 60), plot.maxX - 60),
-                                    y: plot.origin.y + 28
-                                )
-                                .allowsHitTesting(false)
+                        if let hoveredDate, let line = hoveredLine, let x = proxy.position(forX: hoveredDate) {
+                            ClampedTooltip(anchorX: plot.origin.x + x, top: plot.origin.y + 6, bounds: plot) {
+                                lineTooltip(line, at: hoveredDate)
+                            }
                         }
                     }
                 }
@@ -465,29 +459,54 @@ private struct PerAssetChart: View {
         }
     }
 
-    /// hover 시점의 날짜 + 종목별 색·이름·수익률 툴팁.
-    private func hoverTooltip(at date: Date) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+    /// 커서 y와 각 라인의 y(그 x에서 보간값)를 비교해, 임계값 안에서 가장 가까운 라인만 선택.
+    private func updateHover(point: CGPoint, proxy: ChartProxy, plot: CGRect) {
+        let localX = point.x - plot.origin.x
+        let localY = point.y - plot.origin.y
+        guard let date = proxy.value(atX: localX, as: Date.self) else {
+            hoveredLineID = nil
+            hoveredDate = nil
+            return
+        }
+        var best: (id: UUID, dist: CGFloat)?
+        for line in lines {
+            guard let ip = interpolated(line, at: date),
+                  let lineY = proxy.position(forY: ip.percent) else { continue }
+            let dist = abs(lineY - localY)
+            if best == nil || dist < best!.dist {
+                best = (line.id, dist)
+            }
+        }
+        // 선 근처(≈16pt)에 있을 때만 하이라이트.
+        if let best, best.dist <= 16 {
+            hoveredLineID = best.id
+            hoveredDate = date
+        } else {
+            hoveredLineID = nil
+            hoveredDate = nil
+        }
+    }
+
+    /// hover 시점의 날짜 + 그 종목 하나의 색·이름·수익률 툴팁.
+    private func lineTooltip(_ line: AssetLineSeries, at date: Date) -> some View {
+        let percent = interpolated(line, at: date)?.percent ?? 0
+        return VStack(alignment: .leading, spacing: 3) {
             Text(date.formatted(.dateTime.year().month().day().locale(model.locale)))
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(theme.text2)
-            ForEach(lines) { line in
-                if let point = nearestPoint(line, to: date) {
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(theme.paletteColor(line.asset.colorIndex))
-                            .frame(width: 6, height: 6)
-                        Text(line.asset.name)
-                            .font(.system(size: 9.5, weight: .medium))
-                            .foregroundStyle(theme.text)
-                            .lineLimit(1)
-                        Spacer(minLength: 10)
-                        Text(MoneyFormatter.percent(Decimal.fromDouble(point.percent)))
-                            .font(.system(size: 9.5, weight: .semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(theme.upDown(point.percent >= 0))
-                    }
-                }
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(theme.paletteColor(line.asset.colorIndex))
+                    .frame(width: 6, height: 6)
+                Text(line.asset.name)
+                    .font(.system(size: 9.5, weight: .medium))
+                    .foregroundStyle(theme.text)
+                    .lineLimit(1)
+                Spacer(minLength: 10)
+                Text(MoneyFormatter.percent(Decimal.fromDouble(percent)))
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(theme.upDown(percent >= 0))
             }
         }
         .padding(.horizontal, 8)
@@ -500,10 +519,21 @@ private struct PerAssetChart: View {
         )
     }
 
-    private func nearestPoint(_ line: AssetLineSeries, to date: Date) -> (date: Date, percent: Double)? {
-        line.points.min {
-            abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
+    /// 주어진 날짜에서 라인의 % 값을 인접 두 점 선형보간으로 계산(구간 밖은 양끝값).
+    private func interpolated(_ line: AssetLineSeries, at date: Date) -> (date: Date, percent: Double)? {
+        let pts = line.points
+        guard let first = pts.first, let last = pts.last else { return nil }
+        if date <= first.date { return first }
+        if date >= last.date { return last }
+        for i in 1..<pts.count {
+            let a = pts[i - 1], b = pts[i]
+            if date >= a.date && date <= b.date {
+                let span = b.date.timeIntervalSince(a.date)
+                let t = span > 0 ? date.timeIntervalSince(a.date) / span : 0
+                return (date, a.percent + (b.percent - a.percent) * t)
+            }
         }
+        return last
     }
 }
 
@@ -520,5 +550,43 @@ enum ChartAxis {
             return .dateTime.month(.abbreviated).locale(locale)
         }
         return .dateTime.month(.defaultDigits).day().locale(locale)
+    }
+}
+
+/// 차트 위 툴팁 — 자기 폭을 측정해 플롯 좌우 안쪽으로 클램프(패널 밖으로 안 잘림).
+/// anchorX는 원하는 중심 x(절대), top은 상단 y(절대), bounds는 플롯 사각형.
+private struct ClampedTooltip<Content: View>: View {
+    let anchorX: CGFloat
+    let top: CGFloat
+    let bounds: CGRect
+    @ViewBuilder let content: Content
+    @State private var width: CGFloat = 0
+
+    private var clampedX: CGFloat {
+        let half = width / 2
+        let lo = bounds.minX + half + 2
+        let hi = bounds.maxX - half - 2
+        guard lo <= hi else { return bounds.midX }
+        return min(max(anchorX, lo), hi)
+    }
+
+    var body: some View {
+        content
+            .fixedSize()
+            .background(
+                GeometryReader { g in
+                    Color.clear.preference(key: TooltipWidthKey.self, value: g.size.width)
+                }
+            )
+            .onPreferenceChange(TooltipWidthKey.self) { width = $0 }
+            .position(x: clampedX, y: top + 20)
+            .allowsHitTesting(false)
+    }
+}
+
+private struct TooltipWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
