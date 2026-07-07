@@ -11,13 +11,16 @@ extension AppModel {
         chartGeneration += 1
     }
 
-    /// 통합/자산별 시계열 + 매수 마커 재계산. 캔들은 일봉 캐시 사용.
-    /// 홈 진입마다 다시 불려도 같은 날은 캐시 히트라 비용이 거의 없다.
+    /// 통합/자산별 시계열 + 매수 마커 재계산.
+    /// 1D는 시간봉으로 최근 24h 인트라데이 곡선, 그 외는 일봉. x 도메인은 기간 전체로 고정.
     func loadHomeChart() async {
         chartLoadToken += 1
         let token = chartLoadToken
         let assets = visibleAssets
         let period = homeChartPeriod
+        let now = Date()
+        // 축은 데이터와 무관하게 늘 선택 기간 전체를 덮는다.
+        homeChartDomain = period.startDate(now: now)...now
         guard !assets.isEmpty else {
             homeSeries = []
             homeAssetSeries = []
@@ -27,37 +30,50 @@ extension AppModel {
         isHomeChartLoading = true
         defer { isHomeChartLoading = false }
 
-        let candlesByAsset = await fetchCandles(assets: assets, interval: .day)
-        var fxSeries = await fetchFXSeries(assets: assets)
-        // FX 시계열 조회 실패 통화는 현물 환율로라도 환산 — 자산이 0원으로 증발하는 것 방지.
+        let candlesByAsset = await fetchCandles(assets: assets, interval: period.candleInterval)
+        // 기준통화가 아닌 자산 통화의 현물 환율 확보(없으면 갱신).
         let base = settings.baseCurrency.uppercased()
         let neededCurrencies = Set(assets.map { $0.currency.uppercased() }).subtracting([base])
         if !neededCurrencies.allSatisfy({ fxRates[$0] != nil }) {
             await refreshFXRates()
         }
-        for currency in Set(assets.map { $0.currency.uppercased() })
-        where currency != base && fxSeries[currency] == nil {
-            if let spot = fxRates[currency] {
-                fxSeries[currency] = [
-                    Candle(date: Date(), open: spot, high: spot, low: spot, close: spot)
-                ]
-            }
-        }
-        let now = Date()
         let from = period.startDate(now: now)
 
-        let series = ValueSeriesBuilder.portfolioSeries(
-            assets: assets,
-            trades: document.trades,
-            candlesByAsset: candlesByAsset,
-            fxSeriesByCurrency: fxSeries,
-            baseCurrency: settings.baseCurrency,
-            from: from,
-            to: now
-        )
+        let series: [ValuePoint]
+        if period.isIntraday {
+            // 하루짜리 창 — 환율은 현물 상수로 환산(인트라데이 FX는 자산 변동 대비 미미).
+            series = ValueSeriesBuilder.intradayPortfolioSeries(
+                assets: assets,
+                trades: document.trades,
+                candlesByAsset: candlesByAsset,
+                fxSpotByCurrency: fxRates,
+                baseCurrency: settings.baseCurrency,
+                from: from,
+                to: now
+            )
+        } else {
+            var fxSeries = await fetchFXSeries(assets: assets)
+            // FX 시계열 조회 실패 통화는 현물 환율로라도 환산 — 자산이 0원으로 증발하는 것 방지.
+            for currency in neededCurrencies where fxSeries[currency] == nil {
+                if let spot = fxRates[currency] {
+                    fxSeries[currency] = [
+                        Candle(date: now, open: spot, high: spot, low: spot, close: spot)
+                    ]
+                }
+            }
+            series = ValueSeriesBuilder.portfolioSeries(
+                assets: assets,
+                trades: document.trades,
+                candlesByAsset: candlesByAsset,
+                fxSeriesByCurrency: fxSeries,
+                baseCurrency: settings.baseCurrency,
+                from: from,
+                to: now
+            )
+        }
 
-        // 자산별 정규화 라인 — 구간 시작 = 통합 시계열과 동일.
-        let windowStart = series.first?.date ?? from ?? now
+        // 자산별 정규화 라인 — 구간 시작 = 표시 창 시작(첫 데이터가 없으면 from).
+        let windowStart = series.first?.date ?? from
         let assetLines: [AssetLineSeries] = assets.compactMap { asset in
             guard !asset.isManual, let candles = candlesByAsset[asset.id] else { return nil }
             let points = ValueSeriesBuilder.normalizedSeries(
@@ -67,16 +83,16 @@ extension AppModel {
             return AssetLineSeries(asset: asset, points: points)
         }
 
-        // 매수 마커 — 표시 구간 안의 매수 체결. y = 그 날짜의 포트폴리오 가치.
-        let lookup = Dictionary(uniqueKeysWithValues: series.map {
-            (Calendar.current.startOfDay(for: $0.date), $0.value)
-        })
+        // 매수 마커 — 표시 구간 안의 매수 체결. y = 그 시점과 가장 가까운 시계열 값.
+        // (일봉/시간봉 공통 — 날짜 키 사전은 인트라데이에서 중복 키로 깨지므로 최근접 탐색.)
         let markers: [BuyMarker] = document.trades
             .filter { $0.side == .buy && $0.date >= windowStart }
-            .compactMap { trade in
+            .compactMap { trade -> BuyMarker? in
                 guard
                     let asset = assets.first(where: { $0.id == trade.assetID }),
-                    let value = lookup[Calendar.current.startOfDay(for: trade.date)]
+                    let nearest = series.min(by: {
+                        abs($0.date.timeIntervalSince(trade.date)) < abs($1.date.timeIntervalSince(trade.date))
+                    })
                 else {
                     return nil
                 }
@@ -86,7 +102,7 @@ extension AppModel {
                 }
                 return BuyMarker(
                     trade: trade, asset: asset,
-                    seriesValue: value, vsCurrentPercent: vsCurrent
+                    seriesValue: nearest.value, vsCurrentPercent: vsCurrent
                 )
             }
             .sorted { $0.trade.date < $1.trade.date }
@@ -193,13 +209,25 @@ extension AppModel {
     private func fetchCandles(assets: [Asset], interval: CandleInterval) async -> [UUID: [Candle]] {
         await withTaskGroup(of: (UUID, [Candle]?).self) { group in
             for asset in assets where !asset.isManual {
+                let id = asset.id
+                let provider = asset.provider
+                let symbol = asset.providerSymbol
                 group.addTask { [candleService] in
+                    // 네이버(국장)는 인트라데이가 없어 야후 .KS/.KQ로 브릿지.
+                    if provider == .naver, interval.isIntraday {
+                        for suffix in [".KS", ".KQ"] {
+                            if let candles = try? await candleService.candles(
+                                provider: .yahoo, providerSymbol: symbol + suffix, interval: interval
+                            ), !candles.isEmpty {
+                                return (id, candles)
+                            }
+                        }
+                        return (id, nil)
+                    }
                     let candles = try? await candleService.candles(
-                        provider: asset.provider,
-                        providerSymbol: asset.providerSymbol,
-                        interval: interval
+                        provider: provider, providerSymbol: symbol, interval: interval
                     )
-                    return (asset.id, candles)
+                    return (id, candles)
                 }
             }
             var result: [UUID: [Candle]] = [:]

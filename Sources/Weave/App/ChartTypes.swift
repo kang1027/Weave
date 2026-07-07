@@ -37,13 +37,42 @@ enum ChartPeriod: String, CaseIterable, Identifiable {
 
     static let homeCases: [ChartPeriod] = allCases
 
-    /// 표시 구간 시작 시점 — 실제 시작은 max(이 값, 첫 매수일)로 클램프된다.
-    func startDate(now: Date = Date(), calendar: Calendar = .current) -> Date? {
+    /// 표시 구간 시작 시점. x 도메인은 항상 이 시점~now로 고정된다(데이터가 짧아도).
+    func startDate(now: Date = Date(), calendar: Calendar = .current) -> Date {
         switch self {
-        case .oneDay: return calendar.date(byAdding: .day, value: -1, to: now)
-        case .oneWeek: return calendar.date(byAdding: .day, value: -7, to: now)
-        case .oneMonth: return calendar.date(byAdding: .month, value: -1, to: now)
-        case .oneYear: return calendar.date(byAdding: .year, value: -1, to: now)
+        case .oneDay: return calendar.date(byAdding: .hour, value: -24, to: now) ?? now
+        case .oneWeek: return calendar.date(byAdding: .day, value: -7, to: now) ?? now
+        case .oneMonth: return calendar.date(byAdding: .month, value: -1, to: now) ?? now
+        case .oneYear: return calendar.date(byAdding: .year, value: -1, to: now) ?? now
+        }
+    }
+
+    /// 캔들 조회 주기 — 1D만 시간봉(인트라데이), 나머지는 일봉.
+    var candleInterval: CandleInterval {
+        self == .oneDay ? .h1 : .day
+    }
+
+    var isIntraday: Bool { self == .oneDay }
+
+    /// x축 눈금 간격 — 1D는 6시간(nn:00), 1W 일, 1M 주, 1Y 2개월.
+    var axisStride: (component: Calendar.Component, count: Int) {
+        switch self {
+        case .oneDay: return (.hour, 6)
+        case .oneWeek: return (.day, 1)
+        case .oneMonth: return (.weekOfYear, 1)
+        case .oneYear: return (.month, 2)
+        }
+    }
+
+    /// x축 라벨 포맷 — 1D 시:분(24h), 1W·1M 월/일, 1Y 월.
+    func axisFormat(locale: Locale) -> Date.FormatStyle {
+        switch self {
+        case .oneDay:
+            return .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits).locale(locale)
+        case .oneWeek, .oneMonth:
+            return .dateTime.month(.defaultDigits).day().locale(locale)
+        case .oneYear:
+            return .dateTime.month(.abbreviated).locale(locale)
         }
     }
 }

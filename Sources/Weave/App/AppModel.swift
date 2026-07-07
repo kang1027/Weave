@@ -44,6 +44,8 @@ final class AppModel: ObservableObject {
     @Published var homeSeries: [ValuePoint] = []
     @Published var homeAssetSeries: [AssetLineSeries] = []
     @Published var homeBuyMarkers: [BuyMarker] = []
+    /// 홈 차트 x 도메인 — 선택 기간 전체 창(startDate~now)으로 고정. 데이터가 짧아도 축은 기간만큼.
+    @Published var homeChartDomain: ClosedRange<Date>?
     @Published var isHomeChartLoading = false
     /// Assets 리스트 % 배지 기간(1D/1W/1M/1Y).
     @Published var assetReturnPeriod: AssetReturnPeriod = .day

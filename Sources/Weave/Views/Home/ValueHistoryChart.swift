@@ -98,9 +98,14 @@ private struct CombinedChart: View {
     @State private var hoveredMarkerID: UUID?
     @State private var hoveredDate: Date?
 
-    private var spanDays: Double {
-        guard let first = series.first?.date, let last = series.last?.date else { return 0 }
-        return last.timeIntervalSince(first) / 86_400
+    private var period: ChartPeriod { model.homeChartPeriod }
+
+    /// x 도메인 — 선택 기간 전체(모델에서 고정). 없으면 데이터 범위로 폴백.
+    private var xDomain: ClosedRange<Date> {
+        if let domain = model.homeChartDomain { return domain }
+        let first = series.first?.date ?? Date()
+        let last = series.last?.date ?? first
+        return first <= last ? first...last : first...first.addingTimeInterval(1)
     }
 
     private var yDomain: ClosedRange<Double> {
@@ -150,6 +155,7 @@ private struct CombinedChart: View {
             }
         }
         .chartYScale(domain: yDomain)
+        .chartXScale(domain: xDomain)
         .chartPlotStyle { $0.clipped() }
         .chartYAxis {
             AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
@@ -171,11 +177,12 @@ private struct CombinedChart: View {
             }
         }
         .chartXAxis {
-            // automatic — 데이터 구간이 짧아도 항상 눈금을 만든다(.stride는 월 경계가 없으면 0개).
-            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+            // 도메인이 기간 전체로 고정돼 있어 .stride가 항상 눈금을 만든다(1D 6h·1W 일·1M 주·1Y 2개월).
+            AxisMarks(values: .stride(by: period.axisStride.component, count: period.axisStride.count)) { value in
+                AxisGridLine().foregroundStyle(theme.grid.opacity(0.5))
                 AxisValueLabel(anchor: .top) {
                     if let date = value.as(Date.self) {
-                        Text(date, format: ChartAxis.xFormat(spanDays: spanDays, locale: model.locale))
+                        Text(date, format: period.axisFormat(locale: model.locale))
                             .font(.system(size: 9))
                             .foregroundStyle(theme.xLabel)
                     }
@@ -286,7 +293,7 @@ private struct CombinedChart: View {
         let baseline = series.first(where: { $0.value > 0 })?.value ?? point.value
         let pct = baseline > 0 ? ((point.value - baseline) / baseline * 100).rounded(scale: 2) : 0
         return VStack(alignment: .leading, spacing: 2) {
-            Text(point.date.formatted(.dateTime.year().month().day().locale(model.locale)))
+            Text(point.date, format: tooltipDateFormat(period: period, locale: model.locale))
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(theme.text2)
             HStack(spacing: 6) {
@@ -366,10 +373,14 @@ private struct PerAssetChart: View {
         hoveredLineID.flatMap { id in lines.first(where: { $0.id == id }) }
     }
 
-    private var spanDays: Double {
+    private var period: ChartPeriod { model.homeChartPeriod }
+
+    private var xDomain: ClosedRange<Date> {
+        if let domain = model.homeChartDomain { return domain }
         let dates = lines.flatMap { $0.points.map(\.date) }
-        guard let first = dates.min(), let last = dates.max() else { return 0 }
-        return last.timeIntervalSince(first) / 86_400
+        let first = dates.min() ?? Date()
+        let last = dates.max() ?? first
+        return first <= last ? first...last : first...first.addingTimeInterval(1)
     }
 
     var body: some View {
@@ -404,6 +415,7 @@ private struct PerAssetChart: View {
                 .foregroundStyle(theme.paletteColor(line.asset.colorIndex))
             }
         }
+        .chartXScale(domain: xDomain)
         .chartPlotStyle { $0.clipped() }
         .chartYAxis {
             AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
@@ -418,11 +430,11 @@ private struct PerAssetChart: View {
             }
         }
         .chartXAxis {
-            // automatic — 데이터 구간이 짧아도 항상 눈금을 만든다(.stride는 월 경계가 없으면 0개).
-            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+            AxisMarks(values: .stride(by: period.axisStride.component, count: period.axisStride.count)) { value in
+                AxisGridLine().foregroundStyle(theme.grid.opacity(0.5))
                 AxisValueLabel(anchor: .top) {
                     if let date = value.as(Date.self) {
-                        Text(date, format: ChartAxis.xFormat(spanDays: spanDays, locale: model.locale))
+                        Text(date, format: period.axisFormat(locale: model.locale))
                             .font(.system(size: 9))
                             .foregroundStyle(theme.xLabel)
                     }
@@ -491,7 +503,7 @@ private struct PerAssetChart: View {
     private func lineTooltip(_ line: AssetLineSeries, at date: Date) -> some View {
         let percent = interpolated(line, at: date)?.percent ?? 0
         return VStack(alignment: .leading, spacing: 3) {
-            Text(date.formatted(.dateTime.year().month().day().locale(model.locale)))
+            Text(date, format: tooltipDateFormat(period: period, locale: model.locale))
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(theme.text2)
             HStack(spacing: 5) {
@@ -537,20 +549,11 @@ private struct PerAssetChart: View {
     }
 }
 
-/// x축 라벨 포맷 — 실제 데이터 구간 길이에 맞춰 선택(짧으면 월/일이라 라벨이 안 겹침).
-enum ChartAxis {
-    static func xFormat(spanDays: Double, locale: Locale) -> Date.FormatStyle {
-        if spanDays > 2 * 365 {
-            return .dateTime.year().locale(locale)
-        }
-        if spanDays > 300 {
-            return .dateTime.year(.twoDigits).month(.abbreviated).locale(locale)
-        }
-        if spanDays > 55 {
-            return .dateTime.month(.abbreviated).locale(locale)
-        }
-        return .dateTime.month(.defaultDigits).day().locale(locale)
-    }
+/// 툴팁 날짜 헤더 포맷 — 1D는 월/일 시:분(24h), 그 외는 연/월/일.
+private func tooltipDateFormat(period: ChartPeriod, locale: Locale) -> Date.FormatStyle {
+    period.isIntraday
+        ? .dateTime.month(.defaultDigits).day().hour(.twoDigits(amPM: .omitted)).minute(.twoDigits).locale(locale)
+        : .dateTime.year().month().day().locale(locale)
 }
 
 /// 차트 위 툴팁 — 자기 폭을 측정해 플롯 좌우 안쪽으로 클램프(패널 밖으로 안 잘림).
