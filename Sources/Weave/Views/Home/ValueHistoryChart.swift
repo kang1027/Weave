@@ -152,13 +152,15 @@ private struct CombinedChart: View {
             }
         }
         .chartXAxis {
-            AxisMarks(values: ChartAxis.xValues(for: model.homeChartPeriod)) { _ in
-                AxisValueLabel(
-                    format: ChartAxis.xFormat(for: model.homeChartPeriod, locale: model.locale),
-                    anchor: .top
-                )
-                .font(.system(size: 9))
-                .foregroundStyle(theme.xLabel)
+            // automatic — 데이터 구간이 짧아도 항상 눈금을 만든다(.stride는 월 경계가 없으면 0개).
+            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                AxisValueLabel(anchor: .top) {
+                    if let date = value.as(Date.self) {
+                        Text(date, format: ChartAxis.xFormat(for: model.homeChartPeriod, locale: model.locale))
+                            .font(.system(size: 9))
+                            .foregroundStyle(theme.xLabel)
+                    }
+                }
             }
         }
         .chartOverlay { proxy in
@@ -332,13 +334,15 @@ private struct PerAssetChart: View {
             }
         }
         .chartXAxis {
-            AxisMarks(values: ChartAxis.xValues(for: model.homeChartPeriod)) { _ in
-                AxisValueLabel(
-                    format: ChartAxis.xFormat(for: model.homeChartPeriod, locale: model.locale),
-                    anchor: .top
-                )
-                .font(.system(size: 9))
-                .foregroundStyle(theme.xLabel)
+            // automatic — 데이터 구간이 짧아도 항상 눈금을 만든다(.stride는 월 경계가 없으면 0개).
+            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                AxisValueLabel(anchor: .top) {
+                    if let date = value.as(Date.self) {
+                        Text(date, format: ChartAxis.xFormat(for: model.homeChartPeriod, locale: model.locale))
+                            .font(.system(size: 9))
+                            .foregroundStyle(theme.xLabel)
+                    }
+                }
             }
         }
         .chartOverlay { proxy in
@@ -413,18 +417,8 @@ private struct PerAssetChart: View {
     }
 }
 
-/// 기간별 x축 눈금 — automatic은 같은 달에 눈금을 두 번 찍어 "Jun Jun Jul"이 된다.
-/// 달력 단위 stride로 고정한다.
+/// 기간별 x축 라벨 포맷.
 enum ChartAxis {
-    static func xValues(for period: ChartPeriod) -> AxisMarkValues {
-        switch period {
-        case .oneMonth: return .stride(by: .day, count: 7)
-        case .threeMonths, .sixMonths: return .stride(by: .month, count: 1)
-        case .oneYear: return .stride(by: .month, count: 2)
-        case .all: return .stride(by: .year, count: 1)
-        }
-    }
-
     static func xFormat(for period: ChartPeriod, locale: Locale) -> Date.FormatStyle {
         switch period {
         case .oneMonth:
