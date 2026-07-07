@@ -90,6 +90,7 @@
 "Realized" = "실현손익";
 "Realized %@" = "실현손익 %@";
 "Realized P&L" = "실현손익 누계";
+"Total P&L %@" = "총 손익 %@";
 "Record shortcut" = "단축키 등록";
 "Refresh now" = "지금 새로고침";
 "Remove shortcut" = "단축키 제거";

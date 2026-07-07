@@ -27,7 +27,7 @@ struct RingsRow: View {
                 centerText: MoneyFormatter.percent(portfolio.dayChangePercent, fractionDigits: 1),
                 centerColor: theme.upDown(portfolio.dayChangePercent >= 0),
                 caption: "Day",
-                onHoverSegment: { hoveredTooltip = $0.map { ($0.tooltip, 0) } }
+                onHoverTooltip: { hoveredTooltip = $0.map { ($0, 0) } }
             )
 
             RingGauge(
@@ -42,7 +42,8 @@ struct RingsRow: View {
                 centerText: MoneyFormatter.percent(portfolio.totalReturnPercent, fractionDigits: 1),
                 centerColor: theme.upDown(portfolio.totalReturnPercent >= 0),
                 caption: "Return",
-                onHoverSegment: { hoveredTooltip = $0.map { ($0.tooltip, 1) } }
+                centerTooltip: returnCenterTooltip,
+                onHoverTooltip: { hoveredTooltip = $0.map { ($0, 1) } }
             )
 
             RingGauge(
@@ -51,7 +52,7 @@ struct RingsRow: View {
                 centerText: "\(portfolio.assetCount)",
                 centerColor: nil,
                 caption: "Assets",
-                onHoverSegment: { hoveredTooltip = $0.map { ($0.tooltip, 2) } }
+                onHoverTooltip: { hoveredTooltip = $0.map { ($0, 2) } }
             )
         }
         .frame(maxWidth: .infinity)
@@ -113,6 +114,16 @@ struct RingsRow: View {
                 tooltip: text
             )
         }
+    }
+
+    /// Return 링 중앙/트랙 호버 시 — 총액 기준 손익 금액.
+    private var returnCenterTooltip: String? {
+        guard !model.settings.privacyMode else { return nil }
+        let amount = MoneyFormatter.signedPrice(
+            portfolio.unrealizedPnLBase.rounded(scale: 0),
+            currency: model.settings.baseCurrency
+        )
+        return model.t("Total P&L \(amount)")
     }
 
     private func contributionTooltip(_ segment: RingSegment) -> String {
