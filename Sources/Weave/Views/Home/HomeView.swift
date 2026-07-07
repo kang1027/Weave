@@ -41,26 +41,15 @@ struct HomeView: View {
         .task(id: "\(model.chartGeneration)|\(model.homeChartPeriod.rawValue)") {
             await model.loadHomeChart()
         }
-        .confirmationDialog(
-            model.t("Delete asset?"),
-            isPresented: Binding(
-                get: { deletionTarget != nil },
-                set: { if !$0 { deletionTarget = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button(model.t("Delete"), role: .destructive) {
-                if let target = deletionTarget {
-                    model.deleteAsset(id: target.id)
-                }
-                deletionTarget = nil
-            }
-            Button(model.t("Cancel"), role: .cancel) { deletionTarget = nil }
-        } message: {
-            if let target = deletionTarget {
-                Text(model.t("\(target.name) and \(model.tradeCount(assetID: target.id)) trade(s) will be deleted."))
-            }
-        }
+        .confirmDialog(
+            $deletionTarget,
+            title: { _ in model.t("Delete asset?") },
+            message: { model.t("\($0.name) and \(model.tradeCount(assetID: $0.id)) trade(s) will be deleted.") },
+            confirmTitle: model.t("Delete"),
+            isDestructive: true,
+            cancelTitle: model.t("Cancel"),
+            onConfirm: { model.deleteAsset(id: $0.id) }
+        )
     }
 
     private var header: some View {

@@ -83,22 +83,14 @@ struct AssetDetailView: View {
             pendingFocusTradeID = nil
             Task { @MainActor in chartFocusTradeID = id }
         }
-        .confirmationDialog(
-            model.t("Delete trade?"),
-            isPresented: Binding(
-                get: { deletionTarget != nil },
-                set: { if !$0 { deletionTarget = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button(model.t("Delete"), role: .destructive) {
-                if let target = deletionTarget {
-                    model.deleteTrade(id: target.id)
-                }
-                deletionTarget = nil
-            }
-            Button(model.t("Cancel"), role: .cancel) { deletionTarget = nil }
-        }
+        .confirmDialog(
+            $deletionTarget,
+            title: { _ in model.t("Delete trade?") },
+            confirmTitle: model.t("Delete"),
+            isDestructive: true,
+            cancelTitle: model.t("Cancel"),
+            onConfirm: { model.deleteTrade(id: $0.id) }
+        )
     }
 
     // MARK: - 헤더 (로고 + 이름, 로고 클릭 = 아이콘 변경)

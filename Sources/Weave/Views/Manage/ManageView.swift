@@ -45,26 +45,15 @@ struct ManageView: View {
 
             Spacer(minLength: 0)
         }
-        .confirmationDialog(
-            model.t("Delete asset?"),
-            isPresented: Binding(
-                get: { deletionTarget != nil },
-                set: { if !$0 { deletionTarget = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button(model.t("Delete"), role: .destructive) {
-                if let target = deletionTarget {
-                    model.deleteAsset(id: target.id)
-                }
-                deletionTarget = nil
-            }
-            Button(model.t("Cancel"), role: .cancel) { deletionTarget = nil }
-        } message: {
-            if let target = deletionTarget {
-                Text(model.t("\(target.name) and \(model.tradeCount(assetID: target.id)) trade(s) will be deleted."))
-            }
-        }
+        .confirmDialog(
+            $deletionTarget,
+            title: { _ in model.t("Delete asset?") },
+            message: { model.t("\($0.name) and \(model.tradeCount(assetID: $0.id)) trade(s) will be deleted.") },
+            confirmTitle: model.t("Delete"),
+            isDestructive: true,
+            cancelTitle: model.t("Cancel"),
+            onConfirm: { model.deleteAsset(id: $0.id) }
+        )
         .onChange(of: valueEditText) { _, newValue in
             // 숫자만 + 천단위 콤마 (멱등이라 가드 불필요).
             let formatted = MoneyFormatter.groupedInputText(newValue)
@@ -72,26 +61,20 @@ struct ManageView: View {
                 valueEditText = formatted
             }
         }
-        .alert(
-            model.t("Edit value"),
-            isPresented: Binding(
-                get: { valueEditTarget != nil },
-                set: { if !$0 { valueEditTarget = nil } }
-            )
-        ) {
-            TextField(model.t("Value"), text: $valueEditText)
-            Button(model.t("Save")) {
-                if let target = valueEditTarget, let value = Decimal.clean(valueEditText) {
+        .inputDialog(
+            $valueEditTarget,
+            title: { _ in model.t("Edit value") },
+            message: { "\($0.name) · \($0.currency)" },
+            placeholder: model.t("Value"),
+            text: $valueEditText,
+            confirmTitle: model.t("Save"),
+            cancelTitle: model.t("Cancel"),
+            onConfirm: { target in
+                if let value = Decimal.clean(valueEditText) {
                     model.updateManualValue(assetID: target.id, value: value)
                 }
-                valueEditTarget = nil
             }
-            Button(model.t("Cancel"), role: .cancel) { valueEditTarget = nil }
-        } message: {
-            if let target = valueEditTarget {
-                Text("\(target.name) · \(target.currency)")
-            }
-        }
+        )
     }
 
     private var manualAssetButton: some View {
