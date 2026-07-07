@@ -237,7 +237,7 @@ private struct MarkerDot: View {
         else {
             return ""
         }
-        let converted = (marker.trade.price * rate).rounded(scale: 0)
+        let converted = marker.trade.price * rate
         return " (≈ \(MoneyFormatter.price(converted, currency: base)))"
     }
 

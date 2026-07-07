@@ -120,7 +120,7 @@ struct RingsRow: View {
     private var returnCenterTooltip: String? {
         guard !model.settings.privacyMode else { return nil }
         let amount = MoneyFormatter.signedPrice(
-            portfolio.unrealizedPnLBase.rounded(scale: 0),
+            portfolio.unrealizedPnLBase,
             currency: model.settings.baseCurrency
         )
         return model.t("Total P&L \(amount)")
@@ -131,7 +131,7 @@ struct RingsRow: View {
             return segment.label
         }
         let amount = MoneyFormatter.signedPrice(
-            segment.amountBase.rounded(scale: 0),
+            segment.amountBase,
             currency: model.settings.baseCurrency
         )
         return model.t("\(segment.label) contribution \(amount)")

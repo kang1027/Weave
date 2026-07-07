@@ -13,12 +13,12 @@ public enum MoneyFormatter {
         }
     }
 
-    /// 가격/금액. 크기에 따라 소수 자리 조절: ≥1000 → 0, ≥1 → 2, <1 → 4.
-    /// KRW/JPY는 항상 정수.
+    /// 가격/금액. USD 등은 소수 2자리 고정(1 미만 코인은 4자리), KRW/JPY는 항상 정수.
     public static func price(_ value: Decimal, currency: String) -> String {
         let scale = decimalScale(for: value, currency: currency)
+        let minScale = moneyMinScale(for: currency)
         let sign = value < 0 ? "-" : ""
-        return sign + symbol(for: currency) + grouped(abs(value), scale: scale)
+        return sign + symbol(for: currency) + grouped(abs(value), scale: scale, minScale: minScale)
     }
 
     /// 링 툴팁용 축약 금액 — ₩5.19M, $1.2K.
@@ -106,17 +106,20 @@ public enum MoneyFormatter {
 
     private static func decimalScale(for value: Decimal, currency: String) -> Int {
         if ["KRW", "JPY"].contains(currency.uppercased()) { return 0 }
-        let a = abs(value)
-        if a >= 1000 { return 0 }
-        if a >= 1 { return 2 }
-        return 4
+        // USD 등: 1 이상은 2자리 고정, 1 미만(소수 코인)은 4자리.
+        return abs(value) >= 1 ? 2 : 4
     }
 
-    private static func grouped(_ value: Decimal, scale: Int) -> String {
+    /// 금액 최소 소수 자리 — USD 등은 2자리를 항상 보이게(₩919 → $919.00), KRW/JPY는 0.
+    private static func moneyMinScale(for currency: String) -> Int {
+        ["KRW", "JPY"].contains(currency.uppercased()) ? 0 : 2
+    }
+
+    private static func grouped(_ value: Decimal, scale: Int, minScale: Int = 0) -> String {
         let formatter = NumberFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.numberStyle = .decimal
-        formatter.minimumFractionDigits = 0
+        formatter.minimumFractionDigits = min(minScale, scale)
         formatter.maximumFractionDigits = scale
         formatter.usesGroupingSeparator = true
         return formatter.string(from: value.rounded(scale: scale) as NSDecimalNumber) ?? "0"

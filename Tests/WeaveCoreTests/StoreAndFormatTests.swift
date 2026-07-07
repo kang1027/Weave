@@ -94,7 +94,7 @@ import Testing
 
 @Suite struct MoneyFormatterTests {
     @Test func priceScalesByMagnitudeAndCurrency() {
-        #expect(MoneyFormatter.price(60_000, currency: "USD") == "$60,000")
+        #expect(MoneyFormatter.price(60_000, currency: "USD") == "$60,000.00")
         #expect(MoneyFormatter.price(Decimal(string: "3.4567")!, currency: "USD") == "$3.46")
         #expect(MoneyFormatter.price(Decimal(string: "0.12345")!, currency: "USD") == "$0.1235")
         #expect(MoneyFormatter.price(Decimal(string: "61200.7")!, currency: "KRW") == "₩61,201")
@@ -159,7 +159,7 @@ import Testing
 
     @Test func fullFormat() {
         let title = MenuBarTitleBuilder.title(asset: asset, quote: quote, format: .full, privacy: false)
-        #expect(title == "BTC $60,000 ▲1.23%")
+        #expect(title == "BTC $60,000.00 ▲1.23%")
     }
 
     @Test func compactFormat() {
@@ -169,7 +169,7 @@ import Testing
 
     @Test func priceOnlyFormat() {
         let title = MenuBarTitleBuilder.title(asset: asset, quote: quote, format: .priceOnly, privacy: false)
-        #expect(title == "$60,000")
+        #expect(title == "$60,000.00")
     }
 
     @Test func privacyMasksAmountsButKeepsPercent() {

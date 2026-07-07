@@ -101,7 +101,7 @@ struct HomeView: View {
         return VStack(spacing: 6) {
             Text(
                 MoneyFormatter.price(
-                    portfolio.totalValueBase.rounded(scale: 0),
+                    portfolio.totalValueBase,
                     currency: base
                 )
             )
@@ -112,7 +112,7 @@ struct HomeView: View {
             .privacyBlur(model.settings.privacyMode)
 
             HStack(spacing: 4) {
-                Text(MoneyFormatter.signedPrice(pnl.rounded(scale: 0), currency: base))
+                Text(MoneyFormatter.signedPrice(pnl, currency: base))
                     .font(.system(size: 12, weight: .bold))
                     .monospacedDigit()
                     .privacyBlur(model.settings.privacyMode)
@@ -132,7 +132,7 @@ struct HomeView: View {
                 TooltipBubble(
                     text: model.t("Invested")
                         + " "
-                        + MoneyFormatter.price(portfolio.costBasisBase.rounded(scale: 0), currency: base),
+                        + MoneyFormatter.price(portfolio.costBasisBase, currency: base),
                     blurText: model.settings.privacyMode
                 )
                 .offset(y: 30)
