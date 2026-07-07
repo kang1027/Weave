@@ -101,7 +101,6 @@ public enum PortfolioCalculator {
             dayChangePercent: dayPercent,
             totalReturnPercent: returnPercent,
             unrealizedPnLBase: unrealizedTotal,
-            dayChangeAmountBase: dayAmountTotal,
             costBasisBase: costTotal,
             daySegments: contributionSegments(metrics: metrics, total: dayAmountTotal) {
                 $0.dayChangeAmountBase
