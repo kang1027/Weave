@@ -12,6 +12,8 @@ struct AssetDetailView: View {
     @State private var highlightedTradeID: UUID?
     /// 거래 행 클릭 → 차트 마커 포커스 요청.
     @State private var chartFocusTradeID: UUID?
+    /// 인터벌 전환 후(로드 완료 시) 적용할 포커스 — 현재 인터벌 데이터 범위 밖 거래용.
+    @State private var pendingFocusTradeID: UUID?
 
     private var trades: [Trade] {
         model.document.trades(for: assetID)
@@ -67,6 +69,13 @@ struct AssetDetailView: View {
         }
         .task(id: model.detailInterval) {
             await model.loadDetailChart(assetID: assetID)
+        }
+        .onChange(of: model.detailCandles) {
+            // 인터벌 전환으로 새 캔들이 도착하면, 대기 중이던 포커스를 적용한다.
+            // 같은 사이클의 창 리셋(resetWindow)이 끝난 뒤 걸리도록 한 틱 미룬다.
+            guard let id = pendingFocusTradeID else { return }
+            pendingFocusTradeID = nil
+            Task { @MainActor in chartFocusTradeID = id }
         }
         .confirmationDialog(
             model.t("Delete trade?"),
@@ -231,7 +240,7 @@ struct AssetDetailView: View {
                             withAnimation(.easeInOut(duration: 0.25)) {
                                 scrollProxy.scrollTo("detail-chart", anchor: .center)
                             }
-                            chartFocusTradeID = trade.id
+                            requestChartFocus(trade)
                         },
                         onDelete: {
                             deletionTarget = trade
@@ -240,6 +249,29 @@ struct AssetDetailView: View {
                     .id(trade.id)
                 }
             }
+        }
+    }
+
+    /// 거래 행 클릭 → 차트 마커 포커스. 현재 인터벌 데이터에 그 시점이 있으면 바로 팬,
+    /// 없으면(인트라데이의 오래된 거래) 그 거래가 보이는 인터벌로 전환 후 로드되면 포커스.
+    private func requestChartFocus(_ trade: Trade) {
+        let candles = model.detailCandles
+        var inRange = false
+        if let first = candles.first?.date, let last = candles.last?.date {
+            inRange = trade.date >= first && trade.date <= last
+        }
+        if inRange {
+            chartFocusTradeID = trade.id
+            return
+        }
+        let target = CandleInterval.finestCovering(trade.date)
+        if model.detailInterval != target {
+            pendingFocusTradeID = trade.id
+            model.detailInterval = target       // .task(id:)가 재조회 → onChange에서 포커스
+        } else if candles.isEmpty {
+            pendingFocusTradeID = trade.id       // 이미 최적 인터벌 로딩 중 → 로드되면 포커스
+        } else {
+            chartFocusTradeID = trade.id         // 최적 인터벌인데도 범위 밖(아주 오래된 거래) → 가능한 데까지
         }
     }
 

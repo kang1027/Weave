@@ -72,4 +72,17 @@ public enum CandleInterval: String, Codable, Sendable, CaseIterable {
         case .month: return "1M"
         }
     }
+
+    /// 이 인터벌이 대략 커버하는 과거 구간(캔들 개수 한계 × 캔들 폭).
+    public var approximateCoverage: TimeInterval {
+        Double(CandleFetchLimit.limit(for: self)) * seconds
+    }
+
+    /// 주어진 시점을 담을 수 있는 가장 촘촘한 상세 인터벌.
+    /// 인트라데이 데이터엔 오래된 거래가 없으므로, 거래 마커로 점프할 때 인터벌 자동 전환에 쓴다.
+    /// (detailCases는 촘촘→성긴 순이고 커버 범위도 그 순서로 커진다.)
+    public static func finestCovering(_ date: Date, now: Date = Date()) -> CandleInterval {
+        let age = now.timeIntervalSince(date)
+        return detailCases.first { $0.approximateCoverage >= age } ?? .month
+    }
 }
