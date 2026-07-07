@@ -115,16 +115,19 @@ struct ScreenHeader<Trailing: View>: View {
     }
 
     var body: some View {
-        HStack {
-            IconButton(systemName: "chevron.left", action: onBack)
-            Spacer()
+        // 타이틀은 전체 폭 중앙에 절대 배치, 버튼은 양끝에 얹어 좌우 폭과 무관하게 정확히 중앙.
+        ZStack {
+            // ZStack 기본 center 정렬 → 타이틀은 전체 폭 정중앙.
             Text(title)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(theme.text)
                 .lineLimit(1)
-            Spacer()
-            trailing
-                .frame(minWidth: 26, alignment: .trailing)
+                .padding(.horizontal, 34)
+            HStack {
+                IconButton(systemName: "chevron.left", action: onBack)
+                Spacer()
+                trailing
+            }
         }
         .padding(.horizontal, 14)
         .padding(.top, 14)

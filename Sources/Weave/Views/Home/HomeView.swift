@@ -64,29 +64,32 @@ struct HomeView: View {
     }
 
     private var header: some View {
-        HStack {
-            IconButton(systemName: "arrow.clockwise") {
-                model.manualRefresh()
-            }
-            .help(model.t("Refresh now"))
-            Spacer()
+        // 타이틀은 전체 폭 중앙에 절대 배치, 버튼은 양끝에(좌 1 · 우 2개라도 정확히 중앙).
+        ZStack {
+            // ZStack 기본 center 정렬 → "Weave"는 전체 폭 정중앙(좌우 버튼 수와 무관).
             Text(verbatim: "Weave")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(theme.text)
-            Spacer()
-            HStack(spacing: 6) {
-                IconButton(
-                    systemName: model.settings.privacyMode ? "eye.slash" : "eye",
-                    isActive: model.settings.privacyMode
-                ) {
-                    model.settings.privacyMode.toggle()
-                    model.updateMenuBarTitle()
+            HStack {
+                IconButton(systemName: "arrow.clockwise") {
+                    model.manualRefresh()
                 }
-                .help(model.t("Privacy mode"))
-                IconButton(systemName: "gearshape") {
-                    model.push(.settings)
+                .help(model.t("Refresh now"))
+                Spacer()
+                HStack(spacing: 6) {
+                    IconButton(
+                        systemName: model.settings.privacyMode ? "eye.slash" : "eye",
+                        isActive: model.settings.privacyMode
+                    ) {
+                        model.settings.privacyMode.toggle()
+                        model.updateMenuBarTitle()
+                    }
+                    .help(model.t("Privacy mode"))
+                    IconButton(systemName: "gearshape") {
+                        model.push(.settings)
+                    }
+                    .help(model.t("Settings"))
                 }
-                .help(model.t("Settings"))
             }
         }
         .padding(.horizontal, 14)
