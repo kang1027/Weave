@@ -46,7 +46,7 @@ struct SettingsView: View {
                                 options: [
                                     (MenuBarFormat.full, model.t("Full")),
                                     (MenuBarFormat.compact, model.t("Compact")),
-                                    (MenuBarFormat.priceOnly, model.t("Price only"))
+                                    (MenuBarFormat.inline, model.t("Inline"))
                                 ],
                                 selection: Binding(
                                     get: { model.settings.menuBarFormat },

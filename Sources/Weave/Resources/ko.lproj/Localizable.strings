@@ -143,3 +143,4 @@
 "Return ring full at" = "Return 링 만점 기준";
 "Fills at this daily move; over it wraps a new lap" = "이 등락에서 꽉 참 · 초과분은 새 바퀴로";
 "Fills at this total return; over it wraps a new lap" = "이 수익률에서 꽉 참 · 초과분은 새 바퀴로";
+"Inline" = "한 줄";

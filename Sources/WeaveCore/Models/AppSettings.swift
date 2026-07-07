@@ -13,12 +13,12 @@ public enum LanguagePreference: String, Codable, Sendable, CaseIterable {
 }
 
 public enum MenuBarFormat: String, Codable, Sendable, CaseIterable {
-    /// `BTC $60,000 ▲1.23%`
+    /// 2줄 — 이름(위) / 가격 등락%(아래)
     case full
-    /// `BTC ▲1.23%`
+    /// 2줄 — 이름(위) / 등락%(아래)
     case compact
-    /// `$60,000`
-    case priceOnly
+    /// 1줄 — 로고 배지 · 가격 · 등락%
+    case inline
 }
 
 public enum DisplayCurrencyMode: String, Codable, Sendable, CaseIterable {

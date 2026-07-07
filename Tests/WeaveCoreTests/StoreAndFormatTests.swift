@@ -167,16 +167,28 @@ import Testing
         #expect(title == "BTC ▲1.23%")
     }
 
-    @Test func priceOnlyFormat() {
-        let title = MenuBarTitleBuilder.title(asset: asset, quote: quote, format: .priceOnly, privacy: false)
-        #expect(title == "$60,000.00")
+    @Test func inlineFormat() {
+        let title = MenuBarTitleBuilder.title(asset: asset, quote: quote, format: .inline, privacy: false)
+        #expect(title == "BTC $60,000.00 ▲1.23%")
+        // inline parts: 배지 + 1줄(가격 + 색칠 등락%)
+        let parts = MenuBarTitleBuilder.parts(asset: asset, quote: quote, format: .inline, privacy: false)
+        #expect(parts.badge?.initial == "B")
+        #expect(parts.line2 == nil)
+        #expect(parts.line1.percent == " ▲1.23%")
+    }
+
+    @Test func fullPartsAreTwoLines() {
+        let parts = MenuBarTitleBuilder.parts(asset: asset, quote: quote, format: .full, privacy: false)
+        #expect(parts.line1.text == "BTC")
+        #expect(parts.line2?.text == "$60,000.00")
+        #expect(parts.line2?.percent == " ▲1.23%")
     }
 
     @Test func privacyMasksAmountsButKeepsPercent() {
         let full = MenuBarTitleBuilder.title(asset: asset, quote: quote, format: .full, privacy: true)
         #expect(full == "BTC ••••• ▲1.23%")
-        let priceOnly = MenuBarTitleBuilder.title(asset: asset, quote: quote, format: .priceOnly, privacy: true)
-        #expect(priceOnly == "BTC ▲1.23%")
+        let compact = MenuBarTitleBuilder.title(asset: asset, quote: quote, format: .compact, privacy: true)
+        #expect(compact == "BTC ▲1.23%")
     }
 
     @Test func totalTitle() {
