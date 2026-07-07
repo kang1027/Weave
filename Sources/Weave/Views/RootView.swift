@@ -13,6 +13,13 @@ struct RootView: View {
         ZStack {
             theme.bg.ignoresSafeArea()
             content
+
+            // 전역 ⌘Q — 설정에 버튼을 두지 않아도 어디서든 종료되게 숨겨둔다.
+            Button(action: model.quit) { EmptyView() }
+                .keyboardShortcut("q", modifiers: .command)
+                .frame(width: 0, height: 0)
+                .opacity(0)
+                .accessibilityHidden(true)
         }
         .environment(\.theme, theme)
         .environment(\.locale, model.locale)

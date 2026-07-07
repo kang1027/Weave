@@ -165,8 +165,6 @@ struct SettingsView: View {
                         }
                     }
 
-                    quitButton
-                        .padding(.top, 18)
                 }
                 .padding(.bottom, 12)
             }
@@ -184,30 +182,6 @@ struct SettingsView: View {
             .padding(.horizontal, 20)
             .padding(.top, 14)
             .padding(.bottom, 6)
-    }
-
-    private var quitButton: some View {
-        Button {
-            model.quit()
-        } label: {
-            HStack(spacing: 7) {
-                Image(systemName: "power")
-                    .font(.system(size: 11, weight: .semibold))
-                Text(model.t("Quit Weave"))
-                    .font(.system(size: 12, weight: .semibold))
-                Text(verbatim: "⌘Q")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(theme.text2)
-            }
-            .foregroundStyle(theme.redText)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 9)
-            .background(RoundedRectangle(cornerRadius: 8).fill(theme.seg))
-            .contentShape(RoundedRectangle(cornerRadius: 8))
-        }
-        .buttonStyle(.plain)
-        .keyboardShortcut("q", modifiers: .command)
-        .padding(.horizontal, 14)
     }
 
     private var settingsFooter: some View {
@@ -333,18 +307,28 @@ struct SelectPill<T: Hashable>: View {
                 }
             }
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 7) {
                 Text(currentLabel)
-                    .font(.system(size: 11.5, weight: .semibold))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(theme.text)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
+                    .lineLimit(1)
+                // macOS 팝업버튼 글리프 — "select" 어포던스.
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(theme.text2)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(RoundedRectangle(cornerRadius: 7).fill(theme.seg))
-            .contentShape(RoundedRectangle(cornerRadius: 7))
+            .padding(.leading, 11)
+            .padding(.trailing, 8)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(theme.seg)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .strokeBorder(theme.hair, lineWidth: 1)
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
