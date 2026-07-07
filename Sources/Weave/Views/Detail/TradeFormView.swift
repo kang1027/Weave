@@ -21,6 +21,8 @@ struct TradeFormView: View {
     @State private var isPrefilling = false
     @State private var prefillTask: Task<Void, Never>?
     @State private var showDatePicker = false
+    /// 폼 미니 차트용 일봉 — 상세 차트와 별개로 항상 일봉.
+    @State private var chartCandles: [Candle] = []
     /// 차트 선택/프리필로 날짜를 바꿀 때 종가 프리필이 단가를 덮지 않게 하는 가드.
     @State private var suppressDatePrefill = false
     /// 프로그램이 방금 써넣은 필드 — 그 필드의 onChange는 자동 계산을 다시 돌리지 않는다.
@@ -63,10 +65,11 @@ struct TradeFormView: View {
 
             ScrollView {
                 VStack(spacing: 10) {
-                    // 차트에서 지점을 클릭하면 날짜·단가가 아래 폼에 채워진다.
-                    if let asset, model.detailChartAssetID == assetID, !model.detailCandles.isEmpty {
+                    // 일봉 차트 — 마우스 호버 시 가격 표시, 클릭하면 날짜·단가가 폼에 채워진다.
+                    if let asset, !chartCandles.isEmpty {
                         TradePickerChart(
                             asset: asset,
+                            candles: chartCandles,
                             selectedDate: date,
                             selectedPrice: price
                         ) { candle in
@@ -127,6 +130,7 @@ struct TradeFormView: View {
             }
         }
         .onAppear(perform: applyInitialValues)
+        .task { chartCandles = await model.dailyCandles(assetID: assetID) }
         .onDisappear { prefillTask?.cancel() }
         .onChange(of: date) { _, newDate in
             error = nil
@@ -394,13 +398,13 @@ private struct TradePickerChart: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
     let asset: Asset
+    let candles: [Candle]
     let selectedDate: Date
     let selectedPrice: Decimal?
     let onPick: (Candle) -> Void
 
     @State private var hoveredDate: Date?
 
-    private var candles: [Candle] { model.detailCandles }
     private var color: Color { theme.paletteColor(asset.colorIndex) }
 
     private var yDomain: ClosedRange<Double> {
@@ -492,30 +496,51 @@ private struct TradePickerChart: View {
                 GeometryReader { geo in
                     if let plotAnchor = proxy.plotFrame {
                         let plot = geo[plotAnchor]
-                        Rectangle()
-                            .fill(.clear)
-                            .contentShape(Rectangle())
-                            .frame(width: plot.width, height: plot.height)
-                            .position(x: plot.midX, y: plot.midY)
-                            .onContinuousHover { phase in
-                                switch phase {
-                                case .active(let point):
-                                    let x = point.x - plot.origin.x
-                                    hoveredDate = proxy.value(atX: x, as: Date.self)
-                                case .ended:
-                                    hoveredDate = nil
+                        ZStack(alignment: .topLeading) {
+                            Rectangle()
+                                .fill(.clear)
+                                .contentShape(Rectangle())
+                                .frame(width: plot.width, height: plot.height)
+                                .position(x: plot.midX, y: plot.midY)
+                                .onContinuousHover { phase in
+                                    switch phase {
+                                    case .active(let point):
+                                        let x = point.x - plot.origin.x
+                                        hoveredDate = proxy.value(atX: x, as: Date.self)
+                                    case .ended:
+                                        hoveredDate = nil
+                                    }
                                 }
-                            }
-                            .onTapGesture { location in
-                                let x = location.x - plot.origin.x
-                                guard
-                                    let tapped = proxy.value(atX: x, as: Date.self),
-                                    let candle = nearestCandle(to: tapped)
-                                else {
-                                    return
+                                .onTapGesture { location in
+                                    let x = location.x - plot.origin.x
+                                    guard
+                                        let tapped = proxy.value(atX: x, as: Date.self),
+                                        let candle = nearestCandle(to: tapped)
+                                    else {
+                                        return
+                                    }
+                                    onPick(candle)
                                 }
-                                onPick(candle)
+
+                            // 호버 지점의 가격·날짜 툴팁.
+                            if let hoveredDate,
+                               let candle = nearestCandle(to: hoveredDate),
+                               let x = proxy.position(forX: candle.date) {
+                                TooltipBubble(
+                                    text: MoneyFormatter.price(candle.close, currency: asset.currency),
+                                    secondary: candle.date.formatted(
+                                        .dateTime.year().month().day().locale(model.locale)
+                                    ),
+                                    blurText: model.settings.privacyMode
+                                )
+                                .fixedSize()
+                                .position(
+                                    x: min(max(plot.origin.x + x, plot.origin.x + 52), plot.maxX - 52),
+                                    y: plot.origin.y + 18
+                                )
+                                .allowsHitTesting(false)
                             }
+                        }
                     }
                 }
             }

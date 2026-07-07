@@ -154,6 +154,12 @@ extension AppModel {
         detailCandles = candles.sorted { $0.date < $1.date }
     }
 
+    /// 거래 폼 미니 차트용 일봉(캐시 활용) — detailCandles/인터벌과 무관하게 항상 일봉.
+    func dailyCandles(assetID: UUID) async -> [Candle] {
+        guard let asset = asset(id: assetID), !asset.isManual else { return [] }
+        return await fetchDetailCandles(asset: asset, interval: .day).sorted { $0.date < $1.date }
+    }
+
     /// 네이버(국장)는 인트라데이가 없어 야후 `.KS`/`.KQ`로 브릿지한다.
     /// endingAt이 있으면 그 시점으로 끝나는 과거 구간을 조회(거래로 점프).
     private func fetchDetailCandles(
