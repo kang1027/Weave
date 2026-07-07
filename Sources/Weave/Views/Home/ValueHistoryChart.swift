@@ -399,6 +399,15 @@ private struct PerAssetChart: View {
                     )
                     .lineStyle(StrokeStyle(lineWidth: hoveredLineID == line.id ? 2.4 : 1.8))
                 }
+                // 오늘 산 종목은 데이터가 한 점뿐 → 선이 안 그려지니 점으로 표시.
+                if line.points.count == 1, let point = line.points.first {
+                    PointMark(
+                        x: .value("Date", point.date),
+                        y: .value("Percent", point.percent)
+                    )
+                    .symbolSize(30)
+                    .foregroundStyle(theme.paletteColor(line.asset.colorIndex))
+                }
             }
 
             // hover 크로스헤어 — 세로 가이드 + 그 종목 라인 위 포인트(선에 올렸을 때만).

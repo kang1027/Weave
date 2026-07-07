@@ -72,12 +72,18 @@ extension AppModel {
             )
         }
 
-        // 자산별 정규화 라인 — 구간 시작 = 표시 창 시작(첫 데이터가 없으면 from).
+        // 자산별 정규화 라인 — Combined와 같은 기준: 각 종목의 매수일부터 0%.
+        // (창 시작보다 늦게 산 종목은 그 매수일부터 그려 날짜 기준을 통일.)
         let windowStart = series.first?.date ?? from
+        let firstBuyByAsset: [UUID: Date] = Dictionary(
+            document.trades.filter { $0.side == .buy }.map { ($0.assetID, $0.date) },
+            uniquingKeysWith: min
+        )
         let assetLines: [AssetLineSeries] = assets.compactMap { asset in
             guard !asset.isManual, let candles = candlesByAsset[asset.id] else { return nil }
+            let assetStart = max(windowStart, firstBuyByAsset[asset.id] ?? windowStart)
             let points = ValueSeriesBuilder.normalizedSeries(
-                candles: candles, from: windowStart, to: now
+                candles: candles, from: assetStart, to: now
             )
             guard !points.isEmpty else { return nil }
             return AssetLineSeries(asset: asset, points: points)
