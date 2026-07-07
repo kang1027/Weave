@@ -43,10 +43,12 @@ struct RingGauge: View {
                     .stroke(
                         item.segment.color,
                         style: StrokeStyle(
-                            lineWidth: hoveredID == item.id ? hoverLineWidth : lineWidth,
+                            lineWidth: hoveredID == item.segment.id ? hoverLineWidth : lineWidth,
                             lineCap: .butt
                         )
                     )
+                    // 오버플로우 바퀴(lap>0)는 점점 밝게 — "계속 차오르는" 느낌.
+                    .brightness(min(Double(item.lap) * 0.22, 0.66))
                     .rotationEffect(.degrees(-90))
                     .frame(width: radius * 2, height: radius * 2)
                     .animation(.easeOut(duration: 0.15), value: hoveredID)
@@ -102,21 +104,41 @@ struct RingGauge: View {
 
     private struct Positioned: Identifiable {
         let segment: Segment
-        let start: Double
+        let start: Double   // 바퀴 안에서의 0...1 위치
         let end: Double
-        var id: String { segment.id }
+        let lap: Int
+        let index: Int
+        var id: String { "\(segment.id)-\(index)" }
     }
 
+    /// 세그먼트들을 누적하며 바퀴(lap) 경계에서 쪼갠다. 채움 합이 1을 넘으면
+    /// 넘친 만큼 다음 바퀴 arc로 이어 그린다(뒤 항목=상위 바퀴가 위에 그려짐).
     private var positioned: [Positioned] {
+        var result: [Positioned] = []
         var cursor = 0.0
-        return segments.map { segment in
-            let item = Positioned(segment: segment, start: cursor, end: min(cursor + segment.fraction, 1))
-            cursor += segment.fraction
-            return item
+        var index = 0
+        for segment in segments where segment.fraction > 0 {
+            var remaining = segment.fraction
+            while remaining > 1e-9 {
+                let lap = Int(cursor + 1e-9)
+                let withinStart = cursor - Double(lap)
+                let take = min(remaining, 1.0 - withinStart)
+                result.append(Positioned(
+                    segment: segment,
+                    start: withinStart,
+                    end: withinStart + take,
+                    lap: lap,
+                    index: index
+                ))
+                index += 1
+                cursor += take
+                remaining -= take
+            }
         }
+        return result
     }
 
-    /// hover 지점 → 링 밴드 위 각도 → 세그먼트.
+    /// hover 지점 → 링 밴드 위 각도 → 세그먼트(그 각도에서 가장 위 바퀴).
     private func segmentID(at point: CGPoint) -> String? {
         let center = CGPoint(x: size / 2, y: size / 2)
         let dx = point.x - center.x
@@ -128,14 +150,12 @@ struct RingGauge: View {
         var angle = atan2(dx, -dy)
         if angle < 0 { angle += 2 * .pi }
         let fraction = angle / (2 * .pi)
-        var cursor = 0.0
-        for segment in segments {
-            if fraction >= cursor && fraction < cursor + segment.fraction {
-                return segment.id
-            }
-            cursor += segment.fraction
+        // 여러 바퀴가 겹치면 마지막(상위 바퀴) arc가 이긴다.
+        var found: String?
+        for item in positioned where fraction >= item.start && fraction < item.end {
+            found = item.segment.id
         }
-        return nil
+        return found
     }
 }
 

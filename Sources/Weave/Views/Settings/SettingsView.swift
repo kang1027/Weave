@@ -86,6 +86,30 @@ struct SettingsView: View {
                                 )
                             )
                         }
+                        SettingsRow(
+                            title: model.t("Day ring full at"),
+                            subtitle: model.t("Fills at this daily move; over it wraps a new lap")
+                        ) {
+                            SelectPill(
+                                options: [(1, "±1%"), (2, "±2%"), (5, "±5%"), (10, "±10%")],
+                                selection: Binding(
+                                    get: { model.settings.dayRingFullPercent },
+                                    set: { model.settings.dayRingFullPercent = $0 }
+                                )
+                            )
+                        }
+                        SettingsRow(
+                            title: model.t("Return ring full at"),
+                            subtitle: model.t("Fills at this total return; over it wraps a new lap")
+                        ) {
+                            SelectPill(
+                                options: [(10, "±10%"), (25, "±25%"), (50, "±50%"), (100, "±100%")],
+                                selection: Binding(
+                                    get: { model.settings.returnRingFullPercent },
+                                    set: { model.settings.returnRingFullPercent = $0 }
+                                )
+                            )
+                        }
                     }
 
                     sectionLabel(model.t("Data"))

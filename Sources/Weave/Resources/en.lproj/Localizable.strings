@@ -139,3 +139,7 @@
 "Click to change icon" = "Click to change icon";
 "Invested" = "Invested";
 "%@ shares" = "%@ shares";
+"Day ring full at" = "Day ring full at";
+"Return ring full at" = "Return ring full at";
+"Fills at this daily move; over it wraps a new lap" = "Fills at this daily move; over it wraps a new lap";
+"Fills at this total return; over it wraps a new lap" = "Fills at this total return; over it wraps a new lap";

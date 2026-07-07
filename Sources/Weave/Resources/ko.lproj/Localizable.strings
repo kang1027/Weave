@@ -139,3 +139,7 @@
 "Click to change icon" = "클릭해서 아이콘 변경";
 "Invested" = "원금";
 "%@ shares" = "%@주";
+"Day ring full at" = "Day 링 만점 기준";
+"Return ring full at" = "Return 링 만점 기준";
+"Fills at this daily move; over it wraps a new lap" = "이 등락에서 꽉 참 · 초과분은 새 바퀴로";
+"Fills at this total return; over it wraps a new lap" = "이 수익률에서 꽉 참 · 초과분은 새 바퀴로";

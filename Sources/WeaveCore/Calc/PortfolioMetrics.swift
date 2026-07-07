@@ -70,10 +70,20 @@ public struct PortfolioMetrics: Equatable, Sendable {
 public enum RingScale {
     public static let dayFullPercent: Decimal = 2
     public static let returnFullPercent: Decimal = 25
+    /// 멀티랩 상한 — 과도한 수익률에서 무한 바퀴를 그리지 않게.
+    public static let maxLaps = 5
 
     public static func fillFraction(percent: Decimal, fullAt: Decimal) -> Double {
         guard fullAt > 0 else { return 0 }
         let ratio = abs(percent).doubleValue / fullAt.doubleValue
         return min(max(ratio, 0), 1)
+    }
+
+    /// 멀티랩용 채움 비율 — 클램프하지 않되 maxLaps 바퀴로만 상한.
+    /// 1.0 = 한 바퀴, 2.0 = 두 바퀴(만점의 2배).
+    public static func lapRatio(percent: Decimal, fullAt: Decimal) -> Double {
+        guard fullAt > 0 else { return 0 }
+        let ratio = abs(percent).doubleValue / fullAt.doubleValue
+        return min(max(ratio, 0), Double(maxLaps))
     }
 }

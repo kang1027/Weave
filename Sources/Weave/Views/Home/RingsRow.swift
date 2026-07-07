@@ -18,9 +18,9 @@ struct RingsRow: View {
             RingGauge(
                 segments: scaledSegments(
                     portfolio.daySegments,
-                    fill: RingScale.fillFraction(
+                    fill: RingScale.lapRatio(
                         percent: portfolio.dayChangePercent,
-                        fullAt: RingScale.dayFullPercent
+                        fullAt: Decimal(model.settings.dayRingFullPercent)
                     )
                 ),
                 size: 64,
@@ -33,9 +33,9 @@ struct RingsRow: View {
             RingGauge(
                 segments: scaledSegments(
                     portfolio.returnSegments,
-                    fill: RingScale.fillFraction(
+                    fill: RingScale.lapRatio(
                         percent: portfolio.totalReturnPercent,
-                        fullAt: RingScale.returnFullPercent
+                        fullAt: Decimal(model.settings.returnRingFullPercent)
                     )
                 ),
                 size: 96,
