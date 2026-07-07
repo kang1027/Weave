@@ -155,7 +155,6 @@ struct SettingsView: View {
                                     model.updater.setAutomaticChecks($0)
                                 }
                             ))
-                            .opacity(model.updater.isAvailable ? 1 : 0.4)
                         }
                         SettingsButton(
                             title: model.t("Check for updates now…"),
@@ -286,24 +285,54 @@ struct SettingsButton: View {
     }
 }
 
-/// 네이티브 macOS 팝업버튼(NSPopUpButton) — 값 + ⌄⌃ 셰브론, 선택 항목 체크마크.
-/// 앱 테마(preferredColorScheme)에 맞춰 다크/라이트로 렌더된다.
+/// 팝업버튼 룩 — 값 + ⌄⌃ 셰브론(테마 토큰), 드롭다운은 체크마크 있는 네이티브 메뉴.
+/// (네이티브 Picker(.menu)는 앱 강제 테마 라이트에서 안 그려져 커스텀 라벨로 처리.)
 struct SelectPill<T: Hashable>: View {
+    @Environment(\.theme) private var theme
     let options: [(value: T, label: String)]
     @Binding var selection: T
 
     var body: some View {
-        Picker(selection: $selection) {
-            ForEach(options, id: \.value) { option in
-                Text(option.label).tag(option.value)
+        Menu {
+            Picker(selection: $selection) {
+                ForEach(options, id: \.value) { option in
+                    Text(option.label).tag(option.value)
+                }
+            } label: {
+                EmptyView()
             }
+            .labelsHidden()
+            .pickerStyle(.inline)
         } label: {
-            EmptyView()
+            HStack(spacing: 6) {
+                Text(currentLabel)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(theme.text)
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(theme.text2)
+            }
+            .padding(.leading, 10)
+            .padding(.trailing, 7)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(theme.seg)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(theme.hair, lineWidth: 1)
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
-        .labelsHidden()
-        .pickerStyle(.menu)
-        .controlSize(.small)
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
         .fixedSize()
+    }
+
+    private var currentLabel: String {
+        options.first { $0.value == selection }?.label ?? ""
     }
 }
 
@@ -323,6 +352,8 @@ struct HotkeyRecorderButton: View {
                     .font(.system(size: 10, weight: .medium))
                 Text(labelText)
                     .font(.system(size: 11.5, weight: .semibold))
+                    .lineLimit(1)
+                    .fixedSize()
             }
             .foregroundStyle(isRecording ? theme.link : theme.text)
             .padding(.horizontal, 10)
