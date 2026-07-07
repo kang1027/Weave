@@ -136,6 +136,7 @@ struct AssetListRow: View {
     @EnvironmentObject private var model: AppModel
     let metric: AssetMetrics
     let onDelete: () -> Void
+    @State private var isHoveringPrice = false
 
     var body: some View {
         Button {
@@ -173,6 +174,21 @@ struct AssetListRow: View {
                         .monospacedDigit()
                         .foregroundStyle(theme.text)
                         .privacyBlur(model.settings.privacyMode)
+                        .onHover { hovering in
+                            if entryPriceText != nil { isHoveringPrice = hovering }
+                        }
+                        // 가격 hover 시 평단(진입가) 툴팁 — 가격 오른끝 기준 위로.
+                        .overlay(alignment: .topTrailing) {
+                            if isHoveringPrice, let entry = entryPriceText {
+                                TooltipBubble(
+                                    text: model.t("Avg \(entry)"),
+                                    blurText: model.settings.privacyMode
+                                )
+                                .fixedSize()
+                                .offset(y: -30)
+                                .allowsHitTesting(false)
+                            }
+                        }
                     changeBadge
                 }
             }
@@ -181,6 +197,7 @@ struct AssetListRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .zIndex(isHoveringPrice ? 1 : 0)
         .hoverHighlight()
         .contextMenu {
             if !metric.asset.isManual {
@@ -219,6 +236,22 @@ struct AssetListRow: View {
             return MoneyFormatter.price(quote.price * rate, currency: model.settings.baseCurrency)
         }
         return MoneyFormatter.price(quote.price, currency: quote.currency)
+    }
+
+    /// 평단(진입가) — 가격과 같은 통화 규칙으로 표기. 수동자산/미보유는 nil(툴팁 없음).
+    private var entryPriceText: String? {
+        guard !metric.asset.isManual,
+              metric.position.quantity > 0,
+              metric.position.averageCost > 0 else {
+            return nil
+        }
+        let avg = metric.position.averageCost
+        if model.settings.displayCurrencyMode == .base,
+           let rate = model.fxRates[metric.asset.currency.uppercased()] {
+            return MoneyFormatter.price(avg * rate, currency: model.settings.baseCurrency)
+        }
+        let currency = metric.quote?.currency ?? metric.asset.currency
+        return MoneyFormatter.price(avg, currency: currency)
     }
 
     @ViewBuilder
