@@ -278,10 +278,14 @@ struct DetailChart: View {
         guard let last = candles.last?.date else { return }
         let span = max(dataSpanSeconds, minWindowSeconds)
         visibleSeconds = min(defaultWindowSeconds, span)
-        // 포커스 시점이 있으면(거래로 점프) 그 날짜를 중앙에, 없으면 최신을 오른쪽 끝에.
         if let focus = model.detailFocusDate {
-            scrollX = clampScroll(focus.addingTimeInterval(-visibleSeconds / 2))
+            // 거래로 점프 — 새 캔들이 도착하면 살짝 어긋난 지점에서 시작해 그 날짜 중앙으로
+            // 스르륵 슬라이드(하드컷 대신 자연스러운 착지). 데이터는 이미 받아둔 상태.
+            let center = clampScroll(focus.addingTimeInterval(-visibleSeconds / 2))
+            scrollX = clampScroll(focus.addingTimeInterval(-visibleSeconds * 0.12))
+            Task { @MainActor in slideWindow(to: center) }
         } else {
+            // 최신을 오른쪽 끝에.
             scrollX = last.addingTimeInterval(interval.seconds - visibleSeconds)
         }
     }
