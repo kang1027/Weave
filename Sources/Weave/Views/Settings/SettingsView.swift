@@ -286,57 +286,24 @@ struct SettingsButton: View {
     }
 }
 
-/// `.sel` — 현재 값 + ⌄, 클릭 시 선택 리스트.
+/// 네이티브 macOS 팝업버튼(NSPopUpButton) — 값 + ⌄⌃ 셰브론, 선택 항목 체크마크.
+/// 앱 테마(preferredColorScheme)에 맞춰 다크/라이트로 렌더된다.
 struct SelectPill<T: Hashable>: View {
-    @Environment(\.theme) private var theme
     let options: [(value: T, label: String)]
     @Binding var selection: T
 
     var body: some View {
-        Menu {
+        Picker(selection: $selection) {
             ForEach(options, id: \.value) { option in
-                Button {
-                    selection = option.value
-                } label: {
-                    HStack {
-                        if option.value == selection {
-                            Image(systemName: "checkmark")
-                        }
-                        Text(option.label)
-                    }
-                }
+                Text(option.label).tag(option.value)
             }
         } label: {
-            HStack(spacing: 7) {
-                Text(currentLabel)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(theme.text)
-                    .lineLimit(1)
-                // macOS 팝업버튼 글리프 — "select" 어포던스.
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(theme.text2)
-            }
-            .padding(.leading, 11)
-            .padding(.trailing, 8)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(theme.seg)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .strokeBorder(theme.hair, lineWidth: 1)
-                    )
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            EmptyView()
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .controlSize(.small)
         .fixedSize()
-    }
-
-    private var currentLabel: String {
-        options.first { $0.value == selection }?.label ?? ""
     }
 }
 
