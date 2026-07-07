@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import WeaveCore
 
@@ -309,54 +310,64 @@ struct SettingsButton: View {
     }
 }
 
-/// 팝업버튼 룩 — 값 + ⌄⌃ 셰브론(테마 토큰), 드롭다운은 체크마크 있는 네이티브 메뉴.
-/// (네이티브 Picker(.menu)는 앱 강제 테마 라이트에서 안 그려져 커스텀 라벨로 처리.)
+/// 네이티브 macOS 팝업버튼(NSPopUpButton). 앱 테마에 맞춰 appearance를 명시적으로
+/// 지정해 슬레이트/라이트 모두에서 확실히 네이티브 룩으로 뜬다.
+/// (SwiftUI Picker(.menu)는 앱 강제 색상 스킴에서 라이트 시 렌더가 삐끗함.)
 struct SelectPill<T: Hashable>: View {
     @Environment(\.theme) private var theme
     let options: [(value: T, label: String)]
     @Binding var selection: T
 
     var body: some View {
-        Menu {
-            Picker(selection: $selection) {
-                ForEach(options, id: \.value) { option in
-                    Text(option.label).tag(option.value)
-                }
-            } label: {
-                EmptyView()
-            }
-            .labelsHidden()
-            .pickerStyle(.inline)
-        } label: {
-            HStack(spacing: 6) {
-                Text(currentLabel)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(theme.text)
-                    .lineLimit(1)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(theme.text2)
-            }
-            .padding(.leading, 10)
-            .padding(.trailing, 7)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(theme.seg)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .strokeBorder(theme.hair, lineWidth: 1)
-                    )
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
+        NativePopUp(options: options, selection: $selection, isDark: theme.colorScheme == .dark)
+            .fixedSize()
+    }
+}
+
+/// NSPopUpButton 래퍼 — 네이티브 룩 + 테마별 appearance 강제.
+private struct NativePopUp<T: Hashable>: NSViewRepresentable {
+    let options: [(value: T, label: String)]
+    @Binding var selection: T
+    let isDark: Bool
+
+    func makeNSView(context: Context) -> NSPopUpButton {
+        let button = NSPopUpButton(frame: .zero, pullsDown: false)
+        button.controlSize = .small
+        button.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.selectionChanged(_:))
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        return button
     }
 
-    private var currentLabel: String {
-        options.first { $0.value == selection }?.label ?? ""
+    func updateNSView(_ button: NSPopUpButton, context: Context) {
+        context.coordinator.options = options
+        context.coordinator.onSelect = { selection = $0 }
+
+        let titles = options.map(\.label)
+        if button.itemTitles != titles {
+            button.removeAllItems()
+            button.addItems(withTitles: titles)
+        }
+        if let index = options.firstIndex(where: { $0.value == selection }),
+           button.indexOfSelectedItem != index {
+            button.selectItem(at: index)
+        }
+        button.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator: NSObject {
+        var options: [(value: T, label: String)] = []
+        var onSelect: ((T) -> Void)?
+
+        @objc func selectionChanged(_ sender: NSPopUpButton) {
+            let index = sender.indexOfSelectedItem
+            guard options.indices.contains(index) else { return }
+            onSelect?(options[index].value)
+        }
     }
 }
 
