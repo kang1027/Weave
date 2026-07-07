@@ -153,6 +153,8 @@ struct AssetListRow: View {
     @State private var isHoveringPrice = false
 
     var body: some View {
+        // 선택 기간 수익률 — 가격 색·행 배경·배지에 공통 사용.
+        let percent = model.assetReturnPercent(metric)
         Button {
             model.push(.detail(metric.asset.id))
         } label: {
@@ -190,7 +192,7 @@ struct AssetListRow: View {
                     Text(priceText)
                         .font(.system(size: 13, weight: .semibold))
                         .monospacedDigit()
-                        .foregroundStyle(theme.text)
+                        .foregroundStyle(percent.map { theme.upDown($0 >= 0) } ?? theme.text)
                         .privacyBlur(model.settings.privacyMode)
                         .onHover { hovering in
                             if entryPriceText != nil { isHoveringPrice = hovering }
@@ -207,11 +209,13 @@ struct AssetListRow: View {
                                 .allowsHitTesting(false)
                             }
                         }
-                    changeBadge
+                    changeBadge(percent)
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 9)
+            // 하락 은은한 빨강 / 상승 은은한 초록 배경.
+            .background(percent.map { ($0 >= 0 ? theme.green : theme.red).opacity(0.08) } ?? .clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -273,8 +277,8 @@ struct AssetListRow: View {
     }
 
     @ViewBuilder
-    private var changeBadge: some View {
-        if let percent = model.assetReturnPercent(metric) {
+    private func changeBadge(_ percent: Decimal?) -> some View {
+        if let percent {
             ChangeBadge(
                 text: MoneyFormatter.percent(percent),
                 style: percent >= 0 ? .up : .down
