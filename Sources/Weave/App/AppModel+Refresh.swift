@@ -62,12 +62,17 @@ extension AppModel {
                 asset: target, quote: quote,
                 format: settings.menuBarFormat, privacy: privacy
             )
-            menuBarImage = MenuBarImageRenderer.image(
-                MenuBarTitleBuilder.parts(
-                    asset: target, quote: quote,
-                    format: settings.menuBarFormat, privacy: privacy
-                )
+            let parts = MenuBarTitleBuilder.parts(
+                asset: target, quote: quote,
+                format: settings.menuBarFormat, privacy: privacy
             )
+            // 배지 로고 해석 — 커스텀 업로드 or 크립토 CDN(비동기 도착 시 재렌더).
+            let logo = parts.badge == nil
+                ? nil
+                : MenuBarLogoProvider.shared.image(for: target) { [weak self] in
+                    self?.updateMenuBarTitle()
+                }
+            menuBarImage = MenuBarImageRenderer.image(parts, logo: logo)
             return
         }
 
@@ -86,7 +91,8 @@ extension AppModel {
                     baseCurrency: settings.baseCurrency,
                     dayChangePercent: portfolio.dayChangePercent,
                     privacy: privacy
-                )
+                ),
+                logo: nil
             )
         } else {
             menuBarTitle = MenuBarTitleBuilder.placeholder

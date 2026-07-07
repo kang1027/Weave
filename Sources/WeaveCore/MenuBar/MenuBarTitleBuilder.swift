@@ -59,16 +59,15 @@ public enum MenuBarTitleBuilder {
         }
     }
 
-    /// 왼쪽 배지(로고) — 커스텀 로고가 있으면 그 이미지, 없으면 팔레트 색 이니셜.
+    /// 왼쪽 배지 — 실제 로고 이미지는 앱 레이어가 자산으로 해석(커스텀 업로드 or 크립토 CDN),
+    /// 여기 값은 로고가 없을 때의 폴백(팔레트 색 이니셜)용.
     public struct Badge: Equatable, Sendable {
         public var initial: String
         public var colorIndex: Int
-        public var customLogoFileName: String?
 
-        public init(initial: String, colorIndex: Int, customLogoFileName: String?) {
+        public init(initial: String, colorIndex: Int) {
             self.initial = initial
             self.colorIndex = colorIndex
-            self.customLogoFileName = customLogoFileName
         }
     }
 
@@ -157,8 +156,7 @@ public enum MenuBarTitleBuilder {
     private static func assetBadge(_ asset: Asset) -> Badge {
         Badge(
             initial: String(asset.name.prefix(1)).uppercased(),
-            colorIndex: asset.colorIndex,
-            customLogoFileName: asset.customLogoFileName
+            colorIndex: asset.colorIndex
         )
     }
 }

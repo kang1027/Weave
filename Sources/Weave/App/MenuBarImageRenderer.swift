@@ -14,114 +14,113 @@ enum MenuBarImageRenderer {
         hex(0x64D2FF), hex(0xBF5AF2), hex(0xFFD60A), hex(0x66D4CF)
     ]
 
-    static func image(_ parts: MenuBarTitleBuilder.MenuBarParts) -> NSImage {
+    /// - logo: 앱이 해석한 배지 로고(커스텀/크립토 CDN). nil이면 이니셜 폴백.
+    static func image(_ parts: MenuBarTitleBuilder.MenuBarParts, logo: NSImage?) -> NSImage {
         let change = parts.isUp ? up : down
-        let attributed = parts.line2 != nil
-            ? twoLine(parts.line1, parts.line2!, change: change)
-            : oneLine(parts.line1, change: change)
-        return render(attributed, badge: parts.badge)
-    }
-
-    // MARK: - 텍스트 구성
-
-    private static func oneLine(_ line: MenuBarTitleBuilder.Line, change: NSColor) -> NSAttributedString {
-        let base = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium)
-        let result = NSMutableAttributedString(
-            string: line.text,
-            attributes: [.font: base, .foregroundColor: line.textColored ? change : NSColor.labelColor]
-        )
-        if let percent = line.percent {
-            result.append(NSAttributedString(
-                string: percent,
-                attributes: [
-                    .font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold),
-                    .foregroundColor: change
-                ]
-            ))
+        if let line2 = parts.line2 {
+            return renderStacked(
+                top: attributed(parts.line1, change: change, size: 9),
+                bottom: attributed(line2, change: change, size: 9),
+                badge: parts.badge, logo: logo
+            )
         }
-        return result
+        return renderInline(attributed(parts.line1, change: change, size: 13), badge: parts.badge, logo: logo)
     }
 
-    private static func twoLine(
-        _ line1: MenuBarTitleBuilder.Line,
-        _ line2: MenuBarTitleBuilder.Line,
-        change: NSColor
-    ) -> NSAttributedString {
-        let para = NSMutableParagraphStyle()
-        para.alignment = .center
-        para.maximumLineHeight = 10
-        para.minimumLineHeight = 10
-        let text = NSFont.systemFont(ofSize: 9, weight: .semibold)
-        let percentFont = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .bold)
+    // MARK: - 한 줄 텍스트 구성
 
-        let result = NSMutableAttributedString()
-        append(line1, to: result, textFont: text, percentFont: percentFont, change: change, para: para)
-        result.append(NSAttributedString(string: "\n", attributes: [.paragraphStyle: para]))
-        append(line2, to: result, textFont: text, percentFont: percentFont, change: change, para: para)
-        return result
-    }
-
-    private static func append(
+    private static func attributed(
         _ line: MenuBarTitleBuilder.Line,
-        to result: NSMutableAttributedString,
-        textFont: NSFont,
-        percentFont: NSFont,
         change: NSColor,
-        para: NSParagraphStyle
-    ) {
+        size: CGFloat
+    ) -> NSAttributedString {
+        let textFont = NSFont.monospacedDigitSystemFont(ofSize: size, weight: size < 11 ? .semibold : .medium)
+        let percentFont = NSFont.monospacedDigitSystemFont(ofSize: size, weight: .bold)
+        let result = NSMutableAttributedString()
         if !line.text.isEmpty {
             result.append(NSAttributedString(
                 string: line.text,
-                attributes: [
-                    .font: textFont,
-                    .foregroundColor: line.textColored ? change : NSColor.labelColor,
-                    .paragraphStyle: para
-                ]
+                attributes: [.font: textFont, .foregroundColor: line.textColored ? change : NSColor.labelColor]
             ))
         }
         if let percent = line.percent {
             result.append(NSAttributedString(
                 string: percent,
-                attributes: [.font: percentFont, .foregroundColor: change, .paragraphStyle: para]
+                attributes: [.font: percentFont, .foregroundColor: change]
             ))
+        }
+        return result
+    }
+
+    // MARK: - 합성
+
+    /// 1줄: [배지] 텍스트.
+    private static func renderInline(
+        _ text: NSAttributedString,
+        badge: MenuBarTitleBuilder.Badge?,
+        logo: NSImage?
+    ) -> NSImage {
+        let ts = text.size()
+        let badgeSize: CGFloat = badge != nil ? 14 : 0
+        let gap: CGFloat = badge != nil ? 4 : 0
+        let width = badgeSize + gap + ceil(ts.width) + 2
+        let height = max(ceil(ts.height), badgeSize)
+
+        return draw(width: width, height: height) {
+            if let badge {
+                drawBadge(badge, logo: logo, in: NSRect(x: 0, y: (height - badgeSize) / 2, width: badgeSize, height: badgeSize))
+            }
+            text.draw(at: NSPoint(x: badgeSize + gap, y: (height - ceil(ts.height)) / 2))
         }
     }
 
-    // MARK: - 이미지 합성
+    /// 2줄: 상단 [배지] 텍스트 / 하단 텍스트 (좌측 정렬). 배지는 상단 줄 이름 왼쪽에만.
+    private static func renderStacked(
+        top: NSAttributedString,
+        bottom: NSAttributedString,
+        badge: MenuBarTitleBuilder.Badge?,
+        logo: NSImage?
+    ) -> NSImage {
+        let ts = top.size()
+        let bs = bottom.size()
+        let badgeSize: CGFloat = badge != nil ? 13 : 0
+        let gap: CGFloat = badge != nil ? 3 : 0
+        let topRowHeight = max(ceil(ts.height), badgeSize)
+        let bottomRowHeight = ceil(bs.height)
+        let height = topRowHeight + bottomRowHeight
+        let width = max(badgeSize + gap + ceil(ts.width), ceil(bs.width)) + 2
 
-    private static func render(_ attributed: NSAttributedString, badge: MenuBarTitleBuilder.Badge?) -> NSImage {
-        let textBounds = attributed.boundingRect(
-            with: NSSize(width: 500, height: 100),
-            options: [.usesLineFragmentOrigin]
-        )
-        let textWidth = ceil(textBounds.width)
-        let textHeight = ceil(textBounds.height)
-        let badgeSize: CGFloat = badge != nil ? 15 : 0
-        let gap: CGFloat = badge != nil ? 4 : 0
-        let width = badgeSize + gap + textWidth + 2
-        let height = max(textHeight, badgeSize)
-
-        let image = NSImage(size: NSSize(width: width, height: height))
-        image.lockFocus()
-
-        if let badge {
-            drawBadge(badge, in: NSRect(x: 0, y: (height - badgeSize) / 2, width: badgeSize, height: badgeSize))
+        return draw(width: width, height: height) {
+            // 하단(가격 등락%) — 좌측 정렬.
+            bottom.draw(at: NSPoint(x: 0, y: (bottomRowHeight - ceil(bs.height)) / 2))
+            // 상단 배지 + 이름 — 배지는 이름 왼쪽에만.
+            if let badge {
+                drawBadge(
+                    badge, logo: logo,
+                    in: NSRect(x: 0, y: bottomRowHeight + (topRowHeight - badgeSize) / 2, width: badgeSize, height: badgeSize)
+                )
+            }
+            top.draw(at: NSPoint(x: badgeSize + gap, y: bottomRowHeight + (topRowHeight - ceil(ts.height)) / 2))
         }
-        attributed.draw(
-            with: NSRect(x: badgeSize + gap, y: (height - textHeight) / 2, width: textWidth, height: textHeight),
-            options: [.usesLineFragmentOrigin]
-        )
+    }
 
+    private static func draw(width: CGFloat, height: CGFloat, _ body: () -> Void) -> NSImage {
+        let image = NSImage(size: NSSize(width: max(width, 1), height: max(height, 1)))
+        image.lockFocus()
+        body()
         image.unlockFocus()
         image.isTemplate = false
         return image
     }
 
-    private static func drawBadge(_ badge: MenuBarTitleBuilder.Badge, in rect: NSRect) {
+    private static func drawBadge(
+        _ badge: MenuBarTitleBuilder.Badge,
+        logo: NSImage?,
+        in rect: NSRect
+    ) {
         let radius = rect.width * 0.29
         let clip = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
-
-        if let fileName = badge.customLogoFileName, let logo = LogoStore.image(named: fileName) {
+        if let logo {
             NSGraphicsContext.saveGraphicsState()
             clip.addClip()
             drawAspectFill(logo, in: rect)
@@ -132,7 +131,7 @@ enum MenuBarImageRenderer {
             let initial = NSAttributedString(
                 string: badge.initial,
                 attributes: [
-                    .font: NSFont.systemFont(ofSize: 8, weight: .bold),
+                    .font: NSFont.systemFont(ofSize: rect.width * 0.55, weight: .bold),
                     .foregroundColor: NSColor.white
                 ]
             )
@@ -150,13 +149,13 @@ enum MenuBarImageRenderer {
         }
         let scale = max(rect.width / source.width, rect.height / source.height)
         let scaled = NSSize(width: source.width * scale, height: source.height * scale)
-        let drawRect = NSRect(
-            x: rect.midX - scaled.width / 2,
-            y: rect.midY - scaled.height / 2,
-            width: scaled.width,
-            height: scaled.height
+        image.draw(
+            in: NSRect(
+                x: rect.midX - scaled.width / 2, y: rect.midY - scaled.height / 2,
+                width: scaled.width, height: scaled.height
+            ),
+            from: .zero, operation: .sourceOver, fraction: 1
         )
-        image.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1)
     }
 
     private static func color(for colorIndex: Int) -> NSColor {
