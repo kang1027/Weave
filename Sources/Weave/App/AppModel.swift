@@ -272,6 +272,8 @@ final class AppModel: ObservableObject {
                     try? await Task.sleep(for: .seconds(30))
                 } else {
                     try? await Task.sleep(for: .seconds(interval))
+                    // 취소로 sleep이 조기 반환되면 증가시키지 않는다(restart 시 유령 +1 방지).
+                    if Task.isCancelled { break }
                     self.rotationIndex += 1
                 }
             }
