@@ -96,6 +96,12 @@ private struct CombinedChart: View {
     let markers: [BuyMarker]
 
     @State private var hoveredMarkerID: UUID?
+    @State private var hoveredDate: Date?
+
+    private var spanDays: Double {
+        guard let first = series.first?.date, let last = series.last?.date else { return 0 }
+        return last.timeIntervalSince(first) / 86_400
+    }
 
     private var yDomain: ClosedRange<Double> {
         let values = series.map { $0.value.doubleValue }
@@ -129,6 +135,19 @@ private struct CombinedChart: View {
                 .foregroundStyle(theme.green)
                 .lineStyle(StrokeStyle(lineWidth: 2))
             }
+
+            // hover 크로스헤어 — 세로 가이드 + 그 시점 값 포인트.
+            if hoveredMarkerID == nil, let hoveredDate, let point = nearestPoint(to: hoveredDate) {
+                RuleMark(x: .value("Date", point.date))
+                    .foregroundStyle(theme.guide)
+                    .lineStyle(StrokeStyle(lineWidth: 1))
+                PointMark(
+                    x: .value("Date", point.date),
+                    y: .value("Value", point.value.doubleValue)
+                )
+                .symbolSize(40)
+                .foregroundStyle(theme.green)
+            }
         }
         .chartYScale(domain: yDomain)
         .chartPlotStyle { $0.clipped() }
@@ -156,7 +175,7 @@ private struct CombinedChart: View {
             AxisMarks(values: .automatic(desiredCount: 4)) { value in
                 AxisValueLabel(anchor: .top) {
                     if let date = value.as(Date.self) {
-                        Text(date, format: ChartAxis.xFormat(for: model.homeChartPeriod, locale: model.locale))
+                        Text(date, format: ChartAxis.xFormat(spanDays: spanDays, locale: model.locale))
                             .font(.system(size: 9))
                             .foregroundStyle(theme.xLabel)
                     }
@@ -175,6 +194,21 @@ private struct CombinedChart: View {
         if let plotAnchor = proxy.plotFrame {
             let plot = geo[plotAnchor]
             ZStack(alignment: .topLeading) {
+                // hover 캡처(마커 아래).
+                Rectangle()
+                    .fill(.clear)
+                    .contentShape(Rectangle())
+                    .frame(width: plot.width, height: plot.height)
+                    .position(x: plot.midX, y: plot.midY)
+                    .onContinuousHover { phase in
+                        switch phase {
+                        case .active(let point):
+                            hoveredDate = proxy.value(atX: point.x - plot.origin.x, as: Date.self)
+                        case .ended:
+                            hoveredDate = nil
+                        }
+                    }
+
                 ForEach(markers) { marker in
                     if let rawX = proxy.position(forX: Calendar.current.startOfDay(for: marker.trade.date)),
                        let rawY = proxy.position(forY: marker.seriesValue.doubleValue) {
@@ -193,8 +227,55 @@ private struct CombinedChart: View {
                         .position(x: plot.origin.x + x, y: plot.origin.y + y)
                     }
                 }
+
+                // 값 툴팁 — 날짜·평가액·등락률(마커 hover 중이 아닐 때).
+                if hoveredMarkerID == nil, let hoveredDate, let point = nearestPoint(to: hoveredDate),
+                   let x = proxy.position(forX: point.date) {
+                    valueTooltip(point)
+                        .fixedSize()
+                        .position(
+                            x: min(max(plot.origin.x + x, plot.origin.x + 56), plot.maxX - 56),
+                            y: plot.origin.y + 20
+                        )
+                        .allowsHitTesting(false)
+                }
             }
         }
+    }
+
+    private func nearestPoint(to date: Date) -> ValuePoint? {
+        series.min { abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date)) }
+    }
+
+    /// hover 값 툴팁 — 날짜 + 총 평가액 + 구간 시작 대비 등락률.
+    private func valueTooltip(_ point: ValuePoint) -> some View {
+        let base = model.settings.baseCurrency
+        let baseline = series.first(where: { $0.value > 0 })?.value ?? point.value
+        let pct = baseline > 0 ? ((point.value - baseline) / baseline * 100).rounded(scale: 2) : 0
+        return VStack(alignment: .leading, spacing: 2) {
+            Text(point.date.formatted(.dateTime.year().month().day().locale(model.locale)))
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(theme.text2)
+            HStack(spacing: 6) {
+                Text(MoneyFormatter.price(point.value, currency: base))
+                    .font(.system(size: 11, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(theme.text)
+                    .privacyBlur(model.settings.privacyMode)
+                Text(MoneyFormatter.percent(pct))
+                    .font(.system(size: 10, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(theme.upDown(pct >= 0))
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(theme.tooltipBg)
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(theme.tooltipBorder))
+                .shadow(color: .black.opacity(0.2), radius: 10, y: 6)
+        )
     }
 }
 
@@ -289,6 +370,12 @@ private struct PerAssetChart: View {
 
     @State private var hoveredDate: Date?
 
+    private var spanDays: Double {
+        let dates = lines.flatMap { $0.points.map(\.date) }
+        guard let first = dates.min(), let last = dates.max() else { return 0 }
+        return last.timeIntervalSince(first) / 86_400
+    }
+
     var body: some View {
         Chart {
             ForEach(lines) { line in
@@ -338,7 +425,7 @@ private struct PerAssetChart: View {
             AxisMarks(values: .automatic(desiredCount: 4)) { value in
                 AxisValueLabel(anchor: .top) {
                     if let date = value.as(Date.self) {
-                        Text(date, format: ChartAxis.xFormat(for: model.homeChartPeriod, locale: model.locale))
+                        Text(date, format: ChartAxis.xFormat(spanDays: spanDays, locale: model.locale))
                             .font(.system(size: 9))
                             .foregroundStyle(theme.xLabel)
                     }
@@ -378,9 +465,12 @@ private struct PerAssetChart: View {
         }
     }
 
-    /// hover 시점의 종목별 색·이름·수익률 툴팁.
+    /// hover 시점의 날짜 + 종목별 색·이름·수익률 툴팁.
     private func hoverTooltip(at date: Date) -> some View {
         VStack(alignment: .leading, spacing: 3) {
+            Text(date.formatted(.dateTime.year().month().day().locale(model.locale)))
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(theme.text2)
             ForEach(lines) { line in
                 if let point = nearestPoint(line, to: date) {
                     HStack(spacing: 5) {
@@ -417,16 +507,18 @@ private struct PerAssetChart: View {
     }
 }
 
-/// 기간별 x축 라벨 포맷.
+/// x축 라벨 포맷 — 실제 데이터 구간 길이에 맞춰 선택(짧으면 월/일이라 라벨이 안 겹침).
 enum ChartAxis {
-    static func xFormat(for period: ChartPeriod, locale: Locale) -> Date.FormatStyle {
-        switch period {
-        case .oneMonth:
-            return .dateTime.month(.defaultDigits).day().locale(locale)
-        case .threeMonths, .sixMonths, .oneYear:
-            return .dateTime.month(.abbreviated).locale(locale)
-        case .all:
+    static func xFormat(spanDays: Double, locale: Locale) -> Date.FormatStyle {
+        if spanDays > 2 * 365 {
             return .dateTime.year().locale(locale)
         }
+        if spanDays > 300 {
+            return .dateTime.year(.twoDigits).month(.abbreviated).locale(locale)
+        }
+        if spanDays > 55 {
+            return .dateTime.month(.abbreviated).locale(locale)
+        }
+        return .dateTime.month(.defaultDigits).day().locale(locale)
     }
 }
