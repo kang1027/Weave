@@ -26,7 +26,7 @@ final class AppModel: ObservableObject {
     /// 최근 갱신 라운드에서 시세를 못 받은 자산 — stale 표시용.
     @Published var staleAssetIDs: Set<UUID> = []
     @Published var route: [Route] = []
-    @Published var menuBarTitle: String = MenuBarTitleBuilder.placeholder
+    @Published var menuBarTitle = AttributedString(MenuBarTitleBuilder.placeholder)
     @Published var nextRefreshAt: Date?
 
     // 검색 (자산 관리 화면)

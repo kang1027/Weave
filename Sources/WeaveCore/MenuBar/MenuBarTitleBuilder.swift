@@ -8,8 +8,10 @@ public enum MenuBarTitleBuilder {
         format: MenuBarFormat,
         privacy: Bool
     ) -> String {
-        let symbol = asset.symbol.uppercased()
-        guard let quote else { return symbol }
+        // 숫자 코드 심볼(국장 005930, 일장 7203 등)은 코드 대신 이름으로 표시.
+        let isNumericSymbol = !asset.symbol.isEmpty && asset.symbol.allSatisfy(\.isNumber)
+        let name = isNumericSymbol ? asset.name : asset.symbol.uppercased()
+        guard let quote else { return name }
 
         let price = privacy
             ? MoneyFormatter.masked
@@ -18,11 +20,11 @@ public enum MenuBarTitleBuilder {
 
         switch format {
         case .full:
-            return "\(symbol) \(price) \(percent)"
+            return "\(name) \(price) \(percent)"
         case .compact:
-            return "\(symbol) \(percent)"
+            return "\(name) \(percent)"
         case .priceOnly:
-            return privacy ? "\(symbol) \(percent)" : price
+            return privacy ? "\(name) \(percent)" : price
         }
     }
 
