@@ -129,10 +129,10 @@ struct SettingsView: View {
                                 )
                             )
                         }
-                        SettingsButton(title: model.t("Back up data…")) {
+                        SettingsButton(title: model.t("Export data…")) {
                             model.exportBackup()
                         }
-                        SettingsButton(title: model.t("Restore from backup…")) {
+                        SettingsButton(title: model.t("Import data…")) {
                             model.importBackup()
                         }
                         SettingsButton(title: model.t("Clear candle cache")) {
@@ -387,6 +387,9 @@ struct HotkeyRecorderButton: View {
 
     private func startRecording() {
         isRecording = true
+        // accessory 앱의 팝오버는 비활성 상태라 ⌘조합 키가 프론트 앱으로 새어나간다.
+        // 앱을 활성화해 로컬 모니터가 조합 키를 받을 수 있게 한다.
+        NSApp.activate(ignoringOtherApps: true)
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             defer { stopRecording() }
             if event.keyCode == 53 { // ESC → 취소

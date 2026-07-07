@@ -26,7 +26,7 @@
 "Available: %@" = "Available: %@";
 "Avg %@" = "Avg %@";
 "BUY" = "BUY";
-"Back up data…" = "Back up data…";
+"Export data…" = "Export data…";
 "Backup failed" = "Backup failed";
 "Base" = "Base";
 "Base currency" = "Base currency";
@@ -94,7 +94,7 @@
 "Refresh now" = "Refresh now";
 "Remove shortcut" = "Remove shortcut";
 "Restore failed" = "Restore failed";
-"Restore from backup…" = "Restore from backup…";
+"Import data…" = "Import data…";
 "SELL" = "SELL";
 "Save Trade" = "Save Trade";
 "Search BTC, 삼성전자, AAPL…" = "Search BTC, 삼성전자, AAPL…";

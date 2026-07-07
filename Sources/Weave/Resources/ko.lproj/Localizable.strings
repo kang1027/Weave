@@ -26,7 +26,7 @@
 "Available: %@" = "매도 가능: %@";
 "Avg %@" = "평단 %@";
 "BUY" = "매수";
-"Back up data…" = "데이터 백업…";
+"Export data…" = "데이터 내보내기…";
 "Backup failed" = "백업 실패";
 "Base" = "기준 통화";
 "Base currency" = "기준 통화";
@@ -94,7 +94,7 @@
 "Refresh now" = "지금 새로고침";
 "Remove shortcut" = "단축키 제거";
 "Restore failed" = "복원 실패";
-"Restore from backup…" = "백업에서 복원…";
+"Import data…" = "데이터 가져오기…";
 "SELL" = "매도";
 "Save Trade" = "거래 저장";
 "Search BTC, 삼성전자, AAPL…" = "BTC, 삼성전자, AAPL 검색…";
