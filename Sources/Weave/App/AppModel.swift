@@ -52,6 +52,8 @@ final class AppModel: ObservableObject {
     @Published var detailInterval: CandleInterval = .day
     @Published var detailCandles: [Candle] = []
     @Published var isDetailChartLoading = false
+    /// 상세 차트가 중심으로 볼 시점 — nil이면 최근. 데이터 범위 밖 거래로 점프할 때 그 거래일로 설정.
+    @Published var detailFocusDate: Date?
     var detailChartAssetID: UUID?
     var detailLoadToken = 0
 

@@ -39,8 +39,19 @@ public actor CandleService {
     public func candles(
         provider: ProviderKind,
         providerSymbol: String,
-        interval: CandleInterval
+        interval: CandleInterval,
+        endingAt endDate: Date? = nil
     ) async throws -> [Candle] {
+        // 과거 구간 조회(거래로 점프)는 최근 캐시를 덮지 않도록 캐시를 우회해 직접 받는다.
+        if let endDate {
+            guard let dataProvider = providers[provider] else {
+                throw ProviderError.unsupportedSymbol(providerSymbol)
+            }
+            return try await dataProvider.candles(
+                providerSymbol: providerSymbol, interval: interval, endingAt: endDate
+            )
+        }
+
         let key = cacheKey(provider: provider, symbol: providerSymbol, interval: interval)
 
         if let cached = memory[key] ?? loadDisk(key: key) {

@@ -1,6 +1,12 @@
 import SwiftUI
 import WeaveCore
 
+/// 상세 차트 재조회 트리거 — 인터벌 또는 포커스 시점이 바뀌면 캔들을 다시 받는다.
+private struct DetailLoadKey: Equatable {
+    let interval: CandleInterval
+    let focusDate: Date?
+}
+
 /// 자산 상세 — 현재가/배지 · 실캔들 차트 · Trades 리스트.
 struct AssetDetailView: View {
     @Environment(\.theme) private var theme
@@ -67,7 +73,7 @@ struct AssetDetailView: View {
 
             footer(asset: asset, position: position)
         }
-        .task(id: model.detailInterval) {
+        .task(id: DetailLoadKey(interval: model.detailInterval, focusDate: model.detailFocusDate)) {
             await model.loadDetailChart(assetID: assetID)
         }
         .onChange(of: model.detailCandles) {
@@ -253,7 +259,7 @@ struct AssetDetailView: View {
     }
 
     /// 거래 행 클릭 → 차트 마커 포커스. 현재 인터벌 데이터에 그 시점이 있으면 바로 팬,
-    /// 없으면(인트라데이의 오래된 거래) 그 거래가 보이는 인터벌로 전환 후 로드되면 포커스.
+    /// 없으면(인트라데이의 오래된 거래) 인터벌은 유지한 채 그 거래일 구간을 재조회한 뒤 포커스.
     private func requestChartFocus(_ trade: Trade) {
         let candles = model.detailCandles
         var inRange = false
@@ -262,16 +268,12 @@ struct AssetDetailView: View {
         }
         if inRange {
             chartFocusTradeID = trade.id
-            return
-        }
-        let target = CandleInterval.finestCovering(trade.date)
-        if model.detailInterval != target {
-            pendingFocusTradeID = trade.id
-            model.detailInterval = target       // .task(id:)가 재조회 → onChange에서 포커스
-        } else if candles.isEmpty {
-            pendingFocusTradeID = trade.id       // 이미 최적 인터벌 로딩 중 → 로드되면 포커스
+        } else if model.detailFocusDate == trade.date {
+            // 이미 이 거래 시점으로 조회한 상태(소스에 그 구간이 없을 수도) → 가능한 데까지.
+            chartFocusTradeID = trade.id
         } else {
-            chartFocusTradeID = trade.id         // 최적 인터벌인데도 범위 밖(아주 오래된 거래) → 가능한 데까지
+            pendingFocusTradeID = trade.id
+            model.detailFocusDate = trade.date   // .task(id:)가 재조회 → onChange에서 포커스
         }
     }
 

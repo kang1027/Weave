@@ -139,6 +139,34 @@ public struct YahooProvider: MarketDataProvider {
         return candles
     }
 
+    public func candles(
+        providerSymbol: String,
+        interval: CandleInterval,
+        endingAt endDate: Date
+    ) async throws -> [Candle] {
+        // 과거 구간은 range 대신 period1/period2(epoch초)로 조회.
+        // (야후 15m은 소스가 최근 60일만 제공 — 그 이전은 빈 결과일 수 있다.)
+        let (spanSeconds, yahooInterval): (TimeInterval, String)
+        switch interval {
+        case .m15: (spanSeconds, yahooInterval) = (60 * 86_400, "15m")
+        case .h1: (spanSeconds, yahooInterval) = (90 * 86_400, "1h")
+        case .h4: (spanSeconds, yahooInterval) = (180 * 86_400, "1h")
+        case .day: (spanSeconds, yahooInterval) = (730 * 86_400, "1d")
+        case .week: (spanSeconds, yahooInterval) = (3_650 * 86_400, "1wk")
+        case .month: (spanSeconds, yahooInterval) = (7_300 * 86_400, "1mo")
+        }
+        let period2 = Int(endDate.timeIntervalSince1970)
+        let period1 = period2 - Int(spanSeconds)
+        let data = try await chartData(
+            symbol: providerSymbol, period1: period1, period2: period2, interval: yahooInterval
+        )
+        let candles = try Self.parseCandles(data)
+        if interval == .h4 {
+            return CandleAggregator.aggregate(candles, bucketSeconds: interval.seconds)
+        }
+        return candles
+    }
+
     static func parseCandles(_ data: Data) throws -> [Candle] {
         let result = try chartResult(data)
         guard
@@ -179,6 +207,18 @@ public struct YahooProvider: MarketDataProvider {
             let encoded = symbol.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
             let url = URL(
                 string: "https://query1.finance.yahoo.com/v8/finance/chart/\(encoded)?range=\(range)&interval=\(interval)"
+            )
+        else {
+            throw ProviderError.unsupportedSymbol(symbol)
+        }
+        return try await http.get(url, headers: Self.headers)
+    }
+
+    private func chartData(symbol: String, period1: Int, period2: Int, interval: String) async throws -> Data {
+        guard
+            let encoded = symbol.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+            let url = URL(
+                string: "https://query1.finance.yahoo.com/v8/finance/chart/\(encoded)?period1=\(period1)&period2=\(period2)&interval=\(interval)"
             )
         else {
             throw ProviderError.unsupportedSymbol(symbol)

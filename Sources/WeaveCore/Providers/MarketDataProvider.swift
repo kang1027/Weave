@@ -6,6 +6,15 @@ public protocol MarketDataProvider: Sendable {
     func search(query: String) async throws -> [SearchResult]
     func quote(providerSymbol: String) async throws -> Quote
     func candles(providerSymbol: String, interval: CandleInterval) async throws -> [Candle]
+    /// endDate로 끝나는 과거 구간 조회 — 오래된 거래로 점프할 때 그 시점 캔들을 받는다.
+    /// 미지원 소스는 최근 구간으로 폴백한다.
+    func candles(providerSymbol: String, interval: CandleInterval, endingAt endDate: Date) async throws -> [Candle]
+}
+
+public extension MarketDataProvider {
+    func candles(providerSymbol: String, interval: CandleInterval, endingAt endDate: Date) async throws -> [Candle] {
+        try await candles(providerSymbol: providerSymbol, interval: interval)
+    }
 }
 
 public enum ProviderError: Error, Equatable {

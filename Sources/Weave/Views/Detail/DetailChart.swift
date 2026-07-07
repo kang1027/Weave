@@ -248,7 +248,11 @@ struct DetailChart: View {
                 zoom(by: 1 / 1.4)
             }
             zoomButton(systemName: "arrow.counterclockwise", help: model.t("Reset zoom")) {
-                withAnimation(.easeOut(duration: 0.2)) { resetWindow() }
+                if model.detailFocusDate != nil {
+                    model.detailFocusDate = nil   // 거래 포커스 해제 → 최근 구간 재조회 후 최신으로 복귀
+                } else {
+                    withAnimation(.easeOut(duration: 0.2)) { resetWindow() }
+                }
             }
         }
     }
@@ -274,7 +278,12 @@ struct DetailChart: View {
         guard let last = candles.last?.date else { return }
         let span = max(dataSpanSeconds, minWindowSeconds)
         visibleSeconds = min(defaultWindowSeconds, span)
-        scrollX = last.addingTimeInterval(interval.seconds - visibleSeconds)
+        // 포커스 시점이 있으면(거래로 점프) 그 날짜를 중앙에, 없으면 최신을 오른쪽 끝에.
+        if let focus = model.detailFocusDate {
+            scrollX = clampScroll(focus.addingTimeInterval(-visibleSeconds / 2))
+        } else {
+            scrollX = last.addingTimeInterval(interval.seconds - visibleSeconds)
+        }
     }
 
     /// 창 오른쪽 끝은 마지막 캔들을 넘지 않는다 — 미래 빈 구간 금지.

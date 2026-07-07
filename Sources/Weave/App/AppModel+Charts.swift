@@ -107,10 +107,11 @@ extension AppModel {
             detailChartAssetID = nil
             return
         }
-        // 다른 자산으로 전환 시 이전 자산 캔들이 잠깐 보이지 않게 즉시 비운다.
+        // 다른 자산으로 전환 시 이전 자산 캔들이 잠깐 보이지 않게 즉시 비우고, 포커스도 최근으로 리셋.
         if detailChartAssetID != assetID {
             detailCandles = []
             detailChartAssetID = assetID
+            detailFocusDate = nil
         }
         detailLoadToken += 1
         let token = detailLoadToken
@@ -118,21 +119,32 @@ extension AppModel {
         defer { isDetailChartLoading = false }
 
         let interval = detailInterval
-        let candles = await fetchDetailCandles(asset: asset, interval: interval)
+        // 포커스 시점이 있으면 그 날짜를 대략 중앙에 두도록 그 이후로 끝나는 과거 구간을 받는다.
+        let endingAt = detailFocusDate.map { focus -> Date in
+            let halfSpan = Double(CandleFetchLimit.limit(for: interval)) * interval.seconds / 2
+            return min(Date(), focus.addingTimeInterval(halfSpan))
+        }
+        let candles = await fetchDetailCandles(asset: asset, interval: interval, endingAt: endingAt)
 
-        // 더 최신 요청(자산 전환/인터벌 변경)이 시작됐다면 이 결과는 버린다.
+        // 더 최신 요청(자산 전환/인터벌 변경/포커스 변경)이 시작됐다면 이 결과는 버린다.
         guard token == detailLoadToken else { return }
         detailCandles = candles.sorted { $0.date < $1.date }
     }
 
     /// 네이버(국장)는 인트라데이가 없어 야후 `.KS`/`.KQ`로 브릿지한다.
-    private func fetchDetailCandles(asset: Asset, interval: CandleInterval) async -> [Candle] {
+    /// endingAt이 있으면 그 시점으로 끝나는 과거 구간을 조회(거래로 점프).
+    private func fetchDetailCandles(
+        asset: Asset,
+        interval: CandleInterval,
+        endingAt: Date? = nil
+    ) async -> [Candle] {
         if asset.provider == .naver, interval.isIntraday {
             for suffix in [".KS", ".KQ"] {
                 if let candles = try? await candleService.candles(
                     provider: .yahoo,
                     providerSymbol: asset.providerSymbol + suffix,
-                    interval: interval
+                    interval: interval,
+                    endingAt: endingAt
                 ), !candles.isEmpty {
                     return candles
                 }
@@ -142,7 +154,8 @@ extension AppModel {
         return (try? await candleService.candles(
             provider: asset.provider,
             providerSymbol: asset.providerSymbol,
-            interval: interval
+            interval: interval,
+            endingAt: endingAt
         )) ?? []
     }
 

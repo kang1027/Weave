@@ -68,6 +68,22 @@ public struct BinanceProvider: MarketDataProvider {
     // MARK: - Candles
 
     public func candles(providerSymbol: String, interval: CandleInterval) async throws -> [Candle] {
+        try await fetchKlines(providerSymbol: providerSymbol, interval: interval, endDate: nil)
+    }
+
+    public func candles(
+        providerSymbol: String,
+        interval: CandleInterval,
+        endingAt endDate: Date
+    ) async throws -> [Candle] {
+        try await fetchKlines(providerSymbol: providerSymbol, interval: interval, endDate: endDate)
+    }
+
+    private func fetchKlines(
+        providerSymbol: String,
+        interval: CandleInterval,
+        endDate: Date?
+    ) async throws -> [Candle] {
         let binanceInterval: String
         switch interval {
         case .m15: binanceInterval = "15m"
@@ -78,9 +94,12 @@ public struct BinanceProvider: MarketDataProvider {
         case .month: binanceInterval = "1M"
         }
         let limit = min(CandleFetchLimit.limit(for: interval), 1000)
-        let url = URL(
-            string: "https://api.binance.com/api/v3/klines?symbol=\(providerSymbol)&interval=\(binanceInterval)&limit=\(limit)"
-        )!
+        var query = "symbol=\(providerSymbol)&interval=\(binanceInterval)&limit=\(limit)"
+        if let endDate {
+            // klines는 endTime(ms) 이하 캔들 중 최근 limit개를 준다.
+            query += "&endTime=\(Int(endDate.timeIntervalSince1970 * 1000))"
+        }
+        let url = URL(string: "https://api.binance.com/api/v3/klines?\(query)")!
         let data = try await http.get(url)
         return try Self.parseKlines(data)
     }
