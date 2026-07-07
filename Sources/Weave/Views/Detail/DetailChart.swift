@@ -20,6 +20,8 @@ struct DetailChart: View {
 
     @State private var focusedTradeID: UUID?
     @State private var panAnimationTask: Task<Void, Never>?
+    /// 슬라이드 중 렌더할 구간(시작·도착 창의 합집합). nil이면 평상시.
+    @State private var renderSpanOverride: ClosedRange<Date>?
 
     @State private var hoveredDate: Date?
     @State private var hoveredTradeID: UUID?
@@ -55,10 +57,18 @@ struct DetailChart: View {
     private var windowEnd: Date { scrollX.addingTimeInterval(effectiveVisibleSeconds) }
 
     /// 렌더 대상 — 보이는 창 ± 15% 버퍼, 최대 500포인트로 다운샘플.
+    /// 슬라이드 중에는 지나갈 구간(renderSpanOverride)을 통째로 렌더해 라인이 끊기지 않게.
     private var renderCandles: [Candle] {
-        let buffer = effectiveVisibleSeconds * 0.15
-        let from = scrollX.addingTimeInterval(-buffer)
-        let to = windowEnd.addingTimeInterval(buffer)
+        let from: Date
+        let to: Date
+        if let span = renderSpanOverride {
+            from = span.lowerBound
+            to = span.upperBound
+        } else {
+            let buffer = effectiveVisibleSeconds * 0.15
+            from = scrollX.addingTimeInterval(-buffer)
+            to = windowEnd.addingTimeInterval(buffer)
+        }
         let slice = candles.filter { $0.date >= from && $0.date <= to }
         return CandleAggregator.downsample(slice.isEmpty ? candles : slice, maxPoints: 500)
     }
@@ -68,12 +78,11 @@ struct DetailChart: View {
         return window.isEmpty ? candles : window
     }
 
-    /// y 도메인은 보이는 구간에 맞춰 자동 피팅.
+    /// y 도메인은 보이는 캔들에 맞춰 자동 피팅.
+    /// 마커는 가격선 위에 얹으므로(체결가 아님) 체결가는 도메인 계산에서 뺀다 —
+    /// 그래야 평단에서 크게 벗어난 체결가 하나가 라인을 찌그러뜨리지 않는다.
     private var yDomain: ClosedRange<Double> {
-        var values = visibleCandles.map { $0.close.doubleValue }
-        values.append(contentsOf: visibleTrades
-            .filter { $0.date >= scrollX && $0.date <= windowEnd }
-            .map { $0.price.doubleValue })
+        let values = visibleCandles.map { $0.close.doubleValue }
         guard let min = values.min(), let max = values.max(), min < max else {
             let v = values.first ?? 1
             return (v * 0.9)...(v * 1.1)
@@ -116,24 +125,22 @@ struct DetailChart: View {
         }
         .onDisappear {
             removeScrollZoomMonitor()
-            panAnimationTask?.cancel()
+            endPanAnimation()
         }
         .onHover { isHoveringChart = $0 }
     }
 
-    /// 거래 행 클릭 → 해당 마커가 창 밖이면 그 시점까지 좌/우로 스르륵 팬하고 잠깐 강조.
+    /// 거래 행 클릭 → 해당 마커가 창 밖이면 그 시점까지 좌/우로 스르륵 슬라이드하고 잠깐 강조.
     private func focusMarker(tradeID: UUID) {
         guard let trade = trades.first(where: { $0.id == tradeID }) else { return }
-        if trade.date < scrollX || trade.date > windowEnd {
-            let target = clampScroll(
-                trade.date.addingTimeInterval(-effectiveVisibleSeconds / 2)
-            )
-            animatePan(to: target) {
-                highlightMarker(tradeID)
-            }
-        } else {
+        guard trade.date < scrollX || trade.date > windowEnd else {
             highlightMarker(tradeID)
+            return
         }
+        let target = clampScroll(
+            trade.date.addingTimeInterval(-effectiveVisibleSeconds / 2)
+        )
+        slideWindow(to: target) { highlightMarker(tradeID) }
     }
 
     private func highlightMarker(_ tradeID: UUID) {
@@ -146,33 +153,43 @@ struct DetailChart: View {
         }
     }
 
-    /// 창을 목표 지점까지 easeOut으로 트윈 — 데이터 재조회 없이 이미 가진 캔들 위에서 이동.
-    /// 사용자 팬/줌이 들어오면 즉시 중단.
-    private func animatePan(to target: Date, completion: @escaping () -> Void = {}) {
-        panAnimationTask?.cancel()
+    /// 창 길이는 그대로 두고 scrollX만 목표로 좌/우 슬라이드.
+    /// 리셋 버튼과 동일하게 Swift Charts 스케일 애니메이션에 맡겨 라인·마커가 함께 미끄러진다.
+    /// 지나갈 구간을 한 번에 렌더해 중간이 비지 않게 하고(데이터 재조회 없음), 사용자 팬/줌이
+    /// 들어오면 즉시 중단한다.
+    private func slideWindow(to target: Date, completion: @escaping () -> Void = {}) {
+        endPanAnimation()
         let start = scrollX
         let delta = target.timeIntervalSince(start)
         guard abs(delta) > 1 else {
             completion()
             return
         }
-        // 멀리 갈수록 조금 더 길게 (0.4s ~ 0.8s).
-        let windows = abs(delta) / max(effectiveVisibleSeconds, 1)
-        let duration = min(0.8, 0.4 + windows * 0.05)
-        let steps = max(Int(duration * 60), 12)
+        // 시작·도착 창을 모두 덮는 구간을 렌더 대상으로 잡는다.
+        let buffer = effectiveVisibleSeconds * 0.15
+        let low = min(start, target).addingTimeInterval(-buffer)
+        let high = max(start, target).addingTimeInterval(effectiveVisibleSeconds + buffer)
+        renderSpanOverride = low...high
 
-        panAnimationTask = Task {
-            for step in 1...steps {
-                guard !Task.isCancelled else { return }
-                let progress = Double(step) / Double(steps)
-                let eased = 1 - pow(1 - progress, 3) // easeOut cubic
-                scrollX = start.addingTimeInterval(delta * eased)
-                try? await Task.sleep(for: .milliseconds(Int(duration * 1000) / steps))
-            }
-            guard !Task.isCancelled else { return }
+        // 멀리 갈수록 조금 더 길게 (0.35s ~ 0.7s).
+        let windows = abs(delta) / max(effectiveVisibleSeconds, 1)
+        let duration = min(0.7, 0.35 + windows * 0.05)
+        withAnimation(.easeOut(duration: duration)) {
             scrollX = target
+        }
+        panAnimationTask = Task {
+            try? await Task.sleep(for: .seconds(duration))
+            guard !Task.isCancelled else { return }
+            renderSpanOverride = nil
             completion()
         }
+    }
+
+    /// 진행 중인 슬라이드를 멈추고 렌더 구간 오버라이드를 해제(사용자 팬/줌/리셋/재조회 시).
+    private func endPanAnimation() {
+        panAnimationTask?.cancel()
+        panAnimationTask = nil
+        renderSpanOverride = nil
     }
 
     private var placeholder: some View {
@@ -253,7 +270,7 @@ struct DetailChart: View {
     // MARK: - 팬/줌
 
     private func resetWindow() {
-        panAnimationTask?.cancel()
+        endPanAnimation()
         guard let last = candles.last?.date else { return }
         let span = max(dataSpanSeconds, minWindowSeconds)
         visibleSeconds = min(defaultWindowSeconds, span)
@@ -274,7 +291,7 @@ struct DetailChart: View {
 
     /// factor > 1 = 줌아웃, < 1 = 줌인. anchor(커서 날짜)를 창 안 같은 비율 지점에 유지.
     private func zoom(by factor: Double, anchor: Date? = nil) {
-        panAnimationTask?.cancel()
+        endPanAnimation()
         let current = effectiveVisibleSeconds
         let maxWindow = max(dataSpanSeconds, minWindowSeconds)
         let proposed = min(max(current * factor, minWindowSeconds), maxWindow)
@@ -307,7 +324,7 @@ struct DetailChart: View {
         guard scrollMonitor == nil else { return }
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
             guard isHoveringChart, !candles.isEmpty else { return event }
-            panAnimationTask?.cancel()
+            endPanAnimation()
             let deltaX = event.scrollingDeltaX
             let deltaY = event.scrollingDeltaY
             if abs(deltaY) > abs(deltaX), deltaY != 0 {
@@ -385,7 +402,7 @@ struct DetailChart: View {
         DragGesture(minimumDistance: 2)
             .onChanged { value in
                 if dragStartScrollX == nil {
-                    panAnimationTask?.cancel()
+                    endPanAnimation()
                     dragStartScrollX = scrollX
                 }
                 guard let start = dragStartScrollX else { return }
@@ -459,19 +476,43 @@ struct DetailChart: View {
 
     @ViewBuilder
     private var tradeMarkers: some View {
-        ForEach(visibleTrades) { trade in
-            let x = xPosition(for: trade.date)
-            let y = yPosition(for: trade.price.doubleValue)
-            if x >= plotFrame.minX, x <= plotFrame.maxX,
-               y >= plotFrame.minY - 9, y <= plotFrame.maxY + 9 {
-                let clampedX = min(max(x, plotFrame.minX + 9), plotFrame.maxX - 9)
-                tradeMarker(trade: trade, tooltipShift: tooltipShift(atX: clampedX))
+        // 마커 원은 전부 렌더하고 플롯에 클립한다 — 화면 밖 마커도 뷰 트리에 남아
+        // scrollX가 애니메이션될 때 위치가 함께 보간돼 좌/우로 자연스럽게 들고 난다.
+        ZStack(alignment: .topLeading) {
+            ForEach(visibleTrades) { trade in
+                markerDot(trade: trade)
                     .position(
-                        x: clampedX,
-                        y: min(max(y, plotFrame.minY + 9), plotFrame.maxY - 9)
+                        x: xPosition(for: trade.date),
+                        y: yPosition(for: markerLineValue(trade))
                     )
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .clipShape(PlotRectClip(rect: plotFrame))
+
+        // 강조 마커의 툴팁은 클립 밖(플롯 위)에서 그려 잘리지 않게 한다.
+        emphasizedTooltip
+    }
+
+    /// 강조(hover/포커스)된 마커 위 툴팁 — 마커 원 레이어와 분리해 플롯 클립에 잘리지 않게.
+    @ViewBuilder
+    private var emphasizedTooltip: some View {
+        if let id = focusedTradeID ?? hoveredTradeID,
+           let trade = visibleTrades.first(where: { $0.id == id }) {
+            let x = xPosition(for: trade.date)
+            let y = yPosition(for: markerLineValue(trade))
+            if x >= plotFrame.minX - 9, x <= plotFrame.maxX + 9 {
+                TooltipBubble(text: markerTitle(trade), secondary: markerSub(trade))
+                    .position(x: x + tooltipShift(atX: x), y: y - 32)
+                    .allowsHitTesting(false)
+                    .zIndex(30)
+            }
+        }
+    }
+
+    /// 마커 y값 — 체결가가 아니라 거래 시점 캔들 종가(가격선)에 얹는다. 체결가는 툴팁에.
+    private func markerLineValue(_ trade: Trade) -> Double {
+        nearestCandle(to: trade.date)?.close.doubleValue ?? trade.price.doubleValue
     }
 
     /// 마커 툴팁이 플롯 밖으로 잘리지 않게 좌우로 밀어줄 오프셋.
@@ -498,7 +539,7 @@ struct DetailChart: View {
         return model.t("Avg \(price)")
     }
 
-    private func tradeMarker(trade: Trade, tooltipShift: CGFloat) -> some View {
+    private func markerDot(trade: Trade) -> some View {
         let isBuy = trade.side == .buy
         let markerColor = isBuy ? theme.green : theme.red
         let isEmphasized = hoveredTradeID == trade.id || focusedTradeID == trade.id
@@ -510,12 +551,6 @@ struct DetailChart: View {
             Text(isBuy ? "B" : "S")
                 .font(.system(size: 9, weight: .heavy))
                 .foregroundStyle(markerColor)
-            if isEmphasized {
-                TooltipBubble(text: markerTitle(trade), secondary: markerSub(trade))
-                    .offset(x: tooltipShift, y: -32)
-                    .allowsHitTesting(false)
-                    .zIndex(30)
-            }
         }
         .scaleEffect(isEmphasized ? 1.18 : 1)
         .shadow(
@@ -696,4 +731,10 @@ private struct DashedHLine: Shape {
         path.addLine(to: CGPoint(x: rect.width, y: rect.midY))
         return path
     }
+}
+
+/// 플롯 사각형으로 클립 — 마커가 축 라벨 영역으로 넘치지 않게(뷰 좌표계 절대 rect).
+private struct PlotRectClip: Shape {
+    let rect: CGRect
+    func path(in _: CGRect) -> Path { Path(rect) }
 }
