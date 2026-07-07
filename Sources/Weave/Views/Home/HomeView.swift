@@ -214,8 +214,6 @@ struct AssetListRow: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 9)
-            // 하락 은은한 빨강 / 상승 은은한 초록 배경.
-            .background(percent.map { ($0 >= 0 ? theme.green : theme.red).opacity(0.08) } ?? .clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
