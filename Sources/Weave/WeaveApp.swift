@@ -12,8 +12,13 @@ struct WeaveApp: App {
                 .environmentObject(model)
                 .frame(width: 360, height: 720)
         } label: {
-            Text(model.menuBarTitle)
-                .monospacedDigit()
+            if let image = model.menuBarImage {
+                Image(nsImage: image)
+                    .accessibilityLabel(Text(model.menuBarTitle))
+            } else {
+                Text(model.menuBarTitle)
+                    .monospacedDigit()
+            }
         }
         .menuBarExtraStyle(.window)
     }

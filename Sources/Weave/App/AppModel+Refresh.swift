@@ -1,5 +1,4 @@
 import Foundation
-import SwiftUI
 import WeaveCore
 
 extension AppModel {
@@ -58,44 +57,40 @@ extension AppModel {
         }
 
         if let target {
-            let text = MenuBarTitleBuilder.title(
-                asset: target,
-                quote: quotes[target.id],
-                format: settings.menuBarFormat,
-                privacy: privacy
+            let quote = quotes[target.id]
+            menuBarTitle = MenuBarTitleBuilder.title(
+                asset: target, quote: quote,
+                format: settings.menuBarFormat, privacy: privacy
             )
-            if let quote = quotes[target.id] {
-                menuBarTitle = Self.colorized(text, changePercent: quote.changePercent)
-            } else {
-                menuBarTitle = AttributedString(text)
-            }
+            menuBarImage = MenuBarImageRenderer.image(
+                MenuBarTitleBuilder.parts(
+                    asset: target, quote: quote,
+                    format: settings.menuBarFormat, privacy: privacy
+                )
+            )
             return
         }
 
         // 표시할 자산이 없으면 포트폴리오 총액.
         let portfolio = computed.portfolio
         if portfolio.totalValueBase > 0 {
-            let text = MenuBarTitleBuilder.totalTitle(
+            menuBarTitle = MenuBarTitleBuilder.totalTitle(
                 totalBase: portfolio.totalValueBase,
                 baseCurrency: settings.baseCurrency,
                 dayChangePercent: portfolio.dayChangePercent,
                 privacy: privacy
             )
-            menuBarTitle = Self.colorized(text, changePercent: portfolio.dayChangePercent)
+            menuBarImage = MenuBarImageRenderer.image(
+                MenuBarTitleBuilder.totalParts(
+                    totalBase: portfolio.totalValueBase,
+                    baseCurrency: settings.baseCurrency,
+                    dayChangePercent: portfolio.dayChangePercent,
+                    privacy: privacy
+                )
+            )
         } else {
-            menuBarTitle = AttributedString(MenuBarTitleBuilder.placeholder)
+            menuBarTitle = MenuBarTitleBuilder.placeholder
+            menuBarImage = nil
         }
-    }
-
-    /// 메뉴바 문자열에서 등락% 토큰만 초록/빨강으로 칠한다.
-    private static func colorized(_ text: String, changePercent: Decimal) -> AttributedString {
-        var attr = AttributedString(text)
-        let token = MoneyFormatter.arrowPercent(changePercent)
-        if let range = attr.range(of: token) {
-            attr[range].foregroundColor = changePercent >= 0
-                ? Color(hex: 0x32D74B)
-                : Color(hex: 0xFF453A)
-        }
-        return attr
     }
 }
