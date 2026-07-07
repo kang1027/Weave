@@ -75,6 +75,74 @@ public enum ValueSeriesBuilder {
         return points
     }
 
+    /// 인트라데이(1D) 통합 시계열 — 캔들 타임스탬프를 샘플 격자로 쓴다.
+    /// 하루짜리 창이라 보유수량·환율은 사실상 상수 → 환율은 현물(spot) 하나로 환산한다.
+    /// 시장 휴장 종목은 forward-fill로 마지막 종가를 유지(값이 평평).
+    public static func intradayPortfolioSeries(
+        assets: [Asset],
+        trades: [Trade],
+        candlesByAsset: [UUID: [Candle]],
+        fxSpotByCurrency: [String: Decimal],
+        baseCurrency: String,
+        from: Date,
+        to: Date
+    ) -> [ValuePoint] {
+        let visible = assets.filter { !$0.isHidden }
+        let tradesByAsset = Dictionary(grouping: trades, by: \.assetID)
+        let base = baseCurrency.uppercased()
+
+        func fx(_ currency: String) -> Decimal {
+            let code = currency.uppercased()
+            return code == base ? 1 : (fxSpotByCurrency[code] ?? 0)
+        }
+
+        // 정렬된 캔들 + 표시 구간 내 타임스탬프 = 샘플 격자.
+        let sorted: [UUID: [Candle]] = candlesByAsset.mapValues { $0.sorted { $0.date < $1.date } }
+        var sampleSet = Set<Date>()
+        for asset in visible where !asset.isManual {
+            for candle in sorted[asset.id] ?? [] where candle.date >= from && candle.date <= to {
+                sampleSet.insert(candle.date)
+            }
+        }
+        sampleSet.insert(to)
+        let samples = sampleSet.sorted()
+        guard !samples.isEmpty else { return [] }
+
+        // 그날의 끝 보정 없이 정확히 "그 시각 이전 마지막 종가"를 찾는 forward-fill.
+        func close(_ candles: [Candle], at time: Date) -> Decimal? {
+            guard !candles.isEmpty else { return nil }
+            var low = 0
+            var high = candles.count - 1
+            var found = -1
+            while low <= high {
+                let mid = (low + high) / 2
+                if candles[mid].date <= time {
+                    found = mid
+                    low = mid + 1
+                } else {
+                    high = mid - 1
+                }
+            }
+            return found >= 0 ? candles[found].close : candles.first?.close
+        }
+
+        return samples.map { time in
+            var total: Decimal = 0
+            for asset in visible {
+                if asset.isManual {
+                    if asset.includeInChart, let manualValue = asset.manualValue {
+                        total += manualValue * fx(asset.currency)
+                    }
+                    continue
+                }
+                let quantity = PositionCalculator.quantity(onOrBefore: time, trades: tradesByAsset[asset.id] ?? [])
+                guard quantity > 0, let price = close(sorted[asset.id] ?? [], at: time) else { continue }
+                total += quantity * price * fx(asset.currency)
+            }
+            return ValuePoint(date: time, value: total)
+        }
+    }
+
     /// 자산별 모드 — 종가를 구간 시작점 0% 기준으로 정규화한 % 시계열.
     public static func normalizedSeries(
         candles: [Candle],

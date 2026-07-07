@@ -137,6 +137,49 @@ import Testing
         #expect(points.isEmpty)
     }
 
+    private func hour(_ n: Int) -> Date {
+        Date(timeIntervalSince1970: TimeInterval(n) * 3_600)
+    }
+
+    private func hourCandle(_ n: Int, close: Decimal) -> Candle {
+        Candle(date: hour(n), open: close, high: close, low: close, close: close)
+    }
+
+    @Test func intradaySamplesAtCandleTimestampsWithSpotFX() {
+        let btc = Asset(
+            name: "BTC", symbol: "BTC", provider: .binance,
+            providerSymbol: "BTCUSDT", market: .crypto, currency: "USD"
+        )
+        let sam = Asset(
+            name: "SAM", symbol: "005930", provider: .naver,
+            providerSymbol: "005930", market: .koreaStock, currency: "KRW"
+        )
+        let trades = [
+            Trade(assetID: btc.id, side: .buy, quantity: 2, price: 100, date: hour(0)),
+            Trade(assetID: sam.id, side: .buy, quantity: 10, price: 1_000, date: hour(0))
+        ]
+        // BTC는 매시간 캔들, 삼성은 h1·h2만(그 뒤 휴장 → forward-fill).
+        let btcCandles = [hourCandle(1, close: 100), hourCandle(2, close: 110), hourCandle(3, close: 120)]
+        let samCandles = [hourCandle(1, close: 1_000), hourCandle(2, close: 1_100)]
+
+        let points = ValueSeriesBuilder.intradayPortfolioSeries(
+            assets: [btc, sam], trades: trades,
+            candlesByAsset: [btc.id: btcCandles, sam.id: samCandles],
+            fxSpotByCurrency: ["KRW": Decimal(string: "0.001")!],  // 1000 KRW = 1 USD
+            baseCurrency: "USD",
+            from: hour(0), to: hour(3)
+        )
+
+        // 샘플 격자 = 캔들 타임스탬프 합집합 ∪ {to} = h1,h2,h3
+        #expect(points.map(\.date) == [hour(1), hour(2), hour(3)])
+        // h1: BTC 2×100 + SAM 10×1000×0.001 = 200 + 10 = 210
+        #expect(points[0].value == 210)
+        // h2: BTC 2×110 + SAM 10×1100×0.001 = 220 + 11 = 231
+        #expect(points[1].value == 231)
+        // h3: BTC 2×120 + SAM(휴장, forward-fill 1100) 10×1100×0.001 = 240 + 11 = 251
+        #expect(points[2].value == 251)
+    }
+
     @Test func normalizedSeriesStartsAtZeroPercent() {
         let candles = [
             candle(day: 10, close: 200),
