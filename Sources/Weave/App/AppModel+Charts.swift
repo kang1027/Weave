@@ -81,7 +81,11 @@ extension AppModel {
         )
         let assetLines: [AssetLineSeries] = assets.compactMap { asset in
             guard !asset.isManual, let candles = candlesByAsset[asset.id] else { return nil }
-            let assetStart = max(windowStart, firstBuyByAsset[asset.id] ?? windowStart)
+            // 일봉 캔들은 자정에 찍히므로 매수일 자정 기준으로 잘라야 당일 캔들이 포함된다.
+            // (인트라데이는 매수 시각 그대로.)
+            let rawStart = firstBuyByAsset[asset.id] ?? windowStart
+            let buyStart = period.isIntraday ? rawStart : Calendar.current.startOfDay(for: rawStart)
+            let assetStart = max(windowStart, buyStart)
             let points = ValueSeriesBuilder.normalizedSeries(
                 candles: candles, from: assetStart, to: now
             )
