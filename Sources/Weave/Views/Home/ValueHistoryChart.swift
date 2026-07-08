@@ -518,7 +518,11 @@ private struct PerAssetChart: View {
         }
         var best: (id: UUID, dist: CGFloat)?
         for line in lines {
-            guard let ip = interpolated(line, at: date),
+            // 커서 날짜에 실제 데이터가 있는 라인만 후보(늦게 산 종목이 그 이전 구간에서
+            // 클램프된 값으로 잘못 잡히는 것 방지).
+            guard let first = line.points.first?.date, let last = line.points.last?.date,
+                  date >= first, date <= last,
+                  let ip = interpolated(line, at: date),
                   let lineY = proxy.position(forY: ip.percent) else { continue }
             let dist = abs(lineY - localY)
             if best == nil || dist < best!.dist {
