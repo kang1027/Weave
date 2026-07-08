@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import WeaveCore
 
 /// 홈 — 헤더 · 링 3개 · 총액 · Value History · Assets 리스트 · footer.
@@ -7,6 +8,8 @@ struct HomeView: View {
     @EnvironmentObject private var model: AppModel
     @State private var deletionTarget: Asset?
     @State private var isHoveringTotal = false
+    /// 드래그 재정렬 중인 자산.
+    @State private var draggingID: UUID?
 
     var body: some View {
         let (perAsset, portfolio) = model.computed
@@ -40,6 +43,20 @@ struct HomeView: View {
                             AssetListRow(metric: metric) {
                                 deletionTarget = metric.asset
                             }
+                            .opacity(draggingID == metric.asset.id ? 0.4 : 1)
+                            // 드래그 재정렬(시스템 drag — 스크롤과 충돌 없음).
+                            .onDrag {
+                                draggingID = metric.asset.id
+                                return NSItemProvider(object: metric.asset.id.uuidString as NSString)
+                            }
+                            .onDrop(
+                                of: [.text],
+                                delegate: AssetReorderDropDelegate(
+                                    targetID: metric.asset.id,
+                                    draggingID: $draggingID,
+                                    onMove: { model.moveAsset(id: $0, toBefore: $1) }
+                                )
+                            )
                         }
                     }
                 }
@@ -170,10 +187,23 @@ struct AssetListRow: View {
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(theme.text)
                             .lineLimit(1)
+                        if metric.asset.isPinnedToTop {
+                            Image(systemName: "arrow.up.to.line")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(theme.link)
+                                .help(model.t("Pinned to top"))
+                        }
                         if metric.asset.isPinned {
                             Image(systemName: "pin.fill")
                                 .font(.system(size: 8))
                                 .foregroundStyle(theme.text2)
+                        }
+                        // 메뉴바에서 제외된 자산 표시(수동 자산은 애초에 메뉴바에 없어 제외).
+                        if !metric.asset.isManual, !metric.asset.showInMenuBar {
+                            Image(systemName: "rectangle.slash")
+                                .font(.system(size: 8))
+                                .foregroundStyle(theme.text2)
+                                .help(model.t("Hidden from menu bar"))
                         }
                         if model.staleAssetIDs.contains(metric.asset.id) {
                             Image(systemName: "wifi.slash")
@@ -220,11 +250,18 @@ struct AssetListRow: View {
         .zIndex(isHoveringPrice ? 1 : 0)
         .hoverHighlight()
         .contextMenu {
+            Button(metric.asset.isPinnedToTop ? model.t("Unpin from top") : model.t("Pin to top")) {
+                model.togglePinTop(assetID: metric.asset.id)
+            }
             if !metric.asset.isManual {
+                Button(metric.asset.showInMenuBar ? model.t("Hide from menu bar") : model.t("Show in menu bar")) {
+                    model.toggleMenuBar(assetID: metric.asset.id)
+                }
                 Button(metric.asset.isPinned ? model.t("Unpin from menu bar") : model.t("Pin to menu bar")) {
                     model.togglePin(assetID: metric.asset.id)
                 }
             }
+            Divider()
             Button(model.t("Hide")) {
                 model.toggleHidden(assetID: metric.asset.id)
             }
@@ -339,5 +376,26 @@ struct HomeFooter: View {
             text = model.t("Next refresh in \(remaining)s")
         }
         return "\(version) · \(text)"
+    }
+}
+
+/// 자산 행 드래그 재정렬 — 드래그 중인 자산을 hover한 대상 위치로 실시간 이동.
+private struct AssetReorderDropDelegate: DropDelegate {
+    let targetID: UUID
+    @Binding var draggingID: UUID?
+    let onMove: (UUID, UUID) -> Void
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard let draggingID, draggingID != targetID else { return }
+        onMove(draggingID, targetID)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingID = nil
+        return true
     }
 }

@@ -55,6 +55,8 @@
 "General" = "일반";
 "Global shortcut" = "글로벌 단축키";
 "Hide" = "숨김";
+"Hide from menu bar" = "메뉴바에서 숨기기";
+"Hidden from menu bar" = "메뉴바에서 숨김";
 "Holdings" = "보유 자산";
 "Include in chart" = "통합 차트에 포함";
 "JP" = "일장";
@@ -81,6 +83,8 @@
 "Other" = "기타";
 "Others" = "기타";
 "Pin to menu bar" = "메뉴바에 핀 고정";
+"Pin to top" = "맨 위 고정";
+"Pinned to top" = "맨 위 고정됨";
 "Press keys…" = "키를 누르세요…";
 "Price (%@)" = "단가 (%@)";
 "Privacy mode" = "프라이버시 모드";
@@ -118,6 +122,7 @@
 "US" = "미장";
 "Unhide" = "숨김 해제";
 "Unpin from menu bar" = "메뉴바 핀 해제";
+"Unpin from top" = "맨 위 고정 해제";
 "Update Trade" = "거래 수정 저장";
 "Updates" = "업데이트";
 "Used for totals & combined chart" = "총액·통합 차트 합산용";

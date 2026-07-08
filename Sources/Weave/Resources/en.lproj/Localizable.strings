@@ -55,6 +55,8 @@
 "General" = "General";
 "Global shortcut" = "Global shortcut";
 "Hide" = "Hide";
+"Hide from menu bar" = "Hide from menu bar";
+"Hidden from menu bar" = "Hidden from menu bar";
 "Holdings" = "Holdings";
 "Include in chart" = "Include in chart";
 "JP" = "JP";
@@ -81,6 +83,8 @@
 "Other" = "Other";
 "Others" = "Others";
 "Pin to menu bar" = "Pin to menu bar";
+"Pin to top" = "Pin to top";
+"Pinned to top" = "Pinned to top";
 "Press keys…" = "Press keys…";
 "Price (%@)" = "Price (%@)";
 "Privacy mode" = "Privacy mode";
@@ -118,6 +122,7 @@
 "US" = "US";
 "Unhide" = "Unhide";
 "Unpin from menu bar" = "Unpin from menu bar";
+"Unpin from top" = "Unpin from top";
 "Update Trade" = "Update Trade";
 "Updates" = "Updates";
 "Used for totals & combined chart" = "Used for totals & combined chart";
