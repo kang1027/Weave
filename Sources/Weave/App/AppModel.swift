@@ -252,6 +252,7 @@ final class AppModel: ObservableObject {
             document.settings.launchAtLogin = LaunchAtLogin.isEnabled
         }
         updater.setAutomaticChecks(settings.autoUpdateCheck)
+        updater.startPeriodicChecks(everyMinutes: 5)
     }
 
     func refreshIfStale() {

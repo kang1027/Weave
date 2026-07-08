@@ -188,7 +188,7 @@ struct SettingsView: View {
                         SettingsRow(
                             title: model.t("Automatic updates"),
                             subtitle: model.updater.isAvailable
-                                ? model.t("Sparkle · checks hourly")
+                                ? model.t("Sparkle · checks every 5 min")
                                 : model.t("Available in packaged app only")
                         ) {
                             MiniToggle(isOn: Binding(
@@ -200,7 +200,7 @@ struct SettingsView: View {
                             ))
                         }
                         SettingsButton(
-                            title: model.t("Check for updates now…"),
+                            title: model.t("Check for updates now…") + "  ⌘R",
                             disabled: !model.updater.isAvailable
                         ) {
                             model.updater.checkForUpdates()

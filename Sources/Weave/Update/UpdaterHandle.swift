@@ -28,6 +28,7 @@ final class UpdaterHandle: NSObject, ObservableObject {
     private var expectedLength: UInt64 = 0
     private var receivedLength: UInt64 = 0
     private var transientToken = 0
+    private var pollTask: Task<Void, Never>?
 
     override init() {
         super.init()
@@ -58,6 +59,24 @@ final class UpdaterHandle: NSObject, ObservableObject {
 
     func setAutomaticChecks(_ enabled: Bool) {
         updater?.automaticallyChecksForUpdates = enabled
+    }
+
+    /// Sparkle 자체 스케줄러는 최소 1시간이라, 별도 타이머로 더 자주 백그라운드 확인한다.
+    /// 발견 시 사용자 개입 없이 footer 인라인 버튼으로만 노출(팝업 없음).
+    func startPeriodicChecks(everyMinutes minutes: Int) {
+        pollTask?.cancel()
+        guard updater != nil, minutes > 0 else { return }
+        let interval = UInt64(minutes) * 60 * 1_000_000_000
+        pollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: interval)
+                guard !Task.isCancelled, let self, let updater = self.updater else { continue }
+                // 자동 확인이 켜져 있고, 진행 중인 세션이 없을 때만.
+                if updater.automaticallyChecksForUpdates, updater.canCheckForUpdates {
+                    updater.checkForUpdatesInBackground()
+                }
+            }
+        }
     }
 
     // MARK: - footer 버튼 액션

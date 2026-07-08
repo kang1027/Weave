@@ -20,6 +20,14 @@ struct RootView: View {
                 .frame(width: 0, height: 0)
                 .opacity(0)
                 .accessibilityHidden(true)
+
+            // ⌘R — 팝오버 어디서든 업데이트 즉시 확인(결과는 footer 인라인으로).
+            Button { model.updater.checkForUpdates() } label: { EmptyView() }
+                .keyboardShortcut("r", modifiers: .command)
+                .frame(width: 0, height: 0)
+                .opacity(0)
+                .accessibilityHidden(true)
+                .disabled(!model.updater.isAvailable)
         }
         .environment(\.theme, theme)
         .environment(\.locale, model.locale)

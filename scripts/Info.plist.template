@@ -28,7 +28,7 @@
     <string>__SPARKLE_ED_PUBLIC_KEY__</string>
     <key>SUEnableInstallerLauncherService</key>
     <false/>
-    <!-- 업데이트 확인 주기 = 1시간(Sparkle 최소 허용값 3600초). appcast는 작은 XML이라 부하 미미. -->
+    <!-- Sparkle 자체 스케줄러 하한(3600초). 실제 확인은 앱의 커스텀 타이머가 5분마다 수행. -->
     <key>SUScheduledCheckInterval</key>
     <integer>3600</integer>
     <!-- .weave 백업 번들(내부는 zip) — 자산 데이터 + 커스텀 로고를 담는 자급자족 백업. -->
