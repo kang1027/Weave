@@ -32,6 +32,7 @@
 "Base currency" = "기준 통화";
 "Buy" = "매수";
 "By Asset" = "자산별";
+"Can't sell more than you hold (%@)" = "보유 수량보다 많이 팔 수 없어요 (%@)";
 "Cancel" = "취소";
 "Change color" = "색상 변경";
 "Check for updates now…" = "지금 업데이트 확인…";
@@ -48,6 +49,7 @@
 "Delete trade?" = "거래를 삭제할까요?";
 "Edit" = "수정";
 "Edit Trade" = "거래 수정";
+"Enter a valid quantity and price" = "올바른 수량과 가격을 입력하세요";
 "Edit in asset manager" = "자산 관리에서 수정";
 "Full" = "풀";
 "General" = "일반";

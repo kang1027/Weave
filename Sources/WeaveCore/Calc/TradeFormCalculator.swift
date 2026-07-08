@@ -47,10 +47,10 @@ public enum TradeFormCalculator {
         return result
     }
 
-    /// 파생값 반올림 — 1 이상은 소수 2자리(437.27740075 같은 노이즈 방지),
-    /// 1 미만은 소수 코인 수량을 위해 8자리 유지.
+    /// 파생값 반올림 — Decimal 나눗셈의 긴 꼬리(30+자리)만 8자리로 정리한다.
+    /// 표시 정밀도(돈 2자리 / 수량 8자리 등)는 뷰가 필드·자산별로 다시 캡한다.
     public static func smartRounded(_ value: Decimal) -> Decimal {
-        abs(value) >= 1 ? value.rounded(scale: 2) : value.rounded(scale: 8)
+        value.rounded(scale: 8)
     }
 
     /// 매도 검증 — 보유 수량 초과 불가.

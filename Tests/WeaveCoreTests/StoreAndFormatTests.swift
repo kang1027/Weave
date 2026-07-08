@@ -142,8 +142,12 @@ import Testing
         #expect(MoneyFormatter.groupedInputText("427.27740075") == "427.27")
         #expect(MoneyFormatter.groupedInputText("50000.00000011") == "50,000.00")
         #expect(MoneyFormatter.groupedInputText("0.00054321") == "0.00054321")
-        #expect(TradeFormCalculator.smartRounded(Decimal(string: "117.01999664")!) == Decimal(string: "117.02"))
+        // smartRounded는 나눗셈 꼬리만 8자리로 정리(표시 캡은 뷰 담당) — 8자리 이하는 보존.
+        #expect(TradeFormCalculator.smartRounded(Decimal(string: "117.01999664")!) == Decimal(string: "117.01999664"))
         #expect(TradeFormCalculator.smartRounded(Decimal(string: "0.00543219")!) == Decimal(string: "0.00543219"))
+        // 수량 필드는 1 이상이어도 8자리 유지(코인 2.5개 입력 가능).
+        #expect(MoneyFormatter.groupedInputText("2.12345678", maxFractionDigits: 8) == "2.12345678")
+        #expect(MoneyFormatter.groupedInputText("12.5", maxFractionDigits: 0) == "12")
         // 멱등 — 재적용해도 동일.
         let once = MoneyFormatter.groupedInputText("1234567.89")
         #expect(MoneyFormatter.groupedInputText(once) == once)

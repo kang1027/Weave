@@ -32,6 +32,7 @@
 "Base currency" = "Base currency";
 "Buy" = "Buy";
 "By Asset" = "By Asset";
+"Can't sell more than you hold (%@)" = "Can't sell more than you hold (%@)";
 "Cancel" = "Cancel";
 "Change color" = "Change color";
 "Check for updates now…" = "Check for updates now…";
@@ -48,6 +49,7 @@
 "Delete trade?" = "Delete trade?";
 "Edit" = "Edit";
 "Edit Trade" = "Edit Trade";
+"Enter a valid quantity and price" = "Enter a valid quantity and price";
 "Edit in asset manager" = "Edit in asset manager";
 "Full" = "Full";
 "General" = "General";

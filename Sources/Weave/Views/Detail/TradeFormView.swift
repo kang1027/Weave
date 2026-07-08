@@ -47,12 +47,21 @@ struct TradeFormView: View {
         return quantity > availableQuantity
     }
 
-    private var canSave: Bool {
-        guard let quantity, let price, quantity > 0, price >= 0 else { return false }
-        if side == .sell {
-            return TradeFormCalculator.validateSell(quantity: quantity, available: availableQuantity)
-        }
-        return true
+    /// 저장 버튼 활성 여부 = 실제 저장 검증과 동일(전체 이력 oversell 포함).
+    /// 이전엔 그 날짜 시점만 봐서 버튼은 켜졌는데 저장은 조용히 거부되는 경우가 있었다.
+    private var validationError: AppModel.TradeError? {
+        guard let quantity, let price, quantity > 0, price >= 0 else { return .invalidInput }
+        return model.validateTrade(
+            assetID: assetID, side: side, quantity: quantity,
+            price: price, date: date, editingID: editing?.id
+        )
+    }
+
+    private var canSave: Bool { validationError == nil }
+
+    /// 수량 소수 자리 — 국장·일장 정수(0), 그 외(코인·미국주식) 8자리. 크기와 무관.
+    private var quantityFractionDigits: Int {
+        (asset?.market.tradesWholeShares ?? false) ? 0 : 8
     }
 
     var body: some View {
@@ -112,7 +121,7 @@ struct TradeFormView: View {
 
                     if side == .sell {
                         HStack(spacing: 4) {
-                            Text(model.t("Available: \(MoneyFormatter.quantity(availableQuantity))"))
+                            Text(model.t("Available: \(MoneyFormatter.quantity(availableQuantity, maxFractionDigits: quantityFractionDigits))"))
                                 .font(.system(size: 10.5))
                                 .foregroundStyle(theme.text2)
                             if sellExceedsHolding {
@@ -121,6 +130,14 @@ struct TradeFormView: View {
                                     .foregroundStyle(theme.redText)
                             }
                         }
+                    }
+
+                    // 저장이 거부된 이유(전체 이력 검증 실패 등) — 조용한 무동작 방지.
+                    if let error {
+                        Text(errorText(error))
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(theme.redText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
                     saveButton
@@ -222,13 +239,17 @@ struct TradeFormView: View {
                     error = nil
                     // 자동 계산이 써넣은 변경이면 여기서 끝 — 사용자 입력만 재계산 트리거.
                     if pendingProgrammatic.remove(field) != nil { return }
-                    // 숫자·소수점만 허용 + 천단위 콤마 자동.
-                    var formatted = MoneyFormatter.groupedInputText(newValue)
+                    // 숫자·소수점만 허용 + 천단위 콤마 자동. 수량은 자산별 소수 자리로 캡.
+                    var formatted = MoneyFormatter.groupedInputText(
+                        newValue,
+                        maxFractionDigits: field == .quantity ? quantityFractionDigits : nil
+                    )
                     // 매도 수량이 보유 최대치를 넘으면 최대치로 자동 클램프(내림 절삭).
                     if side == .sell, field == .quantity,
                        let entered = Decimal.clean(formatted), entered > availableQuantity {
                         formatted = MoneyFormatter.groupedInputText(
-                            MoneyFormatter.quantity(availableQuantity)
+                            MoneyFormatter.quantity(availableQuantity, maxFractionDigits: quantityFractionDigits),
+                            maxFractionDigits: quantityFractionDigits
                         )
                     }
                     if formatted != newValue {
@@ -278,16 +299,30 @@ struct TradeFormView: View {
         }
     }
 
-    /// 필드 표시용 숫자 — 천단위 콤마 + 소수 자리 규칙(1 이상 2자리, 미만 8자리).
-    private func plainNumber(_ value: Decimal) -> String {
-        MoneyFormatter.quantity(TradeFormCalculator.smartRounded(value))
+    /// 필드 표시용 숫자 — 수량은 자산별(코인 8자리/국장 0), 돈은 통화별(1↑2자리·1↓8·원엔 0).
+    private func plainNumber(_ value: Decimal, field: TradeFormCalculator.Field) -> String {
+        MoneyFormatter.quantity(value, maxFractionDigits: fractionDigits(for: field, value: value))
+    }
+
+    private func fractionDigits(for field: TradeFormCalculator.Field, value: Decimal) -> Int {
+        switch field {
+        case .quantity:
+            return quantityFractionDigits
+        case .price, .amount:
+            let currency = (asset?.currency ?? "").uppercased()
+            if ["KRW", "JPY"].contains(currency) { return 0 }
+            return abs(value) >= 1 ? 2 : 8
+        }
     }
 
     /// 매도로 전환/날짜 변경 등으로 보유 가능 수량이 줄었을 때 수량을 최대치로 맞춘다.
     private func clampSellQuantity() {
         guard side == .sell, let entered = quantity, entered > availableQuantity else { return }
         // 내림 절삭(groupedInputText) — 반올림으로 보유량을 넘기지 않게.
-        setFieldText(.quantity, MoneyFormatter.groupedInputText(MoneyFormatter.quantity(availableQuantity)))
+        setFieldText(.quantity, MoneyFormatter.groupedInputText(
+            MoneyFormatter.quantity(availableQuantity, maxFractionDigits: quantityFractionDigits),
+            maxFractionDigits: quantityFractionDigits
+        ))
         autofill(edited: .quantity)
     }
 
@@ -302,13 +337,13 @@ struct TradeFormView: View {
         )
         // 파생 필드만 갱신 — 사용자가 만진 필드(edited)는 절대 건드리지 않는다.
         if edited != .quantity, let quantity = values.quantity, Decimal.clean(quantityText) != quantity {
-            setFieldText(.quantity, plainNumber(quantity))
+            setFieldText(.quantity, plainNumber(quantity, field: .quantity))
         }
         if edited != .price, let price = values.price, Decimal.clean(priceText) != price {
-            setFieldText(.price, plainNumber(price))
+            setFieldText(.price, plainNumber(price, field: .price))
         }
         if edited != .amount, let amount = values.amount, Decimal.clean(amountText) != amount {
-            setFieldText(.amount, plainNumber(amount))
+            setFieldText(.amount, plainNumber(amount, field: .amount))
         }
     }
 
@@ -316,9 +351,9 @@ struct TradeFormView: View {
     private func applyInitialValues() {
         if let editing {
             side = editing.side
-            setFieldText(.quantity, plainNumber(editing.quantity))
-            setFieldText(.price, plainNumber(editing.price))
-            setFieldText(.amount, plainNumber(editing.amount))
+            setFieldText(.quantity, plainNumber(editing.quantity, field: .quantity))
+            setFieldText(.price, plainNumber(editing.price, field: .price))
+            setFieldText(.amount, plainNumber(editing.amount, field: .amount))
             date = editing.date
             note = editing.note
             return
@@ -326,7 +361,7 @@ struct TradeFormView: View {
         if let prefill {
             suppressDatePrefill = true
             date = prefill.date
-            setFieldText(.price, plainNumber(prefill.price))
+            setFieldText(.price, plainNumber(prefill.price, field: .price))
             autofill(edited: .price)
         }
     }
@@ -337,7 +372,7 @@ struct TradeFormView: View {
         isPrefilling = false
         suppressDatePrefill = true
         date = min(candle.date, Date())
-        setFieldText(.price, plainNumber(candle.close))
+        setFieldText(.price, plainNumber(candle.close, field: .price))
         autofill(edited: .price)
         error = nil
     }
@@ -361,8 +396,19 @@ struct TradeFormView: View {
             else {
                 return
             }
-            setFieldText(.price, plainNumber(close))
+            setFieldText(.price, plainNumber(close, field: .price))
             autofill(edited: .price)
+        }
+    }
+
+    /// 저장 거부 사유 문구.
+    private func errorText(_ error: AppModel.TradeError) -> String {
+        switch error {
+        case .exceedsHolding(let available):
+            let qty = asset?.formattedQuantity(available) ?? MoneyFormatter.quantity(available)
+            return model.t("Can't sell more than you hold (\(qty))")
+        case .invalidInput:
+            return model.t("Enter a valid quantity and price")
         }
     }
 
