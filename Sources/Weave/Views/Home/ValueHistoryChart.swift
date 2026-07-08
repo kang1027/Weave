@@ -392,12 +392,12 @@ private struct PerAssetChart: View {
     @EnvironmentObject private var model: AppModel
     let lines: [AssetLineSeries]
 
-    // 선(라인)에 커서를 올렸을 때만 그 종목 하나를 하이라이트한다.
-    @State private var hoveredLineID: UUID?
+    // 커서 근처(겹친 것 포함) 종목들을 하이라이트한다.
+    @State private var hoveredLineIDs: [UUID] = []
     @State private var hoveredDate: Date?
 
-    private var hoveredLine: AssetLineSeries? {
-        hoveredLineID.flatMap { id in lines.first(where: { $0.id == id }) }
+    private var hoveredLines: [AssetLineSeries] {
+        hoveredLineIDs.compactMap { id in lines.first(where: { $0.id == id }) }
     }
 
     private var period: ChartPeriod { model.homeChartPeriod }
@@ -422,9 +422,9 @@ private struct PerAssetChart: View {
                     // hover 중인 종목만 강조, 나머지는 흐리게.
                     .foregroundStyle(
                         theme.paletteColor(line.asset.colorIndex)
-                            .opacity(hoveredLineID == nil || hoveredLineID == line.id ? 1 : 0.28)
+                            .opacity(hoveredLineIDs.isEmpty || hoveredLineIDs.contains(line.id) ? 1 : 0.28)
                     )
-                    .lineStyle(StrokeStyle(lineWidth: hoveredLineID == line.id ? 2.4 : 1.8))
+                    .lineStyle(StrokeStyle(lineWidth: hoveredLineIDs.contains(line.id) ? 2.4 : 1.8))
                 }
                 // 오늘 산 종목은 데이터가 한 점뿐 → 선이 안 그려지니 점으로 표시.
                 if line.points.count == 1, let point = line.points.first {
@@ -437,18 +437,21 @@ private struct PerAssetChart: View {
                 }
             }
 
-            // hover 크로스헤어 — 세로 가이드 + 그 종목 라인 위 포인트(선에 올렸을 때만).
-            if let hoveredDate, let line = hoveredLine,
-               let point = interpolated(line, at: hoveredDate) {
+            // hover 크로스헤어 — 세로 가이드 + 겹친 종목들 라인 위 포인트.
+            if let hoveredDate, !hoveredLines.isEmpty {
                 RuleMark(x: .value("Date", hoveredDate))
                     .foregroundStyle(theme.guide)
                     .lineStyle(StrokeStyle(lineWidth: 1))
-                PointMark(
-                    x: .value("Date", point.date),
-                    y: .value("Percent", point.percent)
-                )
-                .symbolSize(38)
-                .foregroundStyle(theme.paletteColor(line.asset.colorIndex))
+                ForEach(hoveredLines) { line in
+                    if let point = interpolated(line, at: hoveredDate) {
+                        PointMark(
+                            x: .value("Date", point.date),
+                            y: .value("Percent", point.percent)
+                        )
+                        .symbolSize(38)
+                        .foregroundStyle(theme.paletteColor(line.asset.colorIndex))
+                    }
+                }
             }
         }
         .chartXScale(domain: xDomain)
@@ -492,13 +495,13 @@ private struct PerAssetChart: View {
                                 case .active(let point):
                                     updateHover(point: point, proxy: proxy, plot: plot)
                                 case .ended:
-                                    hoveredLineID = nil
+                                    hoveredLineIDs = []
                                     hoveredDate = nil
                                 }
                             }
-                        if let hoveredDate, let line = hoveredLine, let x = proxy.position(forX: hoveredDate) {
+                        if let hoveredDate, !hoveredLines.isEmpty, let x = proxy.position(forX: hoveredDate) {
                             ClampedTooltip(anchorX: plot.origin.x + x, top: plot.origin.y + 6, bounds: plot) {
-                                lineTooltip(line, at: hoveredDate)
+                                lineTooltip(hoveredLines, at: hoveredDate)
                             }
                         }
                     }
@@ -507,16 +510,16 @@ private struct PerAssetChart: View {
         }
     }
 
-    /// 커서 y와 각 라인의 y(그 x에서 보간값)를 비교해, 임계값 안에서 가장 가까운 라인만 선택.
+    /// 커서 y와 각 라인의 y(그 x에서 보간값)를 비교해, 임계값 안 라인을 전부 선택(겹친 것 모두).
     private func updateHover(point: CGPoint, proxy: ChartProxy, plot: CGRect) {
         let localX = point.x - plot.origin.x
         let localY = point.y - plot.origin.y
         guard let date = proxy.value(atX: localX, as: Date.self) else {
-            hoveredLineID = nil
+            hoveredLineIDs = []
             hoveredDate = nil
             return
         }
-        var best: (id: UUID, dist: CGFloat)?
+        var hits: [(id: UUID, dist: CGFloat)] = []
         for line in lines {
             // 커서 날짜에 실제 데이터가 있는 라인만 후보(늦게 산 종목이 그 이전 구간에서
             // 클램프된 값으로 잘못 잡히는 것 방지).
@@ -525,44 +528,44 @@ private struct PerAssetChart: View {
                   let ip = interpolated(line, at: date),
                   let lineY = proxy.position(forY: ip.percent) else { continue }
             let dist = abs(lineY - localY)
-            if best == nil || dist < best!.dist {
-                best = (line.id, dist)
-            }
+            if dist <= 14 { hits.append((line.id, dist)) }
         }
-        // 선 근처(≈16pt)에 있을 때만 하이라이트.
-        // 날짜는 그 종목의 실제 데이터 포인트에 스냅 — Combined처럼 규격에 맞춰 표시.
-        if let best, best.dist <= 16 {
-            hoveredLineID = best.id
-            let line = lines.first { $0.id == best.id }
-            hoveredDate = line?.points.min {
-                abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
-            }?.date ?? date
-        } else {
-            hoveredLineID = nil
+        guard !hits.isEmpty else {
+            hoveredLineIDs = []
             hoveredDate = nil
+            return
         }
+        // 가까운 순 정렬 — 겹친 것 전부 표시. 날짜는 가장 가까운 라인의 데이터 포인트에 스냅.
+        hits.sort { $0.dist < $1.dist }
+        hoveredLineIDs = hits.map(\.id)
+        let closest = lines.first { $0.id == hits[0].id }
+        hoveredDate = closest?.points.min {
+            abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
+        }?.date ?? date
     }
 
-    /// hover 시점의 날짜 + 그 종목 하나의 색·이름·수익률 툴팁.
-    private func lineTooltip(_ line: AssetLineSeries, at date: Date) -> some View {
-        let percent = interpolated(line, at: date)?.percent ?? 0
-        return VStack(alignment: .leading, spacing: 3) {
+    /// hover 시점의 날짜 + 겹친 종목들의 색·이름·수익률 툴팁.
+    private func lineTooltip(_ tooltipLines: [AssetLineSeries], at date: Date) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
             Text(date, format: tooltipDateFormat(period: period, locale: model.locale))
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(theme.text2)
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(theme.paletteColor(line.asset.colorIndex))
-                    .frame(width: 6, height: 6)
-                Text(line.asset.name)
-                    .font(.system(size: 9.5, weight: .medium))
-                    .foregroundStyle(theme.text)
-                    .lineLimit(1)
-                Spacer(minLength: 10)
-                Text(MoneyFormatter.percent(Decimal.fromDouble(percent)))
-                    .font(.system(size: 9.5, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(theme.upDown(percent >= 0))
+            ForEach(tooltipLines) { line in
+                let percent = interpolated(line, at: date)?.percent ?? 0
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(theme.paletteColor(line.asset.colorIndex))
+                        .frame(width: 6, height: 6)
+                    Text(line.asset.name)
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundStyle(theme.text)
+                        .lineLimit(1)
+                    Spacer(minLength: 10)
+                    Text(MoneyFormatter.percent(Decimal.fromDouble(percent)))
+                        .font(.system(size: 9.5, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(theme.upDown(percent >= 0))
+                }
             }
         }
         .padding(.horizontal, 8)
