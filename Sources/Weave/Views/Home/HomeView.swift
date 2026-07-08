@@ -320,8 +320,18 @@ struct HomeFooter: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        HStack {
-            updateSlot
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                // 버전·다음 갱신 — 항상 표시(업데이트 상태로 덮어쓰지 않음).
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(footerText(now: context.date))
+                        .font(.system(size: 11))
+                        .foregroundStyle(theme.caps)
+                        .monospacedDigit()
+                }
+                // 업데이트 진행 상태 — 활성일 때만 아래 줄에 살짝(OpenUsage 스타일).
+                updateLine
+            }
             Spacer()
             Button {
                 model.push(.manage)
@@ -340,7 +350,7 @@ struct HomeFooter: View {
         }
     }
 
-    @ViewBuilder private var updateSlot: some View {
+    @ViewBuilder private var updateLine: some View {
         switch model.updater.phase {
         case .available(let version):
             updateButton(model.t("Update to \(version)"), systemImage: "arrow.down.circle.fill") {
@@ -354,23 +364,16 @@ struct HomeFooter: View {
             updateButton(model.t("Update failed · Retry"), systemImage: "exclamationmark.circle.fill", tint: theme.red) {
                 model.updater.checkForUpdates()
             }
-        case .downloading(let p):
-            updateStatus(model.t("Downloading… \(percentText(p))"))
-        case .extracting(let p):
-            updateStatus(model.t("Preparing… \(percentText(p))"))
         case .checking:
-            updateStatus(model.t("Checking for updates…"))
+            updateProgress(model.t("Checking for updates…"))
+        case .downloading(let p):
+            updateProgress(model.t("Downloading… \(percentText(p))"))
+        case .extracting(let p):
+            updateProgress(model.t("Preparing… \(percentText(p))"))
         case .installing:
-            updateStatus(model.t("Installing…"))
-        case .upToDate:
-            updateStatus(model.t("You're up to date"))
+            updateProgress(model.t("Installing…"))
         case .idle:
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                Text(footerText(now: context.date))
-                    .font(.system(size: 11))
-                    .foregroundStyle(theme.caps)
-                    .monospacedDigit()
-            }
+            EmptyView()
         }
     }
 
@@ -385,11 +388,15 @@ struct HomeFooter: View {
         .buttonStyle(.plain)
     }
 
-    private func updateStatus(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(theme.link)
-            .monospacedDigit()
+    private func updateProgress(_ title: String) -> some View {
+        HStack(spacing: 5) {
+            Text(title)
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(theme.caps)
+                .monospacedDigit()
+            ProgressView()
+                .controlSize(.mini)
+        }
     }
 
     private func percentText(_ fraction: Double) -> String {

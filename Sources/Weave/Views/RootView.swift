@@ -27,7 +27,6 @@ struct RootView: View {
                 .frame(width: 0, height: 0)
                 .opacity(0)
                 .accessibilityHidden(true)
-                .disabled(!model.updater.isAvailable)
         }
         .environment(\.theme, theme)
         .environment(\.locale, model.locale)

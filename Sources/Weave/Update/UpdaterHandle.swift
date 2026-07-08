@@ -10,8 +10,7 @@ enum UpdatePhase: Equatable {
     case extracting(Double)     // 0...1
     case readyToInstall(String) // 다운로드 완료 → 재시작하면 설치
     case installing
-    case upToDate               // 수동 확인 결과 최신(잠깐 표시)
-    case failed                 // 오류(잠깐 표시)
+    case failed                 // 오류 → 다시 시도 버튼
 }
 
 /// Sparkle 2 커스텀 user driver — 모든 업데이트 UI를 앱 내부(footer)에서 처리한다.
@@ -27,7 +26,6 @@ final class UpdaterHandle: NSObject, ObservableObject {
     private var pendingVersion = ""
     private var expectedLength: UInt64 = 0
     private var receivedLength: UInt64 = 0
-    private var transientToken = 0
     private var pollTask: Task<Void, Never>?
 
     override init() {
@@ -95,15 +93,6 @@ final class UpdaterHandle: NSObject, ObservableObject {
         reply(.install)
     }
 
-    private func flash(_ phase: UpdatePhase) {
-        transientToken += 1
-        let token = transientToken
-        self.phase = phase
-        Task {
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            if self.transientToken == token { self.phase = .idle }
-        }
-    }
 }
 
 // MARK: - SPUUserDriver (모든 UI를 인라인 상태로 변환)
@@ -135,13 +124,14 @@ extension UpdaterHandle: SPUUserDriver {
     func showUpdateReleaseNotesFailedToDownloadWithError(_ error: Error) {}
 
     func showUpdateNotFoundWithError(_ error: Error) async {
-        flash(.upToDate)
+        // 최신이면 별도 메시지 없이 조용히 버전 표시로 복귀.
+        phase = .idle
     }
 
     func showUpdaterError(_ error: Error) async {
         updateFoundReply = nil
         installReply = nil
-        flash(.failed)
+        phase = .failed
     }
 
     func showDownloadInitiated(cancellation: @escaping () -> Void) {
@@ -189,7 +179,7 @@ extension UpdaterHandle: SPUUserDriver {
         updateFoundReply = nil
         installReply = nil
         switch phase {
-        case .upToDate, .failed: break  // 잠깐 표시 중인 상태는 유지
+        case .failed: break  // 오류 표시는 사용자가 다시 시도할 때까지 유지
         default: phase = .idle
         }
     }
