@@ -171,13 +171,13 @@ struct AssetListRow: View {
                             .foregroundStyle(theme.text)
                             .lineLimit(1)
                         if metric.asset.isPinnedToTop {
-                            Image(systemName: "arrow.up.to.line")
-                                .font(.system(size: 8, weight: .bold))
+                            Image(systemName: "pin.fill")
+                                .font(.system(size: 9, weight: .semibold))
                                 .foregroundStyle(theme.link)
                                 .help(model.t("Pinned to top"))
                         }
                         if metric.asset.isPinned {
-                            Image(systemName: "pin.fill")
+                            Image(systemName: "menubar.rectangle")
                                 .font(.system(size: 8))
                                 .foregroundStyle(theme.text2)
                         }
