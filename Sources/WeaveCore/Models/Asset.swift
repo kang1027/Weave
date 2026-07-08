@@ -18,6 +18,11 @@ public struct Asset: Identifiable, Codable, Equatable, Hashable, Sendable {
     /// 메뉴바 핀 고정 — 켜지면 로테이션 없이 이 자산만 표시.
     public var isPinned: Bool
     public var isHidden: Bool
+    /// 홈 자산 리스트 맨 위 고정(메뉴바 핀과 별개). 옛 저장파일 호환 위해 옵셔널.
+    public var pinnedToTop: Bool?
+
+    /// 홈 리스트 맨 위 고정 여부(옵셔널 nil = 미고정).
+    public var isPinnedToTop: Bool { pinnedToTop == true }
     /// Manual Asset 평가액(자산 통화 기준). 시세 갱신 없음.
     public var manualValue: Decimal?
     /// Manual Asset을 통합 차트에 포함할지.
@@ -40,6 +45,7 @@ public struct Asset: Identifiable, Codable, Equatable, Hashable, Sendable {
         showInMenuBar: Bool = true,
         isPinned: Bool = false,
         isHidden: Bool = false,
+        pinnedToTop: Bool? = nil,
         manualValue: Decimal? = nil,
         includeInChart: Bool = true,
         customLogoFileName: String? = nil,
@@ -56,6 +62,7 @@ public struct Asset: Identifiable, Codable, Equatable, Hashable, Sendable {
         self.showInMenuBar = showInMenuBar
         self.isPinned = isPinned
         self.isHidden = isHidden
+        self.pinnedToTop = pinnedToTop
         self.manualValue = manualValue
         self.includeInChart = includeInChart
         self.customLogoFileName = customLogoFileName

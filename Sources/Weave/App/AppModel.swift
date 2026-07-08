@@ -139,13 +139,24 @@ final class AppModel: ObservableObject {
     var visibleAssets: [Asset] { document.assets.filter { !$0.isHidden } }
 
     var computed: (perAsset: [AssetMetrics], portfolio: PortfolioMetrics) {
-        PortfolioCalculator.compute(
+        let result = PortfolioCalculator.compute(
             assets: document.assets,
             trades: document.trades,
             quotes: quotes,
             fxRates: fxRates,
             baseCurrency: settings.baseCurrency
         )
+        // 표시 순서 = 맨 위 고정 먼저, 그다음 사용자 지정 순서(document.assets 배열 순).
+        let order = Dictionary(
+            uniqueKeysWithValues: document.assets.enumerated().map { ($1.id, $0) }
+        )
+        let sorted = result.perAsset.sorted { lhs, rhs in
+            if lhs.asset.isPinnedToTop != rhs.asset.isPinnedToTop {
+                return lhs.asset.isPinnedToTop
+            }
+            return (order[lhs.asset.id] ?? 0) < (order[rhs.asset.id] ?? 0)
+        }
+        return (sorted, result.portfolio)
     }
 
     func asset(id: UUID) -> Asset? {

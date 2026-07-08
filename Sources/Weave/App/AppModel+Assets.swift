@@ -164,6 +164,27 @@ extension AppModel {
         mutateAsset(id: assetID) { $0.colorIndex = colorIndex }
     }
 
+    /// 홈 리스트 맨 위 고정 토글.
+    func togglePinTop(assetID: UUID) {
+        let pinned = asset(id: assetID)?.isPinnedToTop ?? false
+        mutateAsset(id: assetID) { $0.pinnedToTop = pinned ? nil : true }
+    }
+
+    /// 드래그 재정렬 — dragging 자산을 target 자산의 현재 위치로 이동.
+    func moveAsset(id draggingID: UUID, toBefore targetID: UUID) {
+        guard
+            draggingID != targetID,
+            let from = document.assets.firstIndex(where: { $0.id == draggingID }),
+            let target = document.assets.firstIndex(where: { $0.id == targetID })
+        else {
+            return
+        }
+        let moved = document.assets.remove(at: from)
+        let insertAt = document.assets.firstIndex(where: { $0.id == targetID }) ?? target
+        document.assets.insert(moved, at: insertAt)
+        persist()
+    }
+
     // MARK: - 커스텀 로고
 
     /// 파일 선택 → 리사이즈 PNG 저장 → 자산에 연결. 기존 커스텀 로고는 교체 삭제.
