@@ -528,7 +528,8 @@ private struct PerAssetChart: View {
                   let ip = interpolated(line, at: date),
                   let lineY = proxy.position(forY: ip.percent) else { continue }
             let dist = abs(lineY - localY)
-            if dist <= 14 { hits.append((line.id, dist)) }
+            // 커서 포인트에 딱 붙게(좁게). 겹친 선들은 서로 가까워 이 범위에 함께 들어온다.
+            if dist <= 6 { hits.append((line.id, dist)) }
         }
         guard !hits.isEmpty else {
             hoveredLineIDs = []
