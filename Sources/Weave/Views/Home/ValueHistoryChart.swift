@@ -68,8 +68,9 @@ struct ValueHistoryChart: View {
     }
 
     /// 자산별 모드 범례 — 라인 색과 종목명 매핑(ASSETS 리스트 점과 동일 색).
+    /// 자산이 많으면 여러 줄로 자동 줄바꿈(가로로 안 잘림).
     private var assetLegend: some View {
-        HStack(spacing: 10) {
+        FlowLayout(spacing: 10, rowSpacing: 5, alignment: .center) {
             ForEach(model.homeAssetSeries) { line in
                 HStack(spacing: 4) {
                     Circle()
@@ -79,6 +80,7 @@ struct ValueHistoryChart: View {
                         .font(.system(size: 9.5, weight: .medium))
                         .foregroundStyle(theme.text2)
                         .lineLimit(1)
+                        .fixedSize()
                 }
             }
         }
