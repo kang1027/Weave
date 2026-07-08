@@ -97,36 +97,22 @@ private struct CombinedChart: View {
 
     @State private var hoveredMarkerID: UUID?
     @State private var hoveredDate: Date?
-    /// 좌우 드래그로 창을 과거로 민 양(초). 0 = 최신.
-    @State private var panOffset: TimeInterval = 0
-    @State private var dragBaseOffset: TimeInterval?
 
     private var period: ChartPeriod { model.homeChartPeriod }
 
-    /// 기본 창 — 선택 기간 전체(모델에서 고정). 없으면 데이터 범위로 폴백.
-    private var baseDomain: ClosedRange<Date> {
+    /// x 도메인 — 선택 기간 전체(모델에서 고정). 없으면 데이터 범위로 폴백.
+    private var xDomain: ClosedRange<Date> {
         if let domain = model.homeChartDomain { return domain }
         let first = series.first?.date ?? Date()
         let last = series.last?.date ?? first
         return first <= last ? first...last : first...first.addingTimeInterval(1)
     }
 
-    private var dataStart: Date { series.first?.date ?? baseDomain.lowerBound }
-
-    /// 팬 반영된 보이는 창.
-    private var xDomain: ClosedRange<Date> {
-        panWindow(base: baseDomain, dataStart: dataStart, offset: panOffset)
-    }
-
-    /// y는 보이는 창의 값에 맞춰 자동 피팅(팬하면 그 구간에 다시 맞춰짐).
     private var yDomain: ClosedRange<Double> {
-        let domain = xDomain
-        let values = series
-            .filter { $0.date >= domain.lowerBound && $0.date <= domain.upperBound }
-            .map { $0.value.doubleValue }
+        let values = series.map { $0.value.doubleValue }
         guard let min = values.min(), let max = values.max(), min < max else {
             // 값이 하나뿐/전부 동일 — 부호와 무관하게 항상 오름차순 범위(역전 방지).
-            let v = values.first ?? series.first?.value.doubleValue ?? 0
+            let v = values.first ?? 0
             let margin = Swift.abs(v) * 0.05 + 1
             return (v - margin)...(v + margin)
         }
@@ -210,9 +196,6 @@ private struct CombinedChart: View {
                 markerOverlay(proxy: proxy, geo: geo)
             }
         }
-        // 기간/데이터 바뀌면 팬 초기화(최신으로).
-        .onChange(of: model.homeChartPeriod) { _, _ in panOffset = 0 }
-        .onChange(of: model.chartGeneration) { _, _ in panOffset = 0 }
     }
 
     @ViewBuilder
@@ -220,15 +203,13 @@ private struct CombinedChart: View {
         if let plotAnchor = proxy.plotFrame {
             let plot = geo[plotAnchor]
             ZStack(alignment: .topLeading) {
-                // hover 캡처(마커 아래) + 좌우 드래그 팬.
+                // hover 캡처(마커 아래).
                 Rectangle()
                     .fill(.clear)
                     .contentShape(Rectangle())
                     .frame(width: plot.width, height: plot.height)
                     .position(x: plot.midX, y: plot.midY)
                     .onContinuousHover { phase in
-                        // 드래그(팬) 중에는 크로스헤어를 갱신하지 않는다.
-                        guard dragBaseOffset == nil else { return }
                         switch phase {
                         case .active(let point):
                             hoveredDate = proxy.value(atX: point.x - plot.origin.x, as: Date.self)
@@ -236,7 +217,6 @@ private struct CombinedChart: View {
                             hoveredDate = nil
                         }
                     }
-                    .gesture(panGesture(plotWidth: plot.width))
 
                 ForEach(markers) { marker in
                     if let rawX = proxy.position(forX: Calendar.current.startOfDay(for: marker.trade.date)),
@@ -272,24 +252,6 @@ private struct CombinedChart: View {
                 }
             }
         }
-    }
-
-    /// 좌우 드래그로 창을 과거/현재로 이동. 오른쪽으로 끌면 과거를 본다.
-    private func panGesture(plotWidth: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 4)
-            .onChanged { value in
-                let base = dragBaseOffset ?? panOffset
-                if dragBaseOffset == nil {
-                    dragBaseOffset = base
-                    hoveredDate = nil
-                    hoveredMarkerID = nil
-                }
-                let span = baseDomain.upperBound.timeIntervalSince(baseDomain.lowerBound)
-                let delta = Double(value.translation.width / max(plotWidth, 1)) * span
-                let maxOffset = maxPanOffset(base: baseDomain, dataStart: dataStart)
-                panOffset = min(max(0, base + delta), maxOffset)
-            }
-            .onEnded { _ in dragBaseOffset = nil }
     }
 
     // MARK: 마커 툴팁 텍스트
@@ -408,8 +370,6 @@ private struct PerAssetChart: View {
     // 선(라인)에 커서를 올렸을 때만 그 종목 하나를 하이라이트한다.
     @State private var hoveredLineID: UUID?
     @State private var hoveredDate: Date?
-    @State private var panOffset: TimeInterval = 0
-    @State private var dragBaseOffset: TimeInterval?
 
     private var hoveredLine: AssetLineSeries? {
         hoveredLineID.flatMap { id in lines.first(where: { $0.id == id }) }
@@ -417,35 +377,12 @@ private struct PerAssetChart: View {
 
     private var period: ChartPeriod { model.homeChartPeriod }
 
-    private var baseDomain: ClosedRange<Date> {
+    private var xDomain: ClosedRange<Date> {
         if let domain = model.homeChartDomain { return domain }
         let dates = lines.flatMap { $0.points.map(\.date) }
         let first = dates.min() ?? Date()
         let last = dates.max() ?? first
         return first <= last ? first...last : first...first.addingTimeInterval(1)
-    }
-
-    private var dataStart: Date {
-        lines.flatMap { $0.points.map(\.date) }.min() ?? baseDomain.lowerBound
-    }
-
-    private var xDomain: ClosedRange<Date> {
-        panWindow(base: baseDomain, dataStart: dataStart, offset: panOffset)
-    }
-
-    /// y는 보이는 창의 % 값에 맞춰 자동 피팅.
-    private var yDomain: ClosedRange<Double> {
-        let domain = xDomain
-        let values = lines.flatMap { line in
-            line.points.filter { $0.date >= domain.lowerBound && $0.date <= domain.upperBound }.map(\.percent)
-        }
-        guard let min = values.min(), let max = values.max(), min < max else {
-            let v = values.first ?? 0
-            let margin = Swift.abs(v) * 0.1 + 1
-            return (v - margin)...(v + margin)
-        }
-        let pad = (max - min) * 0.15
-        return (min - pad)...(max + pad)
     }
 
     var body: some View {
@@ -490,7 +427,6 @@ private struct PerAssetChart: View {
             }
         }
         .chartXScale(domain: xDomain)
-        .chartYScale(domain: yDomain)
         .chartPlotStyle { $0.clipped() }
         .chartYAxis {
             AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
@@ -527,7 +463,6 @@ private struct PerAssetChart: View {
                             .frame(width: plot.width, height: plot.height)
                             .position(x: plot.midX, y: plot.midY)
                             .onContinuousHover { phase in
-                                guard dragBaseOffset == nil else { return }
                                 switch phase {
                                 case .active(let point):
                                     updateHover(point: point, proxy: proxy, plot: plot)
@@ -536,7 +471,6 @@ private struct PerAssetChart: View {
                                     hoveredDate = nil
                                 }
                             }
-                            .gesture(panGesture(plotWidth: plot.width))
                         if let hoveredDate, let line = hoveredLine, let x = proxy.position(forX: hoveredDate) {
                             ClampedTooltip(anchorX: plot.origin.x + x, top: plot.origin.y + 6, bounds: plot) {
                                 lineTooltip(line, at: hoveredDate)
@@ -546,25 +480,6 @@ private struct PerAssetChart: View {
                 }
             }
         }
-        .onChange(of: model.homeChartPeriod) { _, _ in panOffset = 0 }
-        .onChange(of: model.chartGeneration) { _, _ in panOffset = 0 }
-    }
-
-    /// 좌우 드래그로 창을 과거/현재로 이동.
-    private func panGesture(plotWidth: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 4)
-            .onChanged { value in
-                let base = dragBaseOffset ?? panOffset
-                if dragBaseOffset == nil {
-                    dragBaseOffset = base
-                    hoveredLineID = nil
-                    hoveredDate = nil
-                }
-                let span = baseDomain.upperBound.timeIntervalSince(baseDomain.lowerBound)
-                let delta = Double(value.translation.width / max(plotWidth, 1)) * span
-                panOffset = min(max(0, base + delta), maxPanOffset(base: baseDomain, dataStart: dataStart))
-            }
-            .onEnded { _ in dragBaseOffset = nil }
     }
 
     /// 커서 y와 각 라인의 y(그 x에서 보간값)를 비교해, 임계값 안에서 가장 가까운 라인만 선택.
@@ -647,20 +562,6 @@ private struct PerAssetChart: View {
         }
         return last
     }
-}
-
-/// 팬 가능한 최대 오프셋(초) — 창을 과거로 밀어 시작이 데이터 시작에 닿을 때까지.
-private func maxPanOffset(base: ClosedRange<Date>, dataStart: Date) -> TimeInterval {
-    let span = base.upperBound.timeIntervalSince(base.lowerBound)
-    return max(0, base.upperBound.addingTimeInterval(-span).timeIntervalSince(dataStart))
-}
-
-/// 기본 창을 과거로 offset만큼 민 보이는 창(도메인). offset은 [0, max]로 클램프.
-private func panWindow(base: ClosedRange<Date>, dataStart: Date, offset: TimeInterval) -> ClosedRange<Date> {
-    let span = base.upperBound.timeIntervalSince(base.lowerBound)
-    let clamped = min(max(0, offset), maxPanOffset(base: base, dataStart: dataStart))
-    let end = base.upperBound.addingTimeInterval(-clamped)
-    return end.addingTimeInterval(-span)...end
 }
 
 /// 툴팁 날짜 헤더 포맷 — 1D는 월/일 시:분(24h), 그 외는 연/월/일.
