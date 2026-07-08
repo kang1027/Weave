@@ -68,13 +68,15 @@ extension AppModel {
                     ]
                 }
             }
+            // from: nil → 첫 매수부터 전체 이력. 창(도메인)은 뷰가 기간만큼 잘라 보여주고
+            // 좌우 드래그로 그 창을 과거로 이동한다(이력이 창보다 길 때 팬 가능).
             series = ValueSeriesBuilder.portfolioSeries(
                 assets: assets,
                 trades: document.trades,
                 candlesByAsset: candlesByAsset,
                 fxSeriesByCurrency: fxSeries,
                 baseCurrency: settings.baseCurrency,
-                from: from,
+                from: nil,
                 to: now
             )
         }
