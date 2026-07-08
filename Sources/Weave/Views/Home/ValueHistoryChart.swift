@@ -6,6 +6,13 @@ import WeaveCore
 struct ValueHistoryChart: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
+    /// By Asset 차트에서 범례로 끈 자산(차트에서만 숨김, 전체 숨김과 별개).
+    @State private var hiddenChartAssets: Set<UUID> = []
+
+    /// 범례로 켜둔(표시할) 자산 라인.
+    private var visibleLines: [AssetLineSeries] {
+        model.homeAssetSeries.filter { !hiddenChartAssets.contains($0.asset.id) }
+    }
 
     var body: some View {
         PanelCard {
@@ -54,8 +61,14 @@ struct ValueHistoryChart: View {
         } else {
             if model.homeAssetSeries.isEmpty {
                 emptyChart
+            } else if visibleLines.isEmpty {
+                // 범례로 전부 껐을 때.
+                Text(model.t("Select an asset below"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.text2)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                PerAssetChart(lines: model.homeAssetSeries)
+                PerAssetChart(lines: visibleLines)
             }
         }
     }
@@ -67,21 +80,31 @@ struct ValueHistoryChart: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    /// 자산별 모드 범례 — 라인 색과 종목명 매핑(ASSETS 리스트 점과 동일 색).
+    /// 자산별 모드 범례 — 클릭하면 그 자산 라인을 차트에서 보이기/가리기 토글.
     /// 자산이 많으면 여러 줄로 자동 줄바꿈(가로로 안 잘림).
     private var assetLegend: some View {
         FlowLayout(spacing: 10, rowSpacing: 5, alignment: .center) {
             ForEach(model.homeAssetSeries) { line in
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(theme.paletteColor(line.asset.colorIndex))
-                        .frame(width: 6, height: 6)
-                    Text(line.asset.name)
-                        .font(.system(size: 9.5, weight: .medium))
-                        .foregroundStyle(theme.text2)
-                        .lineLimit(1)
-                        .fixedSize()
+                let hidden = hiddenChartAssets.contains(line.asset.id)
+                Button {
+                    if hidden { hiddenChartAssets.remove(line.asset.id) }
+                    else { hiddenChartAssets.insert(line.asset.id) }
+                } label: {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(theme.paletteColor(line.asset.colorIndex))
+                            .frame(width: 6, height: 6)
+                        Text(line.asset.name)
+                            .font(.system(size: 9.5, weight: .medium))
+                            .foregroundStyle(theme.text2)
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                    .opacity(hidden ? 0.35 : 1)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .help(hidden ? model.t("Show in chart") : model.t("Hide from chart"))
             }
         }
         .frame(maxWidth: .infinity)

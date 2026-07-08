@@ -107,6 +107,9 @@
 "Import data…" = "Import data…";
 "SELL" = "SELL";
 "Save Trade" = "Save Trade";
+"Select an asset below" = "Select an asset below";
+"Show in chart" = "Show in chart";
+"Hide from chart" = "Hide from chart";
 "Search BTC, 삼성전자, AAPL…" = "Search BTC, 삼성전자, AAPL…";
 "Search symbols like BTC, 삼성전자 or AAPL to add your first asset." = "Search symbols like BTC, 삼성전자 or AAPL to add your first asset.";
 "Sell" = "Sell";

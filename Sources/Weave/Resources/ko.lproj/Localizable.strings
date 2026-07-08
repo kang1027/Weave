@@ -107,6 +107,9 @@
 "Import data…" = "데이터 가져오기…";
 "SELL" = "매도";
 "Save Trade" = "거래 저장";
+"Select an asset below" = "아래에서 자산을 선택하세요";
+"Show in chart" = "차트에 표시";
+"Hide from chart" = "차트에서 가리기";
 "Search BTC, 삼성전자, AAPL…" = "BTC, 삼성전자, AAPL 검색…";
 "Search symbols like BTC, 삼성전자 or AAPL to add your first asset." = "BTC, 삼성전자, AAPL 같은 심볼을 검색해 첫 자산을 추가해보세요.";
 "Sell" = "매도";
