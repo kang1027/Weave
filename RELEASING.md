@@ -35,47 +35,42 @@ xcrun notarytool store-credentials weave-notary \
 Vendor/Sparkle/bin/generate_keys        # 공개키 출력 → bundle.sh의 ED_KEY 갱신
 ```
 
-## 1. 버전 올리기
+## 1. 원커맨드 배포 (권장)
 
-`Sources/WeaveCore/WeaveInfo.swift` 의 `version` 을 새 버전으로 수정 후 커밋.
-
-## 2. 서명·공증·zip 생성
+버전업 → 서명·공증 → GitHub Release → appcast → Homebrew cask 까지 한 번에:
 
 ```sh
-SIGN_IDENTITY="Developer ID Application: <NAME> (<TEAMID>)" scripts/release.sh
+scripts/publish.sh patch     # 0.1.0 → 0.1.1
+scripts/publish.sh minor     # 0.1.0 → 0.2.0
+scripts/publish.sh major     # 0.1.0 → 1.0.0
+scripts/publish.sh 0.3.0     # 명시적 버전
 ```
 
-산출: `dist/Weave-<version>.zip` (서명+공증+staple 완료),
-그리고 `sign_update` 이 출력한 `sparkle:edSignature`.
+하는 일:
+1. `WeaveInfo.swift` 의 `version` 갱신
+2. `scripts/release.sh` — 서명·공증·staple·Sparkle 서명 (`SIGN_IDENTITY` 자동 탐지)
+3. `docs/appcast.xml` 에 새 `<item>` 삽입(최신이 위) + XML 유효성 검사
+4. `chore: 릴리즈 v<X>` 커밋 · `v<X>` 태그 · push
+5. `gh release create` — zip 업로드
+6. `kang1027/homebrew-weave` cask 의 `version`/`sha256` 갱신 · push
 
-## 3. GitHub Release
+옵션(env): `SIGN_IDENTITY`(미지정 시 키체인 자동 탐지) · `NOTARY_PROFILE`(기본
+`weave-notary`) · `TAP_REPO`(기본 `kang1027/homebrew-weave`) · `NOTES` · `DRY_RUN=1`.
+
+사전 조건: 워킹트리 clean · `main` 브랜치 · `gh` 인증. 실행 전 계획만 보려면:
 
 ```sh
-gh release create v<version> dist/Weave-<version>.zip \
-  --title "v<version>" --notes "..."
+DRY_RUN=1 scripts/publish.sh minor
 ```
 
-## 4. appcast 갱신 (Sparkle 자동업데이트)
+배포 후 기존 사용자는 Sparkle로, brew 사용자는 `brew upgrade --cask weave-pt` 로 갱신.
 
-`docs/appcast.xml` 에 `<item>` 추가:
-- `sparkle:version` / `sparkle:shortVersionString` = 버전
-- `enclosure url` = release zip 다운로드 URL
-- `sparkle:edSignature` = 2단계 `sign_update` 출력
-- `length` = zip 바이트 수 (`stat -f%z dist/Weave-<version>.zip`)
+## 2. 수동 단계 (문제 생겼을 때 참고)
 
-커밋·푸시하면 GitHub Pages(`kang1027.github.io/Weave/appcast.xml`)가 서빙 →
-기존 사용자는 Sparkle로 자동 업데이트.
+`publish.sh` 없이 손으로 할 경우:
 
-## 5. Homebrew cask 갱신
-
-첫 릴리즈면 tap 리포 생성:
-
-```sh
-gh repo create kang1027/homebrew-weave --public -d "Homebrew tap for Weave"
-```
-
-`Casks/weave-pt.rb` 를 `packaging/weave-pt.rb` 기준으로 만들고 매 릴리즈마다:
-- `version` 갱신
-- `sha256` = `shasum -a 256 dist/Weave-<version>.zip`
-
-푸시하면 사용자는 `brew install --cask kang1027/weave/weave-pt` 로 설치/업데이트.
+1. `WeaveInfo.swift` 버전 수정
+2. `scripts/release.sh` → `dist/Weave-<v>.zip` + `dist/release-info.env`(sha256/length/edSignature)
+3. `gh release create v<v> dist/Weave-<v>.zip`
+4. `docs/appcast.xml` 의 `<!-- appcast:items -->` 아래에 `<item>` 추가 후 push
+5. `homebrew-weave` 의 `Casks/weave-pt.rb` 에서 `version`/`sha256` 갱신 후 push

@@ -6,6 +6,7 @@
     <title>Weave</title>
     <link>https://kang1027.github.io/Weave/appcast.xml</link>
     <language>ko</language>
+    <!-- appcast:items — publish.sh가 이 줄 바로 아래에 새 <item>을 삽입(최신이 위) -->
     <item>
       <title>0.1.0</title>
       <pubDate>Wed, 08 Jul 2026 15:44:29 +0900</pubDate>

@@ -14,7 +14,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 VERSION=$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' Sources/WeaveCore/WeaveInfo.swift)
-SIGN_IDENTITY="${SIGN_IDENTITY:?Developer ID 서명 identity를 SIGN_IDENTITY로 지정}"
+# SIGN_IDENTITY 미지정 시 키체인의 Developer ID Application 인증서를 자동 탐지.
+SIGN_IDENTITY="${SIGN_IDENTITY:-$(security find-identity -v -p codesigning \
+  | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)}"
+if [ -z "$SIGN_IDENTITY" ]; then
+  echo "✗ Developer ID Application 인증서를 찾지 못함 — SIGN_IDENTITY로 직접 지정" >&2
+  exit 1
+fi
 NOTARY_PROFILE="${NOTARY_PROFILE:-weave-notary}"
 
 scripts/bundle.sh
@@ -54,13 +60,28 @@ ditto -c -k --keepParent "$APP" "$ZIP"
 
 echo "▸ Sparkle EdDSA 서명"
 SIGN_UPDATE=$(find Vendor/Sparkle/bin .build/artifacts -name "sign_update" -type f 2>/dev/null | head -1)
+EDSIG=""
+LENGTH=""
 if [ -n "$SIGN_UPDATE" ]; then
-  "$SIGN_UPDATE" "$ZIP"
-  echo "  위 서명을 appcast.xml의 sparkle:edSignature로 사용"
+  SIGN_OUT=$("$SIGN_UPDATE" "$ZIP")
+  echo "  $SIGN_OUT"
+  EDSIG=$(echo "$SIGN_OUT" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
+  LENGTH=$(echo "$SIGN_OUT" | sed -n 's/.*length="\([^"]*\)".*/\1/p')
 else
   echo "  ⚠ sign_update 도구를 찾지 못함"
 fi
 
+# 후속 자동화(publish.sh)가 읽을 릴리즈 메타데이터 — dist/는 gitignore라 커밋 안 됨.
+SHA256=$(shasum -a 256 "$ZIP" | awk '{print $1}')
+[ -z "$LENGTH" ] && LENGTH=$(stat -f%z "$ZIP")
+{
+  echo "VERSION='${VERSION}'"
+  echo "ZIP='${ZIP}'"
+  echo "SHA256='${SHA256}'"
+  echo "LENGTH='${LENGTH}'"
+  echo "EDSIG='${EDSIG}'"
+} > dist/release-info.env
+
 echo "✓ ${ZIP}"
-echo "  1) GitHub Release v${VERSION}에 zip 업로드"
-echo "  2) docs/appcast.xml 항목 추가 후 GitHub Pages 배포"
+echo "  메타데이터: dist/release-info.env (sha256/length/edSignature)"
+echo "  배포 자동화: scripts/publish.sh"
