@@ -20,8 +20,9 @@ extension AppModel {
         let period = homeChartPeriod
         let now = Date()
         // 축은 데이터와 무관하게 늘 선택 기간 전체를 덮는다.
-        homeChartDomain = period.startDate(now: now)...now
+        let domain = period.startDate(now: now)...now
         guard !assets.isEmpty else {
+            homeChartDomain = domain
             homeSeries = []
             homeAssetSeries = []
             homeBuyMarkers = []
@@ -31,6 +32,11 @@ extension AppModel {
         defer { isHomeChartLoading = false }
 
         let candlesByAsset = await fetchCandles(assets: assets, interval: period.candleInterval)
+        // ASSETS %배지는 항상 일봉 기준(별개의 assetReturnPeriod로 1W/1M/1Y 계산)이라,
+        // 차트가 1D(시간봉)일 때도 배지가 정확하도록 일봉을 따로 확보한다(일봉 캐시라 저렴).
+        let dailyCandles = period.isIntraday
+            ? await fetchCandles(assets: assets, interval: .day)
+            : candlesByAsset
         // 기준통화가 아닌 자산 통화의 현물 환율 확보(없으면 갱신).
         let base = settings.baseCurrency.uppercased()
         let neededCurrencies = Set(assets.map { $0.currency.uppercased() }).subtracting([base])
@@ -119,10 +125,11 @@ extension AppModel {
 
         // 더 최신 로드가 시작됐다면 이 결과는 버린다.
         guard token == chartLoadToken else { return }
+        homeChartDomain = domain
         homeSeries = series
         homeAssetSeries = assetLines
         homeBuyMarkers = markers
-        homeAssetCandles = candlesByAsset
+        homeAssetCandles = dailyCandles
     }
 
     /// Assets 리스트 % 배지 — 선택 기간(1D/1W/1M/1Y) 기준 수익률(소스 통화, FX 무관).
