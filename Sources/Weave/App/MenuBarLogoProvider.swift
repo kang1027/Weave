@@ -9,7 +9,9 @@ final class MenuBarLogoProvider {
 
     private var cache: [String: NSImage] = [:]
     private var inFlight: Set<String> = []
-    private var failed: Set<String> = []
+    /// 실패 시각 — 영구 블랙리스트 대신 쿨다운 후 재시도(일시적 네트워크 오류 복구).
+    private var failedAt: [String: Date] = [:]
+    private let retryAfter: TimeInterval = 300
 
     /// 지금 그릴 수 있는 로고. 없으면 nil(배지는 이니셜 폴백), CDN이면 백그라운드 로드 후 onLoad.
     func image(for asset: Asset, onLoad: @escaping () -> Void) -> NSImage? {
@@ -21,7 +23,9 @@ final class MenuBarLogoProvider {
         guard let url = AssetLogoView.logoURL(for: asset) else { return nil }
         let key = url.absoluteString
         if let cached = cache[key] { return cached }
-        guard !failed.contains(key), !inFlight.contains(key) else { return nil }
+        guard !inFlight.contains(key) else { return nil }
+        // 최근 실패는 쿨다운 동안만 건너뛴다(영구 차단 X).
+        if let failed = failedAt[key], Date().timeIntervalSince(failed) < retryAfter { return nil }
 
         inFlight.insert(key)
         Task { [weak self] in
@@ -35,9 +39,10 @@ final class MenuBarLogoProvider {
         inFlight.remove(key)
         if let image {
             cache[key] = image
+            failedAt[key] = nil
             onLoad()
         } else {
-            failed.insert(key)
+            failedAt[key] = Date()
         }
     }
 

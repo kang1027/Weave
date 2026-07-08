@@ -111,8 +111,10 @@ private struct CombinedChart: View {
     private var yDomain: ClosedRange<Double> {
         let values = series.map { $0.value.doubleValue }
         guard let min = values.min(), let max = values.max(), min < max else {
+            // 값이 하나뿐/전부 동일 — 부호와 무관하게 항상 오름차순 범위(역전 방지).
             let v = values.first ?? 0
-            return (v * 0.95)...(v * 1.05 + 1)
+            let margin = Swift.abs(v) * 0.05 + 1
+            return (v - margin)...(v + margin)
         }
         let pad = (max - min) * 0.12
         return (min - pad)...(max + pad)

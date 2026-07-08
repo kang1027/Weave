@@ -457,7 +457,8 @@ private struct TradePickerChart: View {
         let values = candles.map { $0.close.doubleValue }
         guard let min = values.min(), let max = values.max(), min < max else {
             let v = values.first ?? 1
-            return (v * 0.9)...(v * 1.1)
+            let margin = Swift.abs(v) * 0.1 + 1
+            return (v - margin)...(v + margin)
         }
         let pad = (max - min) * 0.12
         return (min - pad)...(max + pad)

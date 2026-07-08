@@ -8,6 +8,8 @@ import WeaveCore
 enum MenuBarImageRenderer {
     private static let up = hex(0x32D74B)
     private static let down = hex(0xFF453A)
+    /// 상태바 항목 최대 폭 — 넘치면 그리기 캔버스에서 클립(비정상 긴 이름 방어).
+    private static let maxWidth: CGFloat = 300
     /// 자산 팔레트(슬레이트) — 로고 없는 배지 색.
     private static let palette: [NSColor] = [
         hex(0xFF9F0A), hex(0x0A84FF), hex(0x8583FF), hex(0xFF375F),
@@ -63,7 +65,8 @@ enum MenuBarImageRenderer {
         let ts = text.size()
         let badgeSize: CGFloat = badge != nil ? 14 : 0
         let gap: CGFloat = badge != nil ? 4 : 0
-        let width = badgeSize + gap + ceil(ts.width) + 2
+        // 비정상적으로 긴 이름/총액이 상태바를 밀지 않게 상한(넘치면 그리기 캔버스에서 클립).
+        let width = min(badgeSize + gap + ceil(ts.width) + 2, maxWidth)
         let height = max(ceil(ts.height), badgeSize)
 
         return draw(width: width, height: height) {
@@ -89,7 +92,7 @@ enum MenuBarImageRenderer {
         let bottomRowHeight = ceil(bs.height)
         let height = topRowHeight + bottomRowHeight
         let topContentWidth = badgeSize + gap + ceil(ts.width)
-        let width = max(topContentWidth, ceil(bs.width)) + 2
+        let width = min(max(topContentWidth, ceil(bs.width)) + 2, maxWidth)
 
         return draw(width: width, height: height) {
             // 하단(가격 등락%) — 가로 중앙.
