@@ -42,8 +42,9 @@ else
 fi
 
 echo "▸ Info.plist 생성"
+# ED_KEY(base64)에는 '/'가 들어갈 수 있어 sed 구분자를 '|'로 쓴다(base64엔 '|' 없음).
 sed -e "s/__VERSION__/${VERSION}/g" \
-    -e "s/__SPARKLE_ED_PUBLIC_KEY__/${ED_KEY}/g" \
+    -e "s|__SPARKLE_ED_PUBLIC_KEY__|${ED_KEY}|g" \
     scripts/Info.plist.template > "$APP/Contents/Info.plist"
 
 echo "✓ dist/Weave.app (${VERSION})"
