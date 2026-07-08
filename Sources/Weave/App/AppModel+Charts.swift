@@ -45,21 +45,17 @@ extension AppModel {
             await refreshFXRates()
         }
         let from = period.startDate(now: now)
-        let firstBuyDate = document.trades.filter { $0.side == .buy }.map(\.date).min()
 
         let series: [ValuePoint]
         if period.isIntraday {
-            // 1D도 좌우 드래그로 과거를 볼 수 있게 전체 이력(첫 매수~지금) 시간봉으로 만든다.
-            // 창(24h)은 뷰가 잘라 보여주고, 드래그로 그 창을 과거로 민다(시간봉은 ~41일 확보).
-            // 환율은 현물 상수로 환산(인트라데이 FX는 자산 변동 대비 미미).
-            let intradayFrom = firstBuyDate.map { Calendar.current.startOfDay(for: $0) } ?? from
+            // 하루짜리 창 — 환율은 현물 상수로 환산(인트라데이 FX는 자산 변동 대비 미미).
             series = ValueSeriesBuilder.intradayPortfolioSeries(
                 assets: assets,
                 trades: document.trades,
                 candlesByAsset: candlesByAsset,
                 fxSpotByCurrency: fxRates,
                 baseCurrency: settings.baseCurrency,
-                from: intradayFrom,
+                from: from,
                 to: now
             )
         } else {
