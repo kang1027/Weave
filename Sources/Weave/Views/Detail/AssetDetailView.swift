@@ -68,8 +68,8 @@ struct AssetDetailView: View {
                         }
                     }
                     .padding(.bottom, 8)
+                    .disableHorizontalScrollBounce()
                 }
-                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
             }
 
             footer(asset: asset, position: position)

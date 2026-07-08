@@ -209,8 +209,8 @@ struct SettingsView: View {
 
                 }
                 .padding(.bottom, 12)
+                .disableHorizontalScrollBounce()
             }
-            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
 
             settingsFooter
         }

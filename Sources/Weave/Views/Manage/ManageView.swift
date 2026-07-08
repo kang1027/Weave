@@ -39,8 +39,8 @@ struct ManageView: View {
                                 )
                             }
                         }
+                        .disableHorizontalScrollBounce()
                     }
-                    .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
                 }
             }
 

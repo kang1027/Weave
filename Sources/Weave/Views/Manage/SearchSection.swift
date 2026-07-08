@@ -30,8 +30,8 @@ struct SearchSection: View {
                             SearchResultRow(result: result)
                         }
                     }
+                    .disableHorizontalScrollBounce()
                 }
-                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
                 .padding(.top, 4)
             } else if model.searchQuery.trimmingCharacters(in: .whitespaces).count >= 2 {
                 Text(model.t("No results"))
