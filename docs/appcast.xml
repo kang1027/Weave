@@ -6,20 +6,18 @@
     <title>Weave</title>
     <link>https://kang1027.github.io/Weave/appcast.xml</link>
     <language>ko</language>
-    <!--
     <item>
       <title>0.1.0</title>
-      <pubDate>Sun, 05 Jul 2026 12:00:00 +0900</pubDate>
+      <pubDate>Wed, 08 Jul 2026 15:44:29 +0900</pubDate>
       <sparkle:version>0.1.0</sparkle:version>
       <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <link>https://github.com/kang1027/Weave/releases/tag/v0.1.0</link>
       <enclosure
         url="https://github.com/kang1027/Weave/releases/download/v0.1.0/Weave-0.1.0.zip"
-        sparkle:edSignature="REPLACE_WITH_SIGN_UPDATE_OUTPUT"
-        length="REPLACE_WITH_ZIP_BYTES"
+        sparkle:edSignature="JiO4RUogIo7wv4u/A1yCY/Ountx71nxeHgVsjcivhjUUZ8vG5KTgEfpt3fTXaqISDpTLirRXagV9yMId8lEiAg=="
+        length="2519568"
         type="application/octet-stream"/>
     </item>
-    -->
   </channel>
 </rss>
