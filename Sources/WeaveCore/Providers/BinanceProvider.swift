@@ -48,7 +48,12 @@ public struct BinanceProvider: MarketDataProvider {
     // MARK: - Quote
 
     public func quote(providerSymbol: String) async throws -> Quote {
-        let url = URL(string: "https://api.binance.com/api/v3/ticker/24hr?symbol=\(providerSymbol)")!
+        guard
+            let encoded = providerSymbol.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+            let url = URL(string: "https://api.binance.com/api/v3/ticker/24hr?symbol=\(encoded)")
+        else {
+            throw ProviderError.unsupportedSymbol(providerSymbol)
+        }
         let data = try await http.get(url)
         let response = try JSONDecoder().decode(TickerResponse.self, from: data)
         guard
@@ -94,12 +99,17 @@ public struct BinanceProvider: MarketDataProvider {
         case .month: binanceInterval = "1M"
         }
         let limit = min(CandleFetchLimit.limit(for: interval), 1000)
-        var query = "symbol=\(providerSymbol)&interval=\(binanceInterval)&limit=\(limit)"
+        guard let encoded = providerSymbol.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+            throw ProviderError.unsupportedSymbol(providerSymbol)
+        }
+        var query = "symbol=\(encoded)&interval=\(binanceInterval)&limit=\(limit)"
         if let endDate {
             // klines는 endTime(ms) 이하 캔들 중 최근 limit개를 준다.
             query += "&endTime=\(Int(endDate.timeIntervalSince1970 * 1000))"
         }
-        let url = URL(string: "https://api.binance.com/api/v3/klines?\(query)")!
+        guard let url = URL(string: "https://api.binance.com/api/v3/klines?\(query)") else {
+            throw ProviderError.unsupportedSymbol(providerSymbol)
+        }
         let data = try await http.get(url)
         return try Self.parseKlines(data)
     }

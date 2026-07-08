@@ -59,7 +59,12 @@ public struct NaverProvider: MarketDataProvider {
     // MARK: - Quote
 
     public func quote(providerSymbol: String) async throws -> Quote {
-        let url = URL(string: "https://polling.finance.naver.com/api/realtime/domestic/stock/\(providerSymbol)")!
+        guard
+            let encoded = providerSymbol.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+            let url = URL(string: "https://polling.finance.naver.com/api/realtime/domestic/stock/\(encoded)")
+        else {
+            throw ProviderError.unsupportedSymbol(providerSymbol)
+        }
         let data = try await http.get(url, headers: Self.headers)
         return try Self.parseQuote(data)
     }
@@ -107,9 +112,14 @@ public struct NaverProvider: MarketDataProvider {
         case .month: timeframe = "month"
         }
         let count = CandleFetchLimit.limit(for: interval)
-        let url = URL(
-            string: "https://fchart.stock.naver.com/sise.nhn?symbol=\(providerSymbol)&timeframe=\(timeframe)&count=\(count)&requestType=0"
-        )!
+        guard
+            let encoded = providerSymbol.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+            let url = URL(
+                string: "https://fchart.stock.naver.com/sise.nhn?symbol=\(encoded)&timeframe=\(timeframe)&count=\(count)&requestType=0"
+            )
+        else {
+            throw ProviderError.unsupportedSymbol(providerSymbol)
+        }
         let data = try await http.get(url, headers: Self.headers)
         return try Self.parseFchart(data)
     }

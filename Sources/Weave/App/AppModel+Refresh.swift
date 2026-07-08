@@ -13,6 +13,9 @@ extension AppModel {
         }
 
         let fresh = await quoteService.quotes(for: targets)
+        // 라운드가 취소됐으면(재시작·간격변경 등) 결과 커밋 금지 — 취소로 비어버린
+        // fresh가 staleAssetIDs를 '전부 stale'로 만들고 메뉴바를 다시 그리는 깜빡임 방지.
+        guard !Task.isCancelled else { return }
         // 성공분만 덮어쓰기 — 실패 자산은 이전 시세 유지.
         quotes.merge(fresh) { _, new in new }
         staleAssetIDs = Set(targets.map(\.id)).subtracting(fresh.keys)
