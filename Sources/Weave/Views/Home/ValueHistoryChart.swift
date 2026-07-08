@@ -255,7 +255,7 @@ private struct CombinedChart: View {
     // MARK: 마커 툴팁 텍스트
 
     private func markerTitle(_ marker: BuyMarker) -> String {
-        let qty = MoneyFormatter.quantity(marker.trade.quantity)
+        let qty = marker.asset.formattedQuantity(marker.trade.quantity)
         let price = model.settings.privacyMode
             ? MoneyFormatter.masked
             : MoneyFormatter.price(marker.trade.price, currency: marker.asset.currency)

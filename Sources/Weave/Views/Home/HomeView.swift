@@ -236,7 +236,7 @@ struct AssetListRow: View {
         if metric.asset.isManual {
             return model.t("Manual")
         }
-        let qty = MoneyFormatter.quantity(metric.position.quantity)
+        let qty = metric.asset.formattedQuantity(metric.position.quantity)
         let buys = model.t("\(metric.position.buyCount) buys")
         let holding = metric.asset.hasNumericSymbol
             ? model.t("\(qty) shares")

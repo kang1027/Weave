@@ -7,4 +7,9 @@ extension Asset {
     var hasNumericSymbol: Bool {
         !symbol.isEmpty && symbol.allSatisfy(\.isNumber)
     }
+
+    /// 보유/거래 수량 표시 문자열 — 국장·일장은 정수, 그 외는 최대 8자리.
+    func formattedQuantity(_ quantity: Decimal) -> String {
+        MoneyFormatter.quantity(quantity, maxFractionDigits: market.tradesWholeShares ? 0 : 8)
+    }
 }

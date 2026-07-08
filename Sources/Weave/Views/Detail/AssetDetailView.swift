@@ -417,7 +417,7 @@ private struct TradeRow: View {
     }
 
     private var quantityLabel: String {
-        let qty = MoneyFormatter.quantity(trade.quantity)
+        let qty = asset.formattedQuantity(trade.quantity)
         return asset.hasNumericSymbol
             ? model.t("\(qty) shares")
             : "\(qty) \(asset.symbol)"

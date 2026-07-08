@@ -53,12 +53,12 @@ public enum MoneyFormatter {
     }
 
     /// 수량 — 뒤쪽 0 제거, 최대 8자리. "0.05", "45"
-    public static func quantity(_ value: Decimal) -> String {
+    public static func quantity(_ value: Decimal, maxFractionDigits: Int = 8) -> String {
         let formatter = NumberFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.numberStyle = .decimal
         formatter.minimumFractionDigits = 0
-        formatter.maximumFractionDigits = 8
+        formatter.maximumFractionDigits = maxFractionDigits
         formatter.usesGroupingSeparator = true
         return formatter.string(from: value as NSDecimalNumber) ?? "0"
     }

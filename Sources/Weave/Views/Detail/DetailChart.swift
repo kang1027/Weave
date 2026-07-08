@@ -593,7 +593,7 @@ struct DetailChart: View {
 
     private func markerTitle(_ trade: Trade) -> String {
         let action = trade.side == .buy ? model.t("Buy") : model.t("Sell")
-        let qty = MoneyFormatter.quantity(trade.quantity)
+        let qty = asset.formattedQuantity(trade.quantity)
         let price = model.settings.privacyMode
             ? MoneyFormatter.masked
             : MoneyFormatter.price(trade.price, currency: asset.currency)
