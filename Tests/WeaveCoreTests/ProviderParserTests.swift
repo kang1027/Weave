@@ -192,4 +192,12 @@ import Testing
         let merged = SearchMerger.merge(query: "btc", binance: binance, naver: [], yahoo: [])
         #expect(merged.first?.symbol == "BTC")
     }
+
+    @Test func mergeAddsSandP500AliasForSymbolQuery() {
+        let merged = SearchMerger.merge(query: "S&P", binance: [], naver: [], yahoo: [])
+        #expect(merged.first?.provider == .yahoo)
+        #expect(merged.first?.providerSymbol == "^GSPC")
+        #expect(merged.first?.name == "S&P 500")
+        #expect(merged.first?.market == .usStock)
+    }
 }

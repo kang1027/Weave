@@ -43,8 +43,9 @@ public enum SearchMerger {
         yahoo: [SearchResult]
     ) -> [SearchResult] {
         let binanceBases = Set(binance.map { $0.symbol.uppercased() })
+        let yahooWithAliases = dedupePreservingFirst(SearchAliases.yahooResults(for: query) + yahoo)
 
-        let dedupedYahoo = yahoo.filter { result in
+        let dedupedYahoo = yahooWithAliases.filter { result in
             switch result.market {
             case .koreaStock:
                 // 국장은 네이버 전담 — 네이버가 응답했으면 야후 국장 결과는 버린다.
@@ -78,5 +79,39 @@ public enum SearchMerger {
             .map(\.element)
             .prefix(20)
             .map { $0 }
+    }
+
+    private static func dedupePreservingFirst(_ results: [SearchResult]) -> [SearchResult] {
+        var seen: Set<String> = []
+        return results.filter { seen.insert($0.id).inserted }
+    }
+}
+
+private enum SearchAliases {
+    static func yahooResults(for query: String) -> [SearchResult] {
+        guard isSandP500Query(query) else { return [] }
+        return [
+            SearchResult(
+                provider: .yahoo,
+                providerSymbol: "^GSPC",
+                symbol: "^GSPC",
+                name: "S&P 500",
+                market: .usStock,
+                currency: "USD"
+            )
+        ]
+    }
+
+    private static func isSandP500Query(_ query: String) -> Bool {
+        let lowercased = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let normalized = lowercased.filter(\.isLetterOrNumber)
+        return normalized == "sp" && lowercased.contains("&")
+            || ["sp500", "sandp", "sandp500", "snp500", "gspc"].contains(normalized)
+    }
+}
+
+private extension Character {
+    var isLetterOrNumber: Bool {
+        unicodeScalars.allSatisfy { CharacterSet.alphanumerics.contains($0) }
     }
 }
