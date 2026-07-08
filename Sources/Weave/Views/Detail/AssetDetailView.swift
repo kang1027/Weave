@@ -363,10 +363,22 @@ private struct TradeRow: View {
                         .lineLimit(1)
                         .privacyBlur(model.settings.privacyMode)
                 }
-                Text(subText)
-                    .font(.system(size: 10))
-                    .foregroundStyle(theme.text2)
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(subText)
+                        .font(.system(size: 10))
+                        .foregroundStyle(theme.text2)
+                        .lineLimit(1)
+                    Text(verbatim: "·")
+                        .font(.system(size: 10))
+                        .foregroundStyle(theme.text2)
+                    // 그 거래의 총액(수량 × 단가).
+                    Text(MoneyFormatter.price(trade.amount, currency: asset.currency))
+                        .font(.system(size: 10, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(theme.text2)
+                        .lineLimit(1)
+                        .privacyBlur(model.settings.privacyMode)
+                }
             }
             Spacer(minLength: 6)
             VStack(alignment: .trailing, spacing: 1) {
