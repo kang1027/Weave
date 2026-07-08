@@ -6,7 +6,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 VERSION=$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' Sources/WeaveCore/WeaveInfo.swift)
-ED_KEY="${SPARKLE_ED_PUBLIC_KEY:-__SPARKLE_ED_PUBLIC_KEY__}"
+# Sparkle EdDSA 공개키 — 앱에 박히는 값이라 공개해도 안전(개인키만 키체인 보관).
+ED_KEY="${SPARKLE_ED_PUBLIC_KEY:-OYrjZVe89kag8gckegzrsPP/KEb63kRRphubPRzHpQQ=}"
 
 echo "▸ swift build -c release (Weave ${VERSION})"
 swift build -c release
