@@ -31,5 +31,26 @@
     <!-- 업데이트 확인 주기 = 1시간(Sparkle 최소 허용값 3600초). appcast는 작은 XML이라 부하 미미. -->
     <key>SUScheduledCheckInterval</key>
     <integer>3600</integer>
+    <!-- .weave 백업 번들(내부는 zip) — 자산 데이터 + 커스텀 로고를 담는 자급자족 백업. -->
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>app.weave.backup</string>
+            <key>UTTypeDescription</key>
+            <string>Weave Backup</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>weave</string>
+                </array>
+            </dict>
+        </dict>
+    </array>
 </dict>
 </plist>

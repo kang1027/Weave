@@ -57,38 +57,80 @@ extension AppModel {
 
     // MARK: - 데이터 백업 / 복원
 
+    /// `.weave` 번들(zip) = `portfolio.json` + `logos/`(참조된 커스텀 로고).
+    private var backupType: UTType {
+        UTType("app.weave.backup") ?? UTType(filenameExtension: "weave") ?? .data
+    }
+
     func exportBackup() {
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = "weave-backup.json"
+        panel.allowedContentTypes = [backupType]
+        panel.nameFieldStringValue = "weave-backup.weave"
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let fm = FileManager.default
+        let stage = fm.temporaryDirectory.appendingPathComponent("weave-export-\(UUID().uuidString)", isDirectory: true)
+        let tmpZip = fm.temporaryDirectory.appendingPathComponent("weave-export-\(UUID().uuidString).zip")
+        defer { try? fm.removeItem(at: stage); try? fm.removeItem(at: tmpZip) }
         do {
+            try fm.createDirectory(at: stage, withIntermediateDirectories: true)
+
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(document)
-            try data.write(to: url, options: .atomic)
+            try encoder.encode(document).write(to: stage.appendingPathComponent("portfolio.json"), options: .atomic)
+
+            // 자산이 참조하는 커스텀 로고 PNG만 번들에 담는다.
+            let logoNames = document.assets.compactMap(\.customLogoFileName)
+            if !logoNames.isEmpty {
+                let logosDir = stage.appendingPathComponent("logos", isDirectory: true)
+                try fm.createDirectory(at: logosDir, withIntermediateDirectories: true)
+                for name in logoNames {
+                    let src = LogoStore.url(for: name)
+                    guard fm.fileExists(atPath: src.path) else { continue }
+                    try? fm.copyItem(at: src, to: logosDir.appendingPathComponent(name))
+                }
+            }
+
+            try BackupArchive.zip(contentsOf: stage, to: tmpZip)
+            if fm.fileExists(atPath: url.path) { try fm.removeItem(at: url) }
+            try fm.moveItem(at: tmpZip, to: url)
         } catch {
-            presentAlert(
-                title: t("Backup failed"),
-                message: error.localizedDescription
-            )
+            presentAlert(title: t("Backup failed"), message: error.localizedDescription)
         }
     }
 
     func importBackup() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.json]
+        // 신규 `.weave` 번들 + 구버전 순수 `.json` 백업 모두 허용.
+        panel.allowedContentTypes = [backupType, .json]
         panel.allowsMultipleSelection = false
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let fm = FileManager.default
+        let extractDir = fm.temporaryDirectory.appendingPathComponent("weave-import-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fm.removeItem(at: extractDir) }
         do {
-            let data = try Data(contentsOf: url)
-            let migrated = try PortfolioMigrator.migrate(data)
+            let documentData: Data
+            var extractedLogosDir: URL?
+            if url.pathExtension.lowercased() == "json" {
+                // 구버전: 순수 JSON(로고 없음).
+                documentData = try Data(contentsOf: url)
+            } else {
+                // `.weave` 번들: 추출 → portfolio.json (+ logos/).
+                try BackupArchive.unzip(url, to: extractDir)
+                documentData = try Data(contentsOf: extractDir.appendingPathComponent("portfolio.json"))
+                let logos = extractDir.appendingPathComponent("logos", isDirectory: true)
+                if fm.fileExists(atPath: logos.path) { extractedLogosDir = logos }
+            }
+
+            let migrated = try PortfolioMigrator.migrate(documentData)
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             let restored = try decoder.decode(PortfolioDocument.self, from: migrated)
+
             // 되돌릴 수 없는 전체 교체 — 확인받는다.
             let confirm = NSAlert()
             confirm.messageText = t("Replace all data?")
@@ -98,6 +140,18 @@ extension AppModel {
             confirm.addButton(withTitle: t("Cancel"))
             NSApp.activate(ignoringOtherApps: true)
             guard confirm.runModal() == .alertFirstButtonReturn else { return }
+
+            // 번들이면 커스텀 로고를 LogoStore 디렉토리에 병합(같은 이름 덮어쓰기).
+            if let extractedLogosDir {
+                try fm.createDirectory(at: LogoStore.directory, withIntermediateDirectories: true)
+                let files = (try? fm.contentsOfDirectory(at: extractedLogosDir, includingPropertiesForKeys: nil)) ?? []
+                for file in files where file.pathExtension.lowercased() == "png" {
+                    let dest = LogoStore.url(for: file.lastPathComponent)
+                    try? fm.removeItem(at: dest)
+                    try? fm.copyItem(at: file, to: dest)
+                }
+            }
+
             document = restored
             persist()
             invalidateHomeChart()
