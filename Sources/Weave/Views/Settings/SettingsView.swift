@@ -188,7 +188,7 @@ struct SettingsView: View {
                         SettingsRow(
                             title: model.t("Automatic updates"),
                             subtitle: model.updater.isAvailable
-                                ? model.t("Sparkle · checks daily")
+                                ? model.t("Sparkle · checks hourly")
                                 : model.t("Available in packaged app only")
                         ) {
                             MiniToggle(isOn: Binding(

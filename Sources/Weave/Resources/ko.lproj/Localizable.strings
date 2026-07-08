@@ -117,7 +117,7 @@
 "Show in menu bar" = "메뉴바에 표시";
 "Source" = "소스 통화";
 "Source: BTC in $, 삼성전자 in ₩" = "소스 통화면 BTC는 $, 삼성전자는 ₩";
-"Sparkle · checks daily" = "Sparkle · 매일 확인";
+"Sparkle · checks hourly" = "Sparkle · 매시간 확인";
 "System" = "시스템";
 "The file is not a valid Weave backup." = "올바른 Weave 백업 파일이 아니에요.";
 "Theme" = "테마";

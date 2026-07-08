@@ -28,5 +28,8 @@
     <string>__SPARKLE_ED_PUBLIC_KEY__</string>
     <key>SUEnableInstallerLauncherService</key>
     <false/>
+    <!-- 업데이트 확인 주기 = 1시간(Sparkle 최소 허용값 3600초). appcast는 작은 XML이라 부하 미미. -->
+    <key>SUScheduledCheckInterval</key>
+    <integer>3600</integer>
 </dict>
 </plist>
