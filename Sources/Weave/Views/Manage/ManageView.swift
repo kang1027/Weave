@@ -40,6 +40,7 @@ struct ManageView: View {
                             }
                         }
                     }
+                    .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
                 }
             }
 

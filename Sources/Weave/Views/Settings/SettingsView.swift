@@ -210,6 +210,7 @@ struct SettingsView: View {
                 }
                 .padding(.bottom, 12)
             }
+            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
 
             settingsFooter
         }

@@ -145,6 +145,7 @@ struct TradeFormView: View {
                 .padding(.horizontal, 14)
                 .padding(.top, 4)
             }
+            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         }
         .onAppear(perform: applyInitialValues)
         .task { chartCandles = await model.dailyCandles(assetID: assetID) }
