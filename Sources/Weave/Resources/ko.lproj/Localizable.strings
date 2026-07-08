@@ -64,6 +64,8 @@
 "Language" = "언어";
 "Launch at login" = "로그인 시 자동 시작";
 "Manage assets" = "자산 관리";
+"Move down" = "아래로 이동";
+"Move up" = "위로 이동";
 "Manual assets have no price updates." = "수동 자산은 시세 갱신이 없어요.";
 "Manual · %@" = "수동 · %@";
 "Menu bar format" = "메뉴바 표시 형식";

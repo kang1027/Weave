@@ -170,18 +170,34 @@ extension AppModel {
         mutateAsset(id: assetID) { $0.pinnedToTop = pinned ? nil : true }
     }
 
-    /// 드래그 재정렬 — dragging 자산을 target 자산의 현재 위치로 이동.
-    func moveAsset(id draggingID: UUID, toBefore targetID: UUID) {
-        guard
-            draggingID != targetID,
-            let from = document.assets.firstIndex(where: { $0.id == draggingID }),
-            let target = document.assets.firstIndex(where: { $0.id == targetID })
-        else {
+    /// 홈 리스트 표시 순서 — 맨 위 고정 먼저, 각 그룹은 배열 순서(숨김 제외).
+    private func displayedAssetOrder() -> [UUID] {
+        let visible = document.assets.filter { !$0.isHidden }
+        return (visible.filter { $0.isPinnedToTop } + visible.filter { !$0.isPinnedToTop }).map(\.id)
+    }
+
+    /// 같은 고정 그룹 안에서 위/아래로 이동 가능 여부(핀 경계는 못 넘음).
+    func canMoveAsset(id: UUID, up: Bool) -> Bool {
+        let order = displayedAssetOrder()
+        guard let pos = order.firstIndex(of: id) else { return false }
+        let neighbor = up ? pos - 1 : pos + 1
+        guard order.indices.contains(neighbor) else { return false }
+        return (asset(id: id)?.isPinnedToTop ?? false) == (asset(id: order[neighbor])?.isPinnedToTop ?? false)
+    }
+
+    /// 우클릭 메뉴 — 표시 순서에서 한 칸 위/아래로 이동.
+    func moveAsset(id: UUID, up: Bool) {
+        guard canMoveAsset(id: id, up: up) else { return }
+        let order = displayedAssetOrder()
+        guard let pos = order.firstIndex(of: id) else { return }
+        let neighborID = order[up ? pos - 1 : pos + 1]
+        guard let from = document.assets.firstIndex(where: { $0.id == id }) else { return }
+        let moved = document.assets.remove(at: from)
+        guard let target = document.assets.firstIndex(where: { $0.id == neighborID }) else {
+            document.assets.insert(moved, at: min(from, document.assets.count))
             return
         }
-        let moved = document.assets.remove(at: from)
-        let insertAt = document.assets.firstIndex(where: { $0.id == targetID }) ?? target
-        document.assets.insert(moved, at: insertAt)
+        document.assets.insert(moved, at: up ? target : target + 1)
         persist()
     }
 

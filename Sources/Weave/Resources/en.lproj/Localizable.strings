@@ -64,6 +64,8 @@
 "Language" = "Language";
 "Launch at login" = "Launch at login";
 "Manage assets" = "Manage assets";
+"Move down" = "Move down";
+"Move up" = "Move up";
 "Manual assets have no price updates." = "Manual assets have no price updates.";
 "Manual · %@" = "Manual · %@";
 "Menu bar format" = "Menu bar format";
