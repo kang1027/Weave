@@ -54,10 +54,10 @@ enum ChartPeriod: String, CaseIterable, Identifiable {
 
     var isIntraday: Bool { self == .oneDay }
 
-    /// x축 눈금 간격 — 1D는 3시간(nn:00), 1W 일, 1M 주, 1Y 2개월.
+    /// x축 눈금 간격 — 1D는 4시간(nn:00), 1W 일, 1M 주, 1Y 2개월.
     var axisStride: (component: Calendar.Component, count: Int) {
         switch self {
-        case .oneDay: return (.hour, 3)
+        case .oneDay: return (.hour, 4)
         case .oneWeek: return (.day, 1)
         case .oneMonth: return (.weekOfYear, 1)
         case .oneYear: return (.month, 2)
