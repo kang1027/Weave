@@ -1,0 +1,20 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Weave">
+  <!-- Placeholder logo — swap with the real app icon when ready. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="area" x1="0" y1="88" x2="0" y2="200" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="60" fill="url(#bg)"/>
+  <path d="M56 176 L104 138 L152 156 L200 94 L200 200 L56 200 Z" fill="url(#area)"/>
+  <path d="M56 176 L104 138 L152 156 L200 94" stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="56" cy="176" r="9" fill="#ffffff"/>
+  <circle cx="104" cy="138" r="9" fill="#ffffff"/>
+  <circle cx="152" cy="156" r="9" fill="#ffffff"/>
+  <circle cx="200" cy="94" r="11" fill="#ffffff"/>
+</svg>
