@@ -39,7 +39,6 @@ struct ManageView: View {
                                 )
                             }
                         }
-                        .disableHorizontalScrollBounce()
                     }
                 }
             }

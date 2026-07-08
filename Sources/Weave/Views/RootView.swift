@@ -21,9 +21,6 @@ struct RootView: View {
                 .opacity(0)
                 .accessibilityHidden(true)
         }
-        // MenuBarExtra(.window)가 콘텐츠를 바깥쪽 스크롤뷰로 감싸 가로 스와이프에 통째로
-        // 튕기므로, 창 전체의 NSScrollView 가로 탄성을 끈다(어느 화면이든 항상 적용).
-        .disableHorizontalScrollBounce()
         .environment(\.theme, theme)
         .environment(\.locale, model.locale)
         .preferredColorScheme(model.settings.theme == .system ? nil : theme.colorScheme)

@@ -44,8 +44,6 @@ struct HomeView: View {
                     }
                 }
                 .padding(.bottom, 8)
-                // 세로 스크롤뷰가 가로 스와이프에 고무줄처럼 튕기는 것 방지.
-                .disableHorizontalScrollBounce()
             }
 
             HomeFooter()

@@ -209,7 +209,6 @@ struct SettingsView: View {
 
                 }
                 .padding(.bottom, 12)
-                .disableHorizontalScrollBounce()
             }
 
             settingsFooter

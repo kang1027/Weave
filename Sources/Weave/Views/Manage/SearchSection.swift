@@ -30,7 +30,6 @@ struct SearchSection: View {
                             SearchResultRow(result: result)
                         }
                     }
-                    .disableHorizontalScrollBounce()
                 }
                 .padding(.top, 4)
             } else if model.searchQuery.trimmingCharacters(in: .whitespaces).count >= 2 {

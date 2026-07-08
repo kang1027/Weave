@@ -68,7 +68,6 @@ struct AssetDetailView: View {
                         }
                     }
                     .padding(.bottom, 8)
-                    .disableHorizontalScrollBounce()
                 }
             }
 
