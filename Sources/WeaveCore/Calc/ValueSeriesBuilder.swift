@@ -189,8 +189,9 @@ public enum ValueSeriesBuilder {
             day = next
         }
         if grid.last.map({ $0 < to }) ?? true { grid.append(to) }
-        // 기준점 = 첫 캔들 종가(그 이전 격자점은 데이터 없어 버려짐).
-        guard let base = sorted.first?.close, base > 0 else { return [] }
+        // 기준점 = 창 시작(start) 시점 종가(forward-fill). 창 이전 캔들이 없으면 첫 캔들.
+        // (전체 이력의 가장 오래된 종가를 쓰면 수백 %로 튄다.)
+        guard let base = close(at: start) ?? sorted.first?.close, base > 0 else { return [] }
         return grid.compactMap { date in
             guard let value = close(at: date) else { return nil }
             return (date, ((value - base) / base * 100).doubleValue)

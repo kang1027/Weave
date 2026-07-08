@@ -193,6 +193,18 @@ import Testing
         #expect(abs(series[3].percent - 30) < 0.0001)
     }
 
+    @Test func normalizedGridBaselineIsWindowStartNotOldest() {
+        // 창(10~13일) 이전에도 이력(5일=50)이 있지만, 기준은 창 시작(10일=100)이어야 한다.
+        let candles = [
+            candle(day: 5, close: 50), candle(day: 10, close: 100), candle(day: 13, close: 130)
+        ]
+        let series = ValueSeriesBuilder.normalizedSeries(
+            candles: candles, from: day(10), to: day(13), step: .day, calendar: calendar
+        )
+        #expect(series.first?.percent == 0)              // 10일 기준 0% (5일 대비 아님)
+        #expect(abs((series.last?.percent ?? 0) - 30) < 0.0001)
+    }
+
     @Test func normalizedSeriesStartsAtZeroPercent() {
         let candles = [
             candle(day: 10, close: 200),
