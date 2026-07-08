@@ -200,7 +200,7 @@ struct SettingsView: View {
                             ))
                         }
                         SettingsButton(
-                            title: model.t("Check for updates now…") + "  ⌘R",
+                            title: model.t("Check for updates now…"),
                             disabled: !model.updater.isAvailable
                         ) {
                             model.updater.checkForUpdates()
