@@ -16,11 +16,25 @@ private struct HorizontalBounceDisabler: NSViewRepresentable {
     }
 
     private func apply(from view: NSView) {
-        // 뷰 계층에 붙은 뒤 상위 NSScrollView를 찾아 가로 탄성만 끈다(세로는 그대로).
+        // 창 전체의 모든 NSScrollView 가로 탄성을 끈다(세로는 그대로).
+        // MenuBarExtra(.window) 팝오버는 콘텐츠를 바깥쪽 스크롤뷰로 감싸므로,
+        // 내 스크롤뷰(enclosingScrollView)만 끄면 바깥쪽이 계속 튕긴다.
         DispatchQueue.main.async { [weak view] in
-            guard let scrollView = view?.enclosingScrollView else { return }
+            guard let window = view?.window else { return }
+            Self.disableHorizontal(in: window.contentView)
+        }
+    }
+
+    private static func disableHorizontal(in view: NSView?) {
+        guard let view else { return }
+        if let scrollView = view as? NSScrollView {
             scrollView.horizontalScrollElasticity = .none
             scrollView.hasHorizontalScroller = false
+            // 스크롤을 우세 축(세로)으로 고정 — 대각/가로 성분을 무시해 옆으로 밀리지 않게.
+            scrollView.usesPredominantAxisScrolling = true
+        }
+        for subview in view.subviews {
+            disableHorizontal(in: subview)
         }
     }
 }
