@@ -21,7 +21,13 @@ extension AppModel {
         let period = homeChartPeriod
         let now = Date()
         // 축은 데이터와 무관하게 늘 선택 기간 전체를 덮는다.
-        let domain = period.startDate(now: now)...now
+        // 일봉 기간은 시작을 자정에 맞춰 x축 눈금 간격이 고르게(첫 칸이 넓어 보이던 것 방지).
+        let domain: ClosedRange<Date>
+        if period.isIntraday {
+            domain = period.startDate(now: now)...now
+        } else {
+            domain = Calendar.current.startOfDay(for: period.startDate(now: now))...now
+        }
         guard !assets.isEmpty else {
             homeChartDomain = domain
             homeSeries = []
@@ -93,8 +99,10 @@ extension AppModel {
             let rawStart = firstBuyByAsset[asset.id] ?? windowStart
             let buyStart = period.isIntraday ? rawStart : Calendar.current.startOfDay(for: rawStart)
             let assetStart = max(windowStart, buyStart)
+            // 일/시간 격자로 forward-fill — 주말·휴장 구멍 없이 Combined와 같은 규격.
             let points = ValueSeriesBuilder.normalizedSeries(
-                candles: candles, from: assetStart, to: now
+                candles: candles, from: assetStart, to: now,
+                step: period.isIntraday ? .hour : .day
             )
             guard !points.isEmpty else { return nil }
             return AssetLineSeries(asset: asset, points: points)

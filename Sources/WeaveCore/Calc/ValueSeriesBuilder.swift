@@ -143,7 +143,7 @@ public enum ValueSeriesBuilder {
         }
     }
 
-    /// 자산별 모드 — 종가를 구간 시작점 0% 기준으로 정규화한 % 시계열.
+    /// 자산별 모드 — 종가를 구간 시작점 0% 기준으로 정규화한 % 시계열(캔들 날짜 그대로).
     public static func normalizedSeries(
         candles: [Candle],
         from: Date,
@@ -155,6 +155,45 @@ public enum ValueSeriesBuilder {
         guard let first = window.first, first.close > 0 else { return [] }
         return window.map { candle in
             (candle.date, ((candle.close - first.close) / first.close * 100).doubleValue)
+        }
+    }
+
+    /// 자산별 모드(그리드) — from~to를 step(일/시간) 격자로 forward-fill 정규화.
+    /// 국장처럼 주말·휴장 캔들이 없어 금→월이 3일 대각선으로 튀는 것 방지(주말은 평평).
+    /// Combined(일 단위 채움)와 같은 규격이라 두 모드가 일관된다.
+    public static func normalizedSeries(
+        candles: [Candle],
+        from: Date,
+        to: Date,
+        step: Calendar.Component,
+        calendar: Calendar = .current
+    ) -> [(date: Date, percent: Double)] {
+        let sorted = candles.filter { $0.close > 0 }.sorted { $0.date < $1.date }
+        guard !sorted.isEmpty else { return [] }
+        // 그 시각 이전 마지막 종가(exact forward-fill).
+        func close(at time: Date) -> Decimal? {
+            var low = 0, high = sorted.count - 1, found = -1
+            while low <= high {
+                let mid = (low + high) / 2
+                if sorted[mid].date <= time { found = mid; low = mid + 1 } else { high = mid - 1 }
+            }
+            return found >= 0 ? sorted[found].close : nil
+        }
+        // 일봉은 자정 격자, 인트라데이는 from 그대로에서 시작.
+        let start = step == .day ? calendar.startOfDay(for: from) : from
+        var grid: [Date] = []
+        var day = start
+        while day <= to {
+            grid.append(day)
+            guard let next = calendar.date(byAdding: step, value: 1, to: day) else { break }
+            day = next
+        }
+        if grid.last.map({ $0 < to }) ?? true { grid.append(to) }
+        // 기준점 = 첫 캔들 종가(그 이전 격자점은 데이터 없어 버려짐).
+        guard let base = sorted.first?.close, base > 0 else { return [] }
+        return grid.compactMap { date in
+            guard let value = close(at: date) else { return nil }
+            return (date, ((value - base) / base * 100).doubleValue)
         }
     }
 

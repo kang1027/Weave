@@ -180,6 +180,19 @@ import Testing
         #expect(points[2].value == 251)
     }
 
+    @Test func normalizedGridForwardFillsWeekendGaps() {
+        // 10일 종가 100, 13일 130 — 11·12일(주말)은 캔들 없음.
+        let candles = [candle(day: 10, close: 100), candle(day: 13, close: 130)]
+        let series = ValueSeriesBuilder.normalizedSeries(
+            candles: candles, from: day(10), to: day(13), step: .day, calendar: calendar
+        )
+        #expect(series.map(\.date) == [day(10), day(11), day(12), day(13)])
+        #expect(series[0].percent == 0)
+        #expect(series[1].percent == 0)   // 주말 = 금요일 종가 유지(평평)
+        #expect(series[2].percent == 0)
+        #expect(abs(series[3].percent - 30) < 0.0001)
+    }
+
     @Test func normalizedSeriesStartsAtZeroPercent() {
         let candles = [
             candle(day: 10, close: 200),
