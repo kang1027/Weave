@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import OSLog
 import SwiftUI
@@ -77,6 +78,7 @@ final class AppModel: ObservableObject {
     private var rotationTask: Task<Void, Never>?
     private var searchTask: Task<Void, Never>?
     private var hasStartedBackgroundWork = false
+    private var updateKeyMonitor: Any?
     var lastRefreshAt: Date?
     var rotationIndex = 0
 
@@ -253,6 +255,21 @@ final class AppModel: ObservableObject {
         }
         updater.setAutomaticChecks(settings.autoUpdateCheck)
         updater.startPeriodicChecks(everyMinutes: 5)
+        installUpdateShortcut()
+    }
+
+    /// ⌘R = 업데이트 즉시 확인. SwiftUI keyboardShortcut은 MenuBarExtra 팝오버에서
+    /// 신뢰성이 없어, 팝오버가 키 윈도우일 때만 도는 로컬 이벤트 모니터로 처리한다.
+    private func installUpdateShortcut() {
+        guard updateKeyMonitor == nil else { return }
+        updateKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // NSEvent를 액터 경계로 넘기지 않도록 여기서 Bool만 판정한다(모니터는 메인스레드 전달).
+            let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            let isCommandR = mods == .command && event.charactersIgnoringModifiers?.lowercased() == "r"
+            guard isCommandR else { return event }
+            MainActor.assumeIsolated { self.updater.checkForUpdates() }
+            return nil  // 소비 — 다른 곳으로 전달 안 함
+        }
     }
 
     func refreshIfStale() {
