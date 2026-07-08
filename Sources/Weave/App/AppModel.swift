@@ -113,7 +113,11 @@ final class AppModel: ObservableObject {
         let naver = NaverProvider(http: http)
         let yahoo = YahooProvider(http: http)
         let providers: [any MarketDataProvider] = [binance, naver, yahoo]
-        let store: any PortfolioStore = (try? JSONPortfolioStore.live())
+        // 스크린샷/데모용: WEAVE_STORE가 있으면 실제 데이터와 격리된 시드 문서를 로드한다.
+        let overrideStore = ProcessInfo.processInfo.environment["WEAVE_STORE"]
+            .map { JSONPortfolioStore(fileURL: URL(fileURLWithPath: $0)) }
+        let store: any PortfolioStore = overrideStore
+            ?? (try? JSONPortfolioStore.live())
             ?? JSONPortfolioStore(
                 fileURL: FileManager.default.temporaryDirectory
                     .appendingPathComponent("Weave/portfolio.json")
@@ -245,6 +249,12 @@ final class AppModel: ObservableObject {
             return
         }
         hasStartedBackgroundWork = true
+        // 스크린샷용: 최근 상승 구간이 잘 보이도록 차트·배지를 1M로 맞춘다.
+        // (% 배지는 기간 시장 등락 기준이라 1M가 최근 흐름을 가장 우호적으로 보여준다.)
+        if ProcessInfo.processInfo.environment["WEAVE_SHOT"] != nil {
+            homeChartPeriod = .oneMonth
+            assetReturnPeriod = .month
+        }
         restartRefreshLoop()
         restartRotationLoop()
         applyHotkey()
