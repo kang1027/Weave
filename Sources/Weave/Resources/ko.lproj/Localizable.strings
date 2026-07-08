@@ -96,7 +96,10 @@
 "Record shortcut" = "단축키 등록";
 "Refresh now" = "지금 새로고침";
 "Remove shortcut" = "단축키 제거";
+"Replace" = "교체";
+"Replace all data?" = "모든 데이터를 교체할까요?";
 "Restore failed" = "복원 실패";
+"This replaces your current data with the imported file. This can't be undone." = "현재 데이터를 가져온 파일로 교체해요. 되돌릴 수 없어요.";
 "Import data…" = "데이터 가져오기…";
 "SELL" = "매도";
 "Save Trade" = "거래 저장";

@@ -8,6 +8,7 @@ extension AppModel {
         homeSeries = []
         homeAssetSeries = []
         homeBuyMarkers = []
+        homeAssetCandles = [:]
         chartGeneration += 1
     }
 

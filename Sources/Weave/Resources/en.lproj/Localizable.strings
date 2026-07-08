@@ -96,7 +96,10 @@
 "Record shortcut" = "Record shortcut";
 "Refresh now" = "Refresh now";
 "Remove shortcut" = "Remove shortcut";
+"Replace" = "Replace";
+"Replace all data?" = "Replace all data?";
 "Restore failed" = "Restore failed";
+"This replaces your current data with the imported file. This can't be undone." = "This replaces your current data with the imported file. This can't be undone.";
 "Import data…" = "Import data…";
 "SELL" = "SELL";
 "Save Trade" = "Save Trade";

@@ -89,6 +89,15 @@ extension AppModel {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             let restored = try decoder.decode(PortfolioDocument.self, from: migrated)
+            // 되돌릴 수 없는 전체 교체 — 확인받는다.
+            let confirm = NSAlert()
+            confirm.messageText = t("Replace all data?")
+            confirm.informativeText = t("This replaces your current data with the imported file. This can't be undone.")
+            confirm.alertStyle = .warning
+            confirm.addButton(withTitle: t("Replace"))
+            confirm.addButton(withTitle: t("Cancel"))
+            NSApp.activate(ignoringOtherApps: true)
+            guard confirm.runModal() == .alertFirstButtonReturn else { return }
             document = restored
             persist()
             invalidateHomeChart()

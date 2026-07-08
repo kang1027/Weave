@@ -24,6 +24,7 @@ let package = Package(
             ],
             resources: [.process("Resources")]
         ),
-        .testTarget(name: "WeaveCoreTests", dependencies: ["WeaveCore"])
+        .testTarget(name: "WeaveCoreTests", dependencies: ["WeaveCore"]),
+        .testTarget(name: "WeaveTests", dependencies: ["Weave"])
     ]
 )

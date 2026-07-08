@@ -22,7 +22,7 @@ extension AppModel {
         }
         guard !isAtAssetLimit else { return nil }
 
-        var asset = Asset(
+        let asset = Asset(
             name: result.name,
             symbol: result.symbol,
             provider: result.provider,
@@ -32,13 +32,7 @@ extension AppModel {
             colorIndex: nextColorIndex()
         )
 
-        // 통화 확정 — 야후는 추정치라 첫 시세의 실제 통화로 교정.
-        if let quote = try? await quoteService.quote(for: asset) {
-            asset.currency = quote.currency.uppercased()
-            quotes[asset.id] = quote
-        }
-
-        // quote 대기 중 다른 추가가 끝났을 수 있다 — 한도·중복 재확인.
+        // 다른 추가가 먼저 끝났을 수 있다 — 한도·중복 재확인.
         guard !isAtAssetLimit else { return nil }
         if let existing = document.assets.first(where: {
             $0.provider == result.provider && $0.providerSymbol == result.providerSymbol
@@ -50,12 +44,38 @@ extension AppModel {
         document.assets.append(asset)
         persist()
         invalidateHomeChart()
-        await refreshFXRates()
         updateMenuBarTitle()
         searchQuery = ""
         searchResults = []
         route = [.detail(asset.id)]
+        Task { [weak self] in
+            await self?.refreshAddedAsset(assetID: asset.id)
+        }
         return asset
+    }
+
+    /// 새 자산은 먼저 화면에 반영하고, 느릴 수 있는 시세/환율은 뒤에서 채운다.
+    private func refreshAddedAsset(assetID: UUID) async {
+        await refreshFXRates()
+        updateMenuBarTitle()
+
+        guard let asset = asset(id: assetID), !asset.isManual else { return }
+        guard let quote = try? await quoteService.quote(for: asset) else {
+            staleAssetIDs.insert(assetID)
+            updateMenuBarTitle()
+            return
+        }
+
+        guard let index = document.assets.firstIndex(where: { $0.id == assetID }) else { return }
+        quotes[assetID] = quote
+        staleAssetIDs.remove(assetID)
+        if quote.currency.uppercased() != document.assets[index].currency.uppercased() {
+            document.assets[index].currency = quote.currency.uppercased()
+            persist()
+        }
+        await refreshFXRates()
+        invalidateHomeChart()
+        updateMenuBarTitle()
     }
 
     /// Manual Asset — 검색 불가 자산. 시세 갱신 없음.

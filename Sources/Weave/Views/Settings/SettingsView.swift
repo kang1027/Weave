@@ -6,6 +6,8 @@ import WeaveCore
 struct SettingsView: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
+    /// 현재 녹화 중인 단축키 레코더(하나만) — 두 레코더가 동시에 켜지지 않게 공유.
+    @State private var activeRecorder: AnyHashable?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,7 +31,9 @@ struct SettingsView: View {
                         ) {
                             HotkeyRecorderButton(
                                 hotkey: model.settings.hotkey,
-                                onChange: { model.setHotkey($0) }
+                                onChange: { model.setHotkey($0) },
+                                id: "global",
+                                active: $activeRecorder
                             )
                         }
                         SettingsRow(
@@ -38,7 +42,9 @@ struct SettingsView: View {
                         ) {
                             HotkeyRecorderButton(
                                 hotkey: model.settings.switchAssetHotkey,
-                                onChange: { model.setSwitchAssetHotkey($0) }
+                                onChange: { model.setSwitchAssetHotkey($0) },
+                                id: "switchAsset",
+                                active: $activeRecorder
                             )
                         }
                         SettingsRow(title: model.t("Menu bar rotation")) {
@@ -362,9 +368,13 @@ private struct NativePopUp<T: Hashable>: NSViewRepresentable {
             button.removeAllItems()
             button.addItems(withTitles: titles)
         }
-        if let index = options.firstIndex(where: { $0.value == selection }),
-           button.indexOfSelectedItem != index {
-            button.selectItem(at: index)
+        if let index = options.firstIndex(where: { $0.value == selection }) {
+            if button.indexOfSelectedItem != index {
+                button.selectItem(at: index)
+            }
+        } else {
+            // 저장값이 옵션에 없으면(예: import된 미지원 통화) 엉뚱한 항목을 보이지 않게 비운다.
+            button.selectItem(at: -1)
         }
         button.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
     }
@@ -384,13 +394,17 @@ private struct NativePopUp<T: Hashable>: NSViewRepresentable {
 }
 
 /// 글로벌 단축키 레코더 — 클릭 후 키 입력을 캡처한다.
+/// `active`는 여러 레코더가 공유 — 한 번에 하나만 녹화되도록(모니터 누수/멈춤 방지).
 struct HotkeyRecorderButton: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
     let hotkey: Hotkey?
     let onChange: (Hotkey?) -> Void
-    @State private var isRecording = false
+    let id: AnyHashable
+    @Binding var active: AnyHashable?
     @State private var monitor: Any?
+
+    private var isRecording: Bool { active == id }
 
     var body: some View {
         Button {
@@ -421,6 +435,10 @@ struct HotkeyRecorderButton: View {
                 }
             }
         }
+        // 다른 레코더가 녹화를 시작하면 내 모니터를 조용히 내린다.
+        .onChange(of: active) { _, newValue in
+            if newValue != id { removeMonitor() }
+        }
         .onDisappear(perform: stopRecording)
     }
 
@@ -433,7 +451,7 @@ struct HotkeyRecorderButton: View {
     }
 
     private func startRecording() {
-        isRecording = true
+        active = id // 다른 레코더는 onChange로 자동 정지.
         // accessory 앱의 팝오버는 비활성 상태라 ⌘조합 키가 프론트 앱으로 새어나간다.
         // 앱을 활성화해 로컬 모니터가 조합 키를 받을 수 있게 한다.
         NSApp.activate(ignoringOtherApps: true)
@@ -450,7 +468,11 @@ struct HotkeyRecorderButton: View {
     }
 
     private func stopRecording() {
-        isRecording = false
+        removeMonitor()
+        if active == id { active = nil }
+    }
+
+    private func removeMonitor() {
         if let monitor {
             NSEvent.removeMonitor(monitor)
             self.monitor = nil

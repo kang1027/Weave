@@ -25,20 +25,25 @@ final class HotkeyManager {
     private init() { installHandler() }
 
     /// 주어진 id의 단축키를 (재)등록. hotkey가 nil이면 해제만 한다.
-    func register(_ id: Action, hotkey: Hotkey?, action: @escaping () -> Void) {
+    /// 등록 성공 여부 반환 — 다른 액션/앱이 이미 점유한 조합이면 false(죽은 등록을 남기지 않음).
+    @discardableResult
+    func register(_ id: Action, hotkey: Hotkey?, action: @escaping () -> Void) -> Bool {
         if let existing = registrations[id.rawValue]?.ref {
             UnregisterEventHotKey(existing)
         }
         registrations[id.rawValue] = nil
-        guard let hotkey else { return }
+        guard let hotkey else { return true }
 
         var ref: EventHotKeyRef?
         let hotKeyID = EventHotKeyID(signature: OSType(0x5756_4B59), id: id.rawValue) // "WVKY"
-        RegisterEventHotKey(
+        let status = RegisterEventHotKey(
             hotkey.keyCode, hotkey.modifiers, hotKeyID,
             GetApplicationEventTarget(), 0, &ref
         )
+        // 실패(예: eventHotKeyExistsErr) 시 nil ref를 저장하지 않는다 — 안 먹는 등록 방지.
+        guard status == noErr, let ref else { return false }
         registrations[id.rawValue] = Registration(ref: ref, action: action)
+        return true
     }
 
     private func trigger(id: UInt32) {
