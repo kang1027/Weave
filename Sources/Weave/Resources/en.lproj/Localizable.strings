@@ -133,7 +133,14 @@
 "Used for totals & combined chart" = "Used for totals & combined chart";
 "Value" = "Value";
 "Value History" = "Value History";
-"Weave %@ → %@ available" = "Weave %@ → %@ available";
+"Update to %@" = "Update to %@";
+"Restart to update" = "Restart to update";
+"Update failed · Retry" = "Update failed · Retry";
+"Downloading… %@" = "Downloading… %@";
+"Preparing… %@" = "Preparing… %@";
+"Checking for updates…" = "Checking for updates…";
+"Installing…" = "Installing…";
+"You're up to date" = "You're up to date";
 "e.g. Apartment" = "e.g. Apartment";
 "vs avg %@" = "vs avg %@";
 "vs now" = "vs now";

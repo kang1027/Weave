@@ -133,7 +133,14 @@
 "Used for totals & combined chart" = "총액·통합 차트 합산용";
 "Value" = "평가액";
 "Value History" = "가치 히스토리";
-"Weave %@ → %@ available" = "Weave %1$@ → %2$@ 사용 가능";
+"Update to %@" = "%@ 업데이트";
+"Restart to update" = "재시작해서 업데이트";
+"Update failed · Retry" = "업데이트 실패 · 다시 시도";
+"Downloading… %@" = "내려받는 중… %@";
+"Preparing… %@" = "설치 준비 중… %@";
+"Checking for updates…" = "업데이트 확인 중…";
+"Installing…" = "설치 중…";
+"You're up to date" = "최신 버전이에요";
 "e.g. Apartment" = "예: 아파트";
 "vs avg %@" = "평단 대비 %@";
 "vs now" = "현재 대비";

@@ -321,23 +321,7 @@ struct HomeFooter: View {
 
     var body: some View {
         HStack {
-            if let newVersion = model.updater.availableVersion {
-                Button {
-                    model.updater.checkForUpdates()
-                } label: {
-                    Text(model.t("Weave \(WeaveInfo.version) → \(newVersion) available"))
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(theme.greenText)
-                }
-                .buttonStyle(.plain)
-            } else {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(footerText(now: context.date))
-                        .font(.system(size: 11))
-                        .foregroundStyle(theme.caps)
-                        .monospacedDigit()
-                }
-            }
+            updateSlot
             Spacer()
             Button {
                 model.push(.manage)
@@ -354,6 +338,62 @@ struct HomeFooter: View {
         .overlay(alignment: .top) {
             Rectangle().fill(theme.hair).frame(height: 1)
         }
+    }
+
+    @ViewBuilder private var updateSlot: some View {
+        switch model.updater.phase {
+        case .available(let version):
+            updateButton(model.t("Update to \(version)"), systemImage: "arrow.down.circle.fill") {
+                model.updater.startDownload()
+            }
+        case .readyToInstall:
+            updateButton(model.t("Restart to update"), systemImage: "arrow.clockwise.circle.fill") {
+                model.updater.installAndRelaunch()
+            }
+        case .failed:
+            updateButton(model.t("Update failed · Retry"), systemImage: "exclamationmark.circle.fill", tint: theme.red) {
+                model.updater.checkForUpdates()
+            }
+        case .downloading(let p):
+            updateStatus(model.t("Downloading… \(percentText(p))"))
+        case .extracting(let p):
+            updateStatus(model.t("Preparing… \(percentText(p))"))
+        case .checking:
+            updateStatus(model.t("Checking for updates…"))
+        case .installing:
+            updateStatus(model.t("Installing…"))
+        case .upToDate:
+            updateStatus(model.t("You're up to date"))
+        case .idle:
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                Text(footerText(now: context.date))
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.caps)
+                    .monospacedDigit()
+            }
+        }
+    }
+
+    private func updateButton(_ title: String, systemImage: String, tint: Color? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: systemImage).font(.system(size: 11, weight: .semibold))
+                Text(title).font(.system(size: 11, weight: .semibold))
+            }
+            .foregroundStyle(tint ?? theme.greenText)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func updateStatus(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(theme.link)
+            .monospacedDigit()
+    }
+
+    private func percentText(_ fraction: Double) -> String {
+        "\(Int((fraction * 100).rounded()))%"
     }
 
     private func footerText(now: Date) -> String {
