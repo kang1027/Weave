@@ -1,6 +1,6 @@
 import Foundation
 
 public enum WeaveInfo {
-    public static let version = "0.1.6"
+    public static let version = "0.1.7"
     public static let appName = "Weave"
 }
