@@ -564,10 +564,11 @@ private struct PerAssetChart: View {
     }
 }
 
-/// 툴팁 날짜 헤더 포맷 — 1D는 월/일 시:분(24h), 그 외는 연/월/일.
+/// 툴팁 날짜 헤더 포맷 — 1D는 월/일 시:분(24시간제 강제), 그 외는 연/월/일.
 private func tooltipDateFormat(period: ChartPeriod, locale: Locale) -> Date.FormatStyle {
     period.isIntraday
-        ? .dateTime.month(.defaultDigits).day().hour(.twoDigits(amPM: .omitted)).minute(.twoDigits).locale(locale)
+        ? .dateTime.month(.defaultDigits).day().hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)
+            .locale(ChartPeriod.hour24Locale(locale))
         : .dateTime.year().month().day().locale(locale)
 }
 

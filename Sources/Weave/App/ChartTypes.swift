@@ -54,26 +54,34 @@ enum ChartPeriod: String, CaseIterable, Identifiable {
 
     var isIntraday: Bool { self == .oneDay }
 
-    /// x축 눈금 간격 — 1D는 6시간(nn:00), 1W 일, 1M 주, 1Y 2개월.
+    /// x축 눈금 간격 — 1D는 3시간(nn:00), 1W 일, 1M 주, 1Y 2개월.
     var axisStride: (component: Calendar.Component, count: Int) {
         switch self {
-        case .oneDay: return (.hour, 6)
+        case .oneDay: return (.hour, 3)
         case .oneWeek: return (.day, 1)
         case .oneMonth: return (.weekOfYear, 1)
         case .oneYear: return (.month, 2)
         }
     }
 
-    /// x축 라벨 포맷 — 1D 시:분(24h), 1W·1M 월/일, 1Y 월.
+    /// x축 라벨 포맷 — 1D 시:분(24시간제 강제), 1W·1M 월/일, 1Y 월.
     func axisFormat(locale: Locale) -> Date.FormatStyle {
         switch self {
         case .oneDay:
-            return .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits).locale(locale)
+            return .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)
+                .locale(ChartPeriod.hour24Locale(locale))
         case .oneWeek, .oneMonth:
             return .dateTime.month(.defaultDigits).day().locale(locale)
         case .oneYear:
             return .dateTime.month(.abbreviated).locale(locale)
         }
+    }
+
+    /// 24시간제로 강제한 로케일 — `.hour(amPM:.omitted)`만으로는 12시간제(02:00=오후2시)라 hourCycle을 바꾼다.
+    static func hour24Locale(_ locale: Locale) -> Locale {
+        var components = Locale.Components(locale: locale)
+        components.hourCycle = .zeroToTwentyThree
+        return Locale(components: components)
     }
 }
 
