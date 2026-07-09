@@ -137,4 +137,4 @@ Each flow follows the "action → expected behavior" format, and reviews/QA vali
 - **F9.3 Release**: `scripts/release.sh` → ED public-key guard → sign → notarize → zip →
   EdDSA signing, all automated. Uploading the GitHub Release and adding the `docs/appcast.xml` entry are
   manual steps the script guides you through (served via GitHub Pages).
-- **F9.4 Receiving updates**: The bundled app checks the appcast daily → shows a footer badge when found → click to install.
+- **F9.4 Receiving updates**: The bundled app checks the appcast every 5 minutes → shows a footer badge when found → click to install.

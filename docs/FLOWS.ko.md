@@ -137,4 +137,4 @@
 - **F9.3 릴리즈**: `scripts/release.sh` → ED 공개키 가드 → 서명 → 공증 → zip →
   EdDSA 서명까지 자동. GitHub Release 업로드와 `docs/appcast.xml` 항목 추가는
   스크립트가 안내하는 수동 단계(GitHub Pages 서빙).
-- **F9.4 업데이트 수신**: 번들 앱이 매일 appcast 확인 → 발견 시 footer 뱃지 → 클릭 설치.
+- **F9.4 업데이트 수신**: 번들 앱이 5분마다 appcast 확인 → 발견 시 footer 뱃지 → 클릭 설치.
