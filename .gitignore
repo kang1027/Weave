@@ -6,3 +6,7 @@ dist/
 xcuserdata/
 Vendor/Sparkle/Sparkle.xcframework/
 Vendor/Sparkle/bin/
+
+# 로컬 개발 지침 — 공개 문서 아님
+CLAUDE.md
+AGENTS.md
