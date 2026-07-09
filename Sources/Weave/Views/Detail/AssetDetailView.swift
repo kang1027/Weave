@@ -15,6 +15,7 @@ struct AssetDetailView: View {
 
     @State private var deletionTarget: Trade?
     @State private var isHoveringLogo = false
+    @State private var isHoveringInvested = false
     @State private var highlightedTradeID: UUID?
     /// 거래 행 클릭 → 차트 마커 포커스 요청.
     @State private var chartFocusTradeID: UUID?
@@ -176,13 +177,16 @@ struct AssetDetailView: View {
         let invested: Decimal? = (!asset.isManual && position.averageCost > 0 && position.quantity > 0)
             ? position.averageCost * position.quantity : nil
         let currency = metric?.quote?.currency ?? asset.currency
-
         let day = metric?.dayChangePercent
         let dayText = day.map { MoneyFormatter.percent($0) }
+        // 현재 보유 평가금액 = 현재가 × 보유수량.
+        let holdingsValue: Decimal? = {
+            guard !asset.isManual, let price = metric?.quote?.price, position.quantity > 0 else { return nil }
+            return price * position.quantity
+        }()
 
-        return VStack(spacing: 6) {
-            // 현재가는 정중앙, 오늘 등락률은 그 오른쪽에 숫자로만(부호 색).
-            // 좌측에 같은 폭의 투명 사본을 둬 가격이 정확히 가운데 오게 한다.
+        return VStack(spacing: 5) {
+            // 현재 단가(중앙) + 오늘 등락률(부호 색). 좌측 투명 사본으로 단가를 정중앙에.
             HStack(alignment: .center, spacing: 8) {
                 if let dayText {
                     Text(dayText).font(.system(size: 14, weight: .semibold)).monospacedDigit().hidden()
@@ -201,31 +205,34 @@ struct AssetDetailView: View {
                 }
             }
 
-            // 그 밑에 이 종목에 넣은 총 투자금액(원금).
-            if let invested {
-                Text(model.t("Invested") + " " + MoneyFormatter.price(invested, currency: currency))
-                    .font(.system(size: 11.5))
-                    .monospacedDigit()
-                    .foregroundStyle(theme.text2)
-                    .privacyBlur(model.settings.privacyMode)
-            }
-
-            // 하단: 평가손익 금액 + 그 오른쪽에 수익률(둘 다 숫자만, 손익 색).
-            if let unrealized {
-                HStack(spacing: 6) {
-                    Text(MoneyFormatter.signedPrice(unrealized.amount, currency: unrealized.currency))
+            // 현재 보유 평가금액 + 수익률 — 투자금 대비 이익이면 초록, 손실이면 빨강.
+            if let holdingsValue, let unrealized {
+                HStack(spacing: 4) {
+                    Text(MoneyFormatter.price(holdingsValue, currency: currency))
                         .font(.system(size: 14, weight: .bold))
                         .monospacedDigit()
-                        .foregroundStyle(unrealized.amount >= 0 ? theme.greenText : theme.redText)
                         .privacyBlur(model.settings.privacyMode)
-                    Text(MoneyFormatter.percent(unrealized.percent))
+                    Text("(\(MoneyFormatter.percent(unrealized.percent)))")
                         .font(.system(size: 13, weight: .semibold))
                         .monospacedDigit()
-                        .foregroundStyle(unrealized.percent >= 0 ? theme.greenText : theme.redText)
                 }
+                .foregroundStyle(theme.upDown(unrealized.amount >= 0))
             }
         }
         .padding(.top, 6)
+        .contentShape(Rectangle())
+        .onHover { isHoveringInvested = $0 }
+        .overlay(alignment: .bottom) {
+            if isHoveringInvested, let invested {
+                TooltipBubble(
+                    text: model.t("Invested") + " " + MoneyFormatter.price(invested, currency: currency),
+                    blurText: model.settings.privacyMode
+                )
+                .offset(y: 26)
+                .allowsHitTesting(false)
+            }
+        }
+        .zIndex(1)
     }
 
     private func priceText(asset: Asset, metric: AssetMetrics?) -> String {
