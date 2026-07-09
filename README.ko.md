@@ -4,7 +4,7 @@
 
 # Weave
 
-**macOS 메뉴바 포트폴리오 트래커 — 크립토·국장·해외주식을 한눈에.**
+**한국·미국·일본 주식과 크립토를 macOS 메뉴바에서. 계정 없이 로컬 저장, 내 거래 기반 실제 손익까지.**
 
 [![Release](https://img.shields.io/github/v/release/kang1027/Weave?label=release&color=6366F1)](https://github.com/kang1027/Weave/releases)
 [![License](https://img.shields.io/github/license/kang1027/Weave?color=6366F1)](LICENSE)
@@ -33,7 +33,7 @@
 ## 기능
 
 - **메뉴바에 상주합니다.** 보유 자산 시세를 번갈아 보여주고, 클릭하면 팝오버로 펼쳐집니다.
-- **크립토·국장·해외주식.** Binance·Naver·Yahoo Finance 심볼 검색을 한곳에서 지원합니다.
+- **한국·미국·일본 주식 + 크립토.** Binance·Naver·Yahoo Finance 심볼 검색을 한곳에서 지원합니다.
 - **정확한 평단·손익.** 매수/매도 기록을 바탕으로 평단과 미실현·실현 수익률을 계산합니다.
 - **가치 히스토리 차트.** 통합·자산별(1D / 1W / 1M / 1Y) 차트에 링 게이지와 매수 마커까지 보여줍니다.
 - **수동 자산.** 티커가 없는 자산도 추적할 수 있어 부동산·현금 등 원하는 것은 무엇이든 합산됩니다.
@@ -70,7 +70,9 @@ scripts/bundle.sh          # dist/Weave.app 번들 생성
 
 ## 데이터 · 프라이버시
 
-포트폴리오는 이 Mac 로컬(`Application Support/Weave`)에만 저장되며 외부로 전송되지 않습니다. Binance·Naver·Yahoo Finance의 공개 시세·캔들만 조회하고, 계정·API 키·텔레메트리는 전혀 없습니다.
+포트폴리오는 이 Mac 로컬(`Application Support/Weave`)에만 저장되며 외부로 전송되지 않습니다. Binance·Naver·Yahoo Finance의 공개 시세·캔들만 조회하고, 계정·API 키·텔레메트리는 전혀 없습니다. 자세한 내용은 [PRIVACY.md](PRIVACY.md)·[SECURITY.md](SECURITY.md)에 있습니다.
+
+시세 데이터는 비공식 공개 엔드포인트에서 오며 지연되거나 부정확할 수 있습니다. Weave는 개인용 기록 도구이지 투자 조언이 아닙니다.
 
 ## 후원
 
@@ -78,7 +80,7 @@ Weave는 무료 오픈소스입니다. 개발을 후원하고 싶으시면 Mac A
 
 ## 문서
 
-[기능 명세](docs/FEATURES.ko.md) · [동작 플로우](docs/FLOWS.ko.md)
+[기능 명세](docs/FEATURES.ko.md) · [동작 플로우](docs/FLOWS.ko.md) · [Privacy](PRIVACY.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
 
 ## 라이선스
 

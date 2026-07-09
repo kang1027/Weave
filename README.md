@@ -4,7 +4,7 @@
 
 # Weave
 
-**A quiet menu-bar portfolio tracker for macOS — crypto, Korean & global stocks, all in one glance.**
+**Korea, US & Japan stocks + crypto — right in your macOS menu bar. Local-only, no account, real P&L from your own trades.**
 
 [![Release](https://img.shields.io/github/v/release/kang1027/Weave?label=release&color=6366F1)](https://github.com/kang1027/Weave/releases)
 [![License](https://img.shields.io/github/license/kang1027/Weave?color=6366F1)](LICENSE)
@@ -33,7 +33,7 @@
 ## Features
 
 - **Lives in your menu bar.** A rotating ticker of your holdings — click for the full popover.
-- **Crypto, Korean & global stocks.** Symbol search across Binance, Naver, and Yahoo Finance.
+- **Korea, US & Japan stocks + crypto.** One symbol search across Binance, Naver, and Yahoo Finance.
 - **Real cost basis & P&L.** Average cost, unrealized and realized returns computed from your own buy/sell history.
 - **Value-history charts.** Combined and per-asset (1D / 1W / 1M / 1Y), ring gauges, and buy markers.
 - **Manual assets.** Track anything without a ticker — real estate, cash, whatever you want counted.
@@ -70,7 +70,9 @@ scripts/bundle.sh          # build dist/Weave.app
 
 ## Data & privacy
 
-Your portfolio is stored only on this Mac (`Application Support/Weave`) and is never sent anywhere. Weave reads public quotes and candles from Binance, Naver, and Yahoo Finance — no accounts, no API keys, no telemetry.
+Your portfolio is stored only on this Mac (`Application Support/Weave`) and is never sent anywhere. Weave reads public quotes and candles from Binance, Naver, and Yahoo Finance — no accounts, no API keys, no telemetry. Details in [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md).
+
+Market data comes from unofficial public endpoints and may be delayed or inaccurate. Weave is a personal tracking tool, not investment advice.
 
 ## Support
 
@@ -78,7 +80,7 @@ Weave is free and open source. If you'd like to support development, you can als
 
 ## Documentation
 
-[Features](docs/FEATURES.md) · [Flows](docs/FLOWS.md)
+[Features](docs/FEATURES.md) · [Flows](docs/FLOWS.md) · [Privacy](PRIVACY.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
 
 ## License
 
