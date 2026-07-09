@@ -163,7 +163,16 @@ struct AssetDetailView: View {
     // MARK: - 현재가 + 배지
 
     private func priceSection(asset: Asset, metric: AssetMetrics?, position: PositionSnapshot) -> some View {
-        VStack(spacing: 7) {
+        // 미실현 평가손익 — 보유 중인 실물 자산일 때만(수량·평단 있음).
+        let unrealized: (amount: Decimal, percent: Decimal, currency: String)? = {
+            guard !asset.isManual, position.averageCost > 0,
+                  let price = metric?.quote?.price, position.quantity > 0 else { return nil }
+            let percent = ((price - position.averageCost) / position.averageCost * 100).rounded(scale: 2)
+            let amount = (price - position.averageCost) * position.quantity
+            return (amount, percent, metric?.quote?.currency ?? asset.currency)
+        }()
+
+        return VStack(spacing: 7) {
             Text(priceText(asset: asset, metric: metric))
                 .font(.system(size: 24, weight: .bold))
                 .monospacedDigit()
@@ -178,22 +187,22 @@ struct AssetDetailView: View {
                         style: percent >= 0 ? .up : .down
                     )
                 }
-                if !asset.isManual, position.averageCost > 0,
-                   let price = metric?.quote?.price, position.quantity > 0 {
-                    let vsAvg = ((price - position.averageCost) / position.averageCost * 100)
-                        .rounded(scale: 2)
-                    // 미실현 평가손익 금액(자산 통화) — "그래서 얼마?"를 % 옆에 함께.
-                    let pnl = (price - position.averageCost) * position.quantity
-                    let currency = metric?.quote?.currency ?? asset.currency
-                    let vsAvgText = model.t("vs avg \(MoneyFormatter.percent(vsAvg))")
+                if let unrealized {
                     ChangeBadge(
-                        text: model.settings.privacyMode
-                            ? vsAvgText
-                            : vsAvgText + " · " + MoneyFormatter.signedPrice(pnl, currency: currency),
+                        text: model.t("vs avg \(MoneyFormatter.percent(unrealized.percent))"),
                         style: .gray,
                         minWidth: 0
                     )
                 }
+            }
+
+            // "그래서 얼마?" — 평가손익 금액은 넘치지 않게 별도 줄에, 손익 색으로.
+            if let unrealized {
+                Text(MoneyFormatter.signedPrice(unrealized.amount, currency: unrealized.currency))
+                    .font(.system(size: 13, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(unrealized.amount >= 0 ? theme.greenText : theme.redText)
+                    .privacyBlur(model.settings.privacyMode)
             }
         }
         .padding(.top, 6)
