@@ -1,3 +1,5 @@
+[English](FEATURES.md) · **한국어**
+
 # Weave 기능 명세
 
 macOS 메뉴바 포트폴리오 트래커. 메뉴바에 핀 자산 시세를 상시 표시하고,

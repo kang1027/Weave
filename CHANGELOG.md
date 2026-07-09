@@ -2,15 +2,17 @@
 
 ## 0.1.0 — 2026-07-05
 
-첫 릴리즈.
+First release.
 
-- 메뉴바 시세 로테이션(핀 고정·풀/컴팩트/가격만 형식) + 팝오버 대시보드
-- Binance / Naver / Yahoo 3소스 심볼 라이브서치로 자산 추가
-- 링 게이지 3종(Day·Return·Assets) — 자산색 세그먼트, hover 툴팁
-- Value History 차트 — 통합/자산별 모드, 기간 필터, 매수 로고 마커
-- 자산 상세 — 실캔들 차트·평단선·매수/매도 마커·크로스헤어
-- 거래 기록(매수/매도) — 자동 계산, 과거 종가 프리필, 이동평균 평단·실현손익
-- Manual Asset(시세 없는 수동 자산)
-- Slate / Light 테마(시스템 연동), 한국어/English
-- 프라이버시 모드(금액 마스킹), 기준 통화(KRW/USD/JPY) 환산 합산
-- 데이터 백업/복원, 캔들 캐시, Sparkle 자동 업데이트
+- Menu-bar quote rotation (pin, full / compact / price-only formats) + popover dashboard
+- Add assets via live symbol search across three sources: Binance / Naver / Yahoo
+- Three ring gauges (Day · Return · Assets) — per-asset color segments, hover tooltips
+- Value History chart — Combined / By Asset modes, period filter, buy logo markers
+- Asset detail — real candle chart, average-cost line, buy/sell markers, crosshair
+- Trade log (buy/sell) — automatic calculation, historical close prefill, moving-average cost & realized P&L
+- Manual assets (no live quote)
+- Slate / Light themes (system-linked), Korean / English
+- Privacy mode (amount masking), base-currency (KRW / USD / JPY) conversion & totals
+- Data backup/restore, candle cache, Sparkle auto-update
+
+Per-release notes for later versions live on the [GitHub Releases](https://github.com/kang1027/Weave/releases) page.

@@ -1,3 +1,5 @@
+[English](FLOWS.md) · **한국어**
+
 # Weave 동작 플로우 (QA/리뷰 기준)
 
 `docs/FEATURES.md`의 명세를 실제 사용자 동작 단위로 풀어놓은 전수 목록.
