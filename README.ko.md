@@ -51,6 +51,10 @@ brew install --cask kang1027/weave/weave-pt
 
 한 줄이면 tap과 설치가 한 번에 된다. Developer ID로 서명 + Apple 공증되어 Gatekeeper 경고 없이 실행되고, Sparkle로 자동 업데이트된다. 업데이트는 `brew upgrade --cask weave-pt`.
 
+### 직접 다운로드
+
+Homebrew가 싫으면 [releases](https://github.com/kang1027/Weave/releases/latest)에서 최신 `.dmg`를 받아 열고 **Weave**를 Applications 폴더로 드래그하면 된다. 서명·공증돼 있어 Gatekeeper 경고 없음.
+
 ### 소스 빌드
 
 macOS 14+ 와 Swift 툴체인 필요.

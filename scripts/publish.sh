@@ -59,7 +59,7 @@ fi
 # ── 4. 서명·공증 릴리즈 (dry-run은 건너뜀) ─────────────────────
 if [ "$DRY_RUN" = 1 ]; then
   echo "  [dry-run] scripts/release.sh (서명·공증 생략)"
-  SHA256="DRYRUN_SHA256"; LENGTH="0"; EDSIG="DRYRUN_EDSIG"; ZIP="dist/Weave-$NEW.zip"
+  SHA256="DRYRUN_SHA256"; LENGTH="0"; EDSIG="DRYRUN_EDSIG"; ZIP="dist/Weave-$NEW.zip"; DMG="dist/Weave-$NEW.dmg"
 else
   scripts/release.sh
   # shellcheck disable=SC1091
@@ -109,11 +109,12 @@ NOTES="${NOTES:-Weave $NEW
 \`\`\`sh
 brew upgrade --cask weave-pt   # 또는: brew install --cask kang1027/weave/weave-pt
 \`\`\`
-기존 사용자는 Sparkle로 자동 업데이트됩니다.}"
+기존 사용자는 Sparkle로 자동 업데이트됩니다.
+Homebrew를 안 쓰면 아래 \`Weave-$NEW.dmg\`를 받아 열고 Weave를 Applications로 드래그하세요.}"
 if [ "$DRY_RUN" = 1 ]; then
-  echo "  [dry-run] gh release create v$NEW $ZIP"
+  echo "  [dry-run] gh release create v$NEW $ZIP $DMG"
 else
-  gh release create "v$NEW" "$ZIP" --title "Weave $NEW" --notes "$NOTES"
+  gh release create "v$NEW" "$ZIP" "$DMG" --title "Weave $NEW" --notes "$NOTES"
 fi
 
 # ── 8. Homebrew cask 갱신 (fresh clone → version/sha256 → push) ─

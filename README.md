@@ -51,6 +51,10 @@ brew install --cask kang1027/weave/weave-pt
 
 One command — it taps and installs in one go. Signed with a Developer ID and notarized by Apple, so it launches without Gatekeeper warnings and keeps itself up to date through Sparkle. Update anytime with `brew upgrade --cask weave-pt`.
 
+### Direct download
+
+Prefer not to use Homebrew? Grab the latest `.dmg` from the [releases page](https://github.com/kang1027/Weave/releases/latest), open it, and drag **Weave** to your Applications folder. It's signed and notarized, so no Gatekeeper warning.
+
 ### Build from source
 
 Requires macOS 14+ and a Swift toolchain.

@@ -71,17 +71,33 @@ else
   echo "  ⚠ sign_update 도구를 찾지 못함"
 fi
 
+# 수동 다운로드용 DMG — 이미 staple된 앱을 담아 DMG 자체도 공증·staple.
+# (brew/Sparkle은 zip 그대로. DMG는 릴리즈 페이지 직접 다운로드용.)
+echo "▸ DMG 생성 + notarize"
+DMG="dist/Weave-${VERSION}.dmg"
+STAGE=$(mktemp -d)
+cp -R "$APP" "$STAGE/Weave.app"
+ln -s /Applications "$STAGE/Applications"
+rm -f "$DMG"
+hdiutil create -volname "Weave" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+rm -rf "$STAGE"
+codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG"
+xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
+xcrun stapler staple "$DMG"
+
 # 후속 자동화(publish.sh)가 읽을 릴리즈 메타데이터 — dist/는 gitignore라 커밋 안 됨.
 SHA256=$(shasum -a 256 "$ZIP" | awk '{print $1}')
 [ -z "$LENGTH" ] && LENGTH=$(stat -f%z "$ZIP")
 {
   echo "VERSION='${VERSION}'"
   echo "ZIP='${ZIP}'"
+  echo "DMG='${DMG}'"
   echo "SHA256='${SHA256}'"
   echo "LENGTH='${LENGTH}'"
   echo "EDSIG='${EDSIG}'"
 } > dist/release-info.env
 
 echo "✓ ${ZIP}"
+echo "✓ ${DMG}"
 echo "  메타데이터: dist/release-info.env (sha256/length/edSignature)"
 echo "  배포 자동화: scripts/publish.sh"
