@@ -44,6 +44,10 @@ scripts/publish.sh patch     # 0.1.0 → 0.1.1
 scripts/publish.sh minor     # 0.1.0 → 0.2.0
 scripts/publish.sh major     # 0.1.0 → 1.0.0
 scripts/publish.sh 0.3.0     # 명시적 버전
+
+# 릴리즈 노트 상단에 변경점 노출(권장): HIGHLIGHTS 에 Added/Fixed/Changed 를 준다.
+HIGHLIGHTS='- Added: Japan stock support\n- Fixed: chart period sync' \
+  scripts/publish.sh minor
 ```
 
 하는 일:

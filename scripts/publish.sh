@@ -103,9 +103,16 @@ run "git push origin main"
 run "git push origin v$NEW"
 
 # ── 7. GitHub Release ──────────────────────────────────────────
+# HIGHLIGHTS="- Added: …\n- Fixed: …" 로 이번 릴리즈의 변경점을 맨 위에 노출(권장).
+NEWS=""
+[ -n "${HIGHLIGHTS:-}" ] && NEWS="## What's new
+
+$(printf '%b' "$HIGHLIGHTS")
+
+"
 NOTES="${NOTES:-Weave $NEW
 
-**Install / update**
+${NEWS}**Install / update**
 \`\`\`sh
 brew upgrade --cask weave-pt   # or: brew install --cask kang1027/weave/weave-pt
 \`\`\`
