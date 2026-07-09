@@ -1,0 +1,49 @@
+name: Bug report
+description: Something isn't working as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the popover
+        2. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Weave version
+      description: Shown in the popover footer (e.g. 0.1.16).
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "e.g. 14.5 / 15.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install Weave?
+      options:
+        - Homebrew cask
+        - Direct .dmg download
+        - Built from source
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, logs, or context. Do not include real account data.
