@@ -15,7 +15,18 @@
 
 <br>
 
-<img src="assets/screenshot.png" width="320" alt="Weave — menu-bar popover with ring gauges, value-history chart and holdings">
+<img src="assets/screenshot-menubar.png" width="300" alt="Weave in the macOS menu bar"><br>
+<sub>Lives in your menu bar</sub>
+
+<br><br>
+
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/screenshot.png" width="230" alt="Portfolio overview"><br><sub><b>Portfolio</b></sub></td>
+    <td align="center"><img src="assets/screenshot-detail.png" width="230" alt="Asset detail"><br><sub><b>Asset detail</b></sub></td>
+    <td align="center"><img src="assets/screenshot-byasset.png" width="230" alt="By-asset chart"><br><sub><b>By asset</b></sub></td>
+  </tr>
+</table>
 
 </div>
 

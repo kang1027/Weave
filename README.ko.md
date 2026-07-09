@@ -15,7 +15,18 @@
 
 <br>
 
-<img src="assets/screenshot.png" width="320" alt="Weave — 링 게이지·가치 히스토리 차트·보유 자산이 담긴 메뉴바 팝오버">
+<img src="assets/screenshot-menubar.png" width="300" alt="macOS 메뉴바의 Weave"><br>
+<sub>메뉴바에 상주</sub>
+
+<br><br>
+
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/screenshot.png" width="230" alt="포트폴리오 개요"><br><sub><b>포트폴리오</b></sub></td>
+    <td align="center"><img src="assets/screenshot-detail.png" width="230" alt="종목 세부"><br><sub><b>종목 세부</b></sub></td>
+    <td align="center"><img src="assets/screenshot-byasset.png" width="230" alt="자산별 차트"><br><sub><b>자산별</b></sub></td>
+  </tr>
+</table>
 
 </div>
 
