@@ -134,6 +134,7 @@
 "Value" = "평가액";
 "Value History" = "가치 히스토리";
 "Update to %@" = "%@ 업데이트";
+"Update & restart to %@" = "%@ 업데이트 후 재시작";
 "Restart to update" = "재시작해서 업데이트";
 "Update failed · Retry" = "업데이트 실패 · 다시 시도";
 "Downloading… %@" = "내려받는 중… %@";

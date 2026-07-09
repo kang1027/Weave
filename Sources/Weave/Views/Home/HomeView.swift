@@ -353,7 +353,7 @@ struct HomeFooter: View {
     @ViewBuilder private var updateLine: some View {
         switch model.updater.phase {
         case .available(let version):
-            updateButton(model.t("Update to \(version)"), systemImage: "arrow.down.circle.fill") {
+            updateButton(model.t("Update & restart to \(version)"), systemImage: "arrow.down.circle.fill") {
                 model.updater.startDownload()
             }
         case .readyToInstall:

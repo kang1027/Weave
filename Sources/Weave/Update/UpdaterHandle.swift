@@ -23,6 +23,8 @@ final class UpdaterHandle: NSObject, ObservableObject {
     private var updater: SPUUpdater?
     private var updateFoundReply: ((SPUUserUpdateChoice) -> Void)?
     private var installReply: ((SPUUserUpdateChoice) -> Void)?
+    /// "업데이트" 한 번 클릭 → 다운로드 끝나면 사용자 재확인 없이 바로 설치·재시작.
+    private var autoInstallWhenReady = false
     private var pendingVersion = ""
     private var expectedLength: UInt64 = 0
     private var receivedLength: UInt64 = 0
@@ -79,10 +81,11 @@ final class UpdaterHandle: NSObject, ObservableObject {
 
     // MARK: - footer 버튼 액션
 
-    /// "업데이트" 클릭 → 다운로드 시작(발견 단계의 reply 소비).
+    /// "업데이트" 클릭 → 다운로드 시작. 완료되면 자동으로 설치·재시작까지 진행(원클릭).
     func startDownload() {
         guard let reply = updateFoundReply else { return }
         updateFoundReply = nil
+        autoInstallWhenReady = true
         reply(.install)
     }
 
@@ -131,6 +134,7 @@ extension UpdaterHandle: SPUUserDriver {
     func showUpdaterError(_ error: Error) async {
         updateFoundReply = nil
         installReply = nil
+        autoInstallWhenReady = false
         phase = .failed
     }
 
@@ -161,6 +165,13 @@ extension UpdaterHandle: SPUUserDriver {
     }
 
     func showReady(toInstallAndRelaunch reply: @escaping (SPUUserUpdateChoice) -> Void) {
+        // 원클릭 경로: 다운로드가 끝났으니 재확인 없이 바로 설치·재시작.
+        if autoInstallWhenReady {
+            autoInstallWhenReady = false
+            phase = .installing
+            reply(.install)
+            return
+        }
         installReply = reply
         phase = .readyToInstall(pendingVersion)
     }
@@ -178,6 +189,7 @@ extension UpdaterHandle: SPUUserDriver {
     func dismissUpdateInstallation() {
         updateFoundReply = nil
         installReply = nil
+        autoInstallWhenReady = false
         switch phase {
         case .failed: break  // 오류 표시는 사용자가 다시 시도할 때까지 유지
         default: phase = .idle

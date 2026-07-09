@@ -134,6 +134,7 @@
 "Value" = "Value";
 "Value History" = "Value History";
 "Update to %@" = "Update to %@";
+"Update & restart to %@" = "Update & restart to %@";
 "Restart to update" = "Restart to update";
 "Update failed · Retry" = "Update failed · Retry";
 "Downloading… %@" = "Downloading… %@";
