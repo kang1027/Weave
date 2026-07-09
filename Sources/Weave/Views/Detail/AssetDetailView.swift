@@ -172,7 +172,12 @@ struct AssetDetailView: View {
             return (amount, percent, metric?.quote?.currency ?? asset.currency)
         }()
 
-        return VStack(spacing: 7) {
+        // 이 종목에 넣은 원금(보유분 취득원가) — 평단 × 보유수량.
+        let invested: Decimal? = (!asset.isManual && position.averageCost > 0 && position.quantity > 0)
+            ? position.averageCost * position.quantity : nil
+        let currency = metric?.quote?.currency ?? asset.currency
+
+        return VStack(spacing: 6) {
             Text(priceText(asset: asset, metric: metric))
                 .font(.system(size: 24, weight: .bold))
                 .monospacedDigit()
@@ -180,14 +185,22 @@ struct AssetDetailView: View {
                 .foregroundStyle(theme.text)
                 .privacyBlur(model.settings.privacyMode)
 
-            HStack(spacing: 5) {
-                if let percent = metric?.dayChangePercent {
-                    ChangeBadge(
-                        text: MoneyFormatter.percent(percent),
-                        style: percent >= 0 ? .up : .down
-                    )
-                }
-                if let unrealized {
+            // 오늘 등락.
+            if let percent = metric?.dayChangePercent {
+                ChangeBadge(
+                    text: MoneyFormatter.percent(percent),
+                    style: percent >= 0 ? .up : .down
+                )
+            }
+
+            // 평가손익: 금액 + 그 오른쪽에 vs avg 수익률(한 묶음).
+            if let unrealized {
+                HStack(spacing: 6) {
+                    Text(MoneyFormatter.signedPrice(unrealized.amount, currency: unrealized.currency))
+                        .font(.system(size: 14, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(unrealized.amount >= 0 ? theme.greenText : theme.redText)
+                        .privacyBlur(model.settings.privacyMode)
                     ChangeBadge(
                         text: model.t("vs avg \(MoneyFormatter.percent(unrealized.percent))"),
                         style: .gray,
@@ -196,12 +209,12 @@ struct AssetDetailView: View {
                 }
             }
 
-            // "그래서 얼마?" — 평가손익 금액은 넘치지 않게 별도 줄에, 손익 색으로.
-            if let unrealized {
-                Text(MoneyFormatter.signedPrice(unrealized.amount, currency: unrealized.currency))
-                    .font(.system(size: 13, weight: .semibold))
+            // 이 종목에 넣은 원금.
+            if let invested {
+                Text(model.t("Invested") + " " + MoneyFormatter.price(invested, currency: currency))
+                    .font(.system(size: 11.5))
                     .monospacedDigit()
-                    .foregroundStyle(unrealized.amount >= 0 ? theme.greenText : theme.redText)
+                    .foregroundStyle(theme.text2)
                     .privacyBlur(model.settings.privacyMode)
             }
         }
