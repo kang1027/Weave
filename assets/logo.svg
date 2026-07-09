@@ -6,10 +6,10 @@
       <stop offset="0.55" stop-color="#7C5CF0"/>
       <stop offset="1" stop-color="#A855F7"/>
     </linearGradient>
-    <radialGradient id="hi" cx="0.3" cy="0.24" r="0.85">
-      <stop stop-color="#ffffff" stop-opacity="0.30"/>
-      <stop offset="0.6" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
+    <linearGradient id="hi" x1="128" y1="0" x2="128" y2="150" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
     <linearGradient id="area" x1="0" y1="88" x2="0" y2="204" gradientUnits="userSpaceOnUse">
       <stop stop-color="#ffffff" stop-opacity="0.38"/>
       <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
