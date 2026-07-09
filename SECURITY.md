@@ -9,7 +9,7 @@ Only the latest release is supported. Please update before reporting an issue.
 Please **do not** open a public issue for security problems.
 
 - Use GitHub's [private vulnerability reporting](https://github.com/kang1027/Weave/security/advisories/new), or
-- email **kang@opq.ooo**.
+- email **kang3171611@naver.com**.
 
 Include steps to reproduce and the affected version. I aim to acknowledge reports within a few days and will keep you updated on a fix.
 

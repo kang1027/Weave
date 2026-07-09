@@ -36,4 +36,4 @@ Market data comes from **unofficial public endpoints** and may be delayed, incom
 
 ## Questions
 
-Open an issue or email **kang@opq.ooo**.
+Open an issue or email **kang3171611@naver.com**.
