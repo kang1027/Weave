@@ -10,8 +10,8 @@
       <stop stop-color="#ffffff" stop-opacity="0.16"/>
       <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
-    <linearGradient id="area" x1="0" y1="88" x2="0" y2="204" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffffff" stop-opacity="0.38"/>
+    <linearGradient id="area" x1="0" y1="70" x2="0" y2="210" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.26"/>
       <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
     <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
@@ -22,20 +22,28 @@
   <rect width="256" height="256" rx="60" fill="url(#bg)"/>
   <rect width="256" height="256" rx="60" fill="url(#hi)"/>
 
-  <path d="M52 158 L90 196 L128 128 L166 166 L206 92 L206 204 L52 204 Z" fill="url(#area)"/>
+  <!-- faint chart grid to fill the canvas -->
+  <g stroke="#ffffff" stroke-opacity="0.09" stroke-width="1.6" stroke-linecap="round">
+    <line x1="40" y1="74" x2="216" y2="74"/>
+    <line x1="40" y1="118" x2="216" y2="118"/>
+    <line x1="40" y1="162" x2="216" y2="162"/>
+    <line x1="40" y1="206" x2="216" y2="206"/>
+  </g>
+
+  <path d="M44 150 L86 200 L128 116 L170 158 L212 68 L212 210 L44 210 Z" fill="url(#area)"/>
 
   <!-- soft glow behind the line -->
-  <path d="M52 158 L90 196 L128 128 L166 166 L206 92" stroke="#ffffff" stroke-opacity="0.45" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+  <path d="M44 150 L86 200 L128 116 L170 158 L212 68" stroke="#ffffff" stroke-opacity="0.45" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
   <!-- crisp line -->
-  <path d="M52 158 L90 196 L128 128 L166 166 L206 92" stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M44 150 L86 200 L128 116 L170 158 L212 68" stroke="#ffffff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
 
-  <circle cx="52" cy="158" r="8" fill="#ffffff"/>
-  <circle cx="90" cy="196" r="8" fill="#ffffff"/>
-  <circle cx="128" cy="128" r="8" fill="#ffffff"/>
-  <circle cx="166" cy="166" r="8" fill="#ffffff"/>
+  <circle cx="44" cy="150" r="8.5" fill="#ffffff"/>
+  <circle cx="86" cy="200" r="8.5" fill="#ffffff"/>
+  <circle cx="128" cy="116" r="8.5" fill="#ffffff"/>
+  <circle cx="170" cy="158" r="8.5" fill="#ffffff"/>
   <!-- endpoint pops with a halo -->
-  <circle cx="206" cy="92" r="18" fill="#ffffff" fill-opacity="0.35" filter="url(#glow)"/>
-  <circle cx="206" cy="92" r="11" fill="#ffffff"/>
+  <circle cx="212" cy="68" r="19" fill="#ffffff" fill-opacity="0.35" filter="url(#glow)"/>
+  <circle cx="212" cy="68" r="11.5" fill="#ffffff"/>
 
   <!-- glassy inner edge -->
   <rect x="1" y="1" width="254" height="254" rx="59" stroke="#ffffff" stroke-opacity="0.14" stroke-width="1.5"/>
