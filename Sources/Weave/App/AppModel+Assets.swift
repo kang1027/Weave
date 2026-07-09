@@ -121,6 +121,7 @@ extension AppModel {
         LogoStore.delete(fileName: asset(id: id)?.customLogoFileName)
         document.assets.removeAll { $0.id == id }
         document.trades.removeAll { $0.assetID == id }
+        document.settings.hiddenHomeChartAssetIDs.removeAll { $0 == id }
         quotes[id] = nil
         staleAssetIDs.remove(id)
         persist()

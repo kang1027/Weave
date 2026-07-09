@@ -108,4 +108,37 @@ private struct DelayedQuoteProvider: MarketDataProvider {
 
         #expect(model.homeAssetCandles.isEmpty)
     }
+
+    @MainActor
+    @Test func togglesHomeChartAssetVisibilityInSettings() {
+        let state = DelayedQuoteState()
+        let model = makeModel(provider: DelayedQuoteProvider(state: state))
+        let first = Asset(
+            name: "Bitcoin",
+            symbol: "BTC",
+            provider: .binance,
+            providerSymbol: "BTCUSDT",
+            market: .crypto,
+            currency: "USD"
+        )
+        let second = Asset(
+            name: "Samsung",
+            symbol: "005930",
+            provider: .naver,
+            providerSymbol: "005930",
+            market: .koreaStock,
+            currency: "KRW"
+        )
+        model.document.assets = [first, second]
+
+        model.toggleHomeChartAssetVisibility(assetID: second.id)
+
+        #expect(model.isHomeChartAssetHidden(second.id))
+        #expect(model.settings.hiddenHomeChartAssetIDs == [second.id])
+
+        model.toggleHomeChartAssetVisibility(assetID: second.id)
+
+        #expect(!model.isHomeChartAssetHidden(second.id))
+        #expect(model.settings.hiddenHomeChartAssetIDs.isEmpty)
+    }
 }

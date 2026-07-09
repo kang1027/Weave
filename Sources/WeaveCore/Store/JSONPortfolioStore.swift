@@ -30,7 +30,9 @@ public struct JSONPortfolioStore: PortfolioStore {
             let migrated = try PortfolioMigrator.migrate(data)
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            return try decoder.decode(PortfolioDocument.self, from: migrated)
+            var document = try decoder.decode(PortfolioDocument.self, from: migrated)
+            document.version = PortfolioDocument.currentVersion
+            return document
         } catch {
             // 읽지 못한 문서를 이후 persist()가 빈 문서로 덮어쓰지 않게
             // 원본을 백업으로 보존한 뒤 실패를 전파한다.
@@ -74,7 +76,8 @@ public enum PortfolioMigrator {
         guard version <= PortfolioDocument.currentVersion else {
             throw MigrationError.newerThanApp(version)
         }
-        // version 1이 최초 스키마 — 아직 마이그레이션 단계 없음.
+        // v1 -> v2: settings.hiddenHomeChartAssetIDs 추가.
+        // 디코더 기본값으로 채워서 기존 Decimal JSON 정밀도를 건드리지 않는다.
         return data
     }
 

@@ -6,12 +6,10 @@ import WeaveCore
 struct ValueHistoryChart: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
-    /// By Asset 차트에서 범례로 끈 자산(차트에서만 숨김, 전체 숨김과 별개).
-    @State private var hiddenChartAssets: Set<UUID> = []
 
     /// 범례로 켜둔(표시할) 자산 라인.
     private var visibleLines: [AssetLineSeries] {
-        model.homeAssetSeries.filter { !hiddenChartAssets.contains($0.asset.id) }
+        model.homeAssetSeries.filter { !model.isHomeChartAssetHidden($0.asset.id) }
     }
 
     var body: some View {
@@ -85,10 +83,9 @@ struct ValueHistoryChart: View {
     private var assetLegend: some View {
         FlowLayout(spacing: 10, rowSpacing: 5, alignment: .center) {
             ForEach(model.homeAssetSeries) { line in
-                let hidden = hiddenChartAssets.contains(line.asset.id)
+                let hidden = model.isHomeChartAssetHidden(line.asset.id)
                 Button {
-                    if hidden { hiddenChartAssets.remove(line.asset.id) }
-                    else { hiddenChartAssets.insert(line.asset.id) }
+                    model.toggleHomeChartAssetVisibility(assetID: line.asset.id)
                 } label: {
                     HStack(spacing: 4) {
                         Circle()

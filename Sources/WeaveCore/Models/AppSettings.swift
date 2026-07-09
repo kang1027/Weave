@@ -66,6 +66,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var dayRingFullPercent: Int
     /// Return 링이 꽉 차는 절대 수익률%(만점).
     public var returnRingFullPercent: Int
+    /// 홈 Value History 자산별 범례에서 차트 라인을 숨긴 자산 ID.
+    public var hiddenHomeChartAssetIDs: [UUID]
 
     public init(
         theme: ThemePreference = .system,
@@ -81,7 +83,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         hotkey: Hotkey? = Hotkey.defaultToggle,
         switchAssetHotkey: Hotkey? = Hotkey.defaultSwitchAsset,
         dayRingFullPercent: Int = 2,
-        returnRingFullPercent: Int = 25
+        returnRingFullPercent: Int = 25,
+        hiddenHomeChartAssetIDs: [UUID] = []
     ) {
         self.theme = theme
         self.language = language
@@ -97,6 +100,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.switchAssetHotkey = switchAssetHotkey
         self.dayRingFullPercent = dayRingFullPercent
         self.returnRingFullPercent = returnRingFullPercent
+        self.hiddenHomeChartAssetIDs = hiddenHomeChartAssetIDs
     }
 
     enum CodingKeys: String, CodingKey {
@@ -104,6 +108,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case quoteRefreshSeconds, rotationSeconds, menuBarFormat
         case privacyMode, launchAtLogin, autoUpdateCheck, hotkey, switchAssetHotkey
         case dayRingFullPercent, returnRingFullPercent
+        case hiddenHomeChartAssetIDs
     }
 
     // 필드 추가·미지의 enum 값·타입 불일치가 있어도 문서 전체 로드가 깨지지 않게
@@ -125,6 +130,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         switchAssetHotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .switchAssetHotkey)) ?? nil ?? d.switchAssetHotkey
         dayRingFullPercent = (try? c.decodeIfPresent(Int.self, forKey: .dayRingFullPercent)) ?? nil ?? d.dayRingFullPercent
         returnRingFullPercent = (try? c.decodeIfPresent(Int.self, forKey: .returnRingFullPercent)) ?? nil ?? d.returnRingFullPercent
+        hiddenHomeChartAssetIDs = (try? c.decodeIfPresent([UUID].self, forKey: .hiddenHomeChartAssetIDs)) ?? nil ?? d.hiddenHomeChartAssetIDs
     }
 
     private static func lenientEnum<T: RawRepresentable>(

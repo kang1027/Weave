@@ -30,6 +30,7 @@ import Testing
         var settings = AppSettings()
         settings.baseCurrency = "USD"
         settings.rotationSeconds = 30
+        settings.hiddenHomeChartAssetIDs = [asset.id]
         let doc = PortfolioDocument(assets: [asset], trades: [trade], settings: settings)
 
         try store.save(doc)
@@ -48,6 +49,7 @@ import Testing
         #expect(doc.settings.quoteRefreshSeconds == 300)
         #expect(doc.settings.theme == .system)
         #expect(doc.settings.privacyMode == false)
+        #expect(doc.settings.hiddenHomeChartAssetIDs.isEmpty)
     }
 
     @Test func unknownEnumValuesFallBackWithoutFailingDocument() throws {
@@ -62,6 +64,22 @@ import Testing
         #expect(doc.settings.theme == .system)
         #expect(doc.settings.menuBarFormat == .full)
         #expect(doc.settings.rotationSeconds == 30)
+    }
+
+    @Test func olderSchemaVersionLoadsAsCurrentVersion() throws {
+        let store = tempStore()
+        let json = """
+        {"version":1,"assets":[],"trades":[],"settings":{"baseCurrency":"USD"}}
+        """
+        try FileManager.default.createDirectory(
+            at: store.fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try Data(json.utf8).write(to: store.fileURL)
+
+        let doc = try store.load()
+
+        #expect(doc.version == PortfolioDocument.currentVersion)
+        #expect(doc.settings.hiddenHomeChartAssetIDs.isEmpty)
     }
 
     @Test func unreadableFileIsBackedUpBeforeThrowing() throws {

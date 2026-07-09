@@ -12,6 +12,25 @@ extension AppModel {
         chartGeneration += 1
     }
 
+    func isHomeChartAssetHidden(_ assetID: UUID) -> Bool {
+        settings.hiddenHomeChartAssetIDs.contains(assetID)
+    }
+
+    func toggleHomeChartAssetVisibility(assetID: UUID) {
+        guard document.assets.contains(where: { $0.id == assetID }) else { return }
+
+        var hiddenIDs = Set(settings.hiddenHomeChartAssetIDs)
+        if hiddenIDs.contains(assetID) {
+            hiddenIDs.remove(assetID)
+        } else {
+            hiddenIDs.insert(assetID)
+        }
+
+        var next = settings
+        next.hiddenHomeChartAssetIDs = document.assets.map(\.id).filter { hiddenIDs.contains($0) }
+        settings = next
+    }
+
     /// 통합/자산별 시계열 + 매수 마커 재계산.
     /// 1D는 시간봉으로 최근 24h 인트라데이 곡선, 그 외는 일봉. x 도메인은 기간 전체로 고정.
     func loadHomeChart() async {

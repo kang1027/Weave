@@ -2,7 +2,7 @@ import Foundation
 
 /// `Application Support/Weave/portfolio.json`에 저장되는 루트 문서.
 public struct PortfolioDocument: Codable, Equatable, Sendable {
-    public static let currentVersion = 1
+    public static let currentVersion = 2
 
     public var version: Int
     public var assets: [Asset]
