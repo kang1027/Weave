@@ -40,8 +40,22 @@ final class AppModel: ObservableObject {
     @Published var isSearching = false
 
     // 홈 차트 상태
-    @Published var homeChartMode: HomeChartMode = .combined
-    @Published var homeChartPeriod: ChartPeriod = .oneMonth
+    @Published var homeChartMode: HomeChartMode = .combined {
+        didSet {
+            guard oldValue != homeChartMode else { return }
+            // 모드별로 기간을 따로 기억한다 — Combined/By Asset이 각자 1D/1W/1M/1Y를 유지.
+            let remembered = periodByMode[homeChartMode] ?? .oneMonth
+            if remembered != homeChartPeriod { homeChartPeriod = remembered }
+        }
+    }
+    @Published var homeChartPeriod: ChartPeriod = .oneMonth {
+        didSet { periodByMode[homeChartMode] = homeChartPeriod }
+    }
+    /// 차트 모드별 마지막 선택 기간 — 모드 전환 시 복원(두 모드를 따로 본다).
+    private var periodByMode: [HomeChartMode: ChartPeriod] = [
+        .combined: .oneMonth,
+        .perAsset: .oneMonth
+    ]
     @Published var homeSeries: [ValuePoint] = []
     @Published var homeAssetSeries: [AssetLineSeries] = []
     @Published var homeBuyMarkers: [BuyMarker] = []
