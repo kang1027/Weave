@@ -196,7 +196,7 @@ Entered via ✎ in the Home footer. Consists of a top search bar + a held-asset 
   - Upload a notarized zip to GitHub Releases + publish `appcast.xml` (GitHub Pages).
   - The repo is **public** — simplifies Releases distribution / appcast hosting.
   - EdDSA signing, 1-day auto-check interval, one-click download→restart.
-- Versioning: semver (`0.x.y`), a CHANGELOG per release. The current version is always shown in the footer.
+- Versioning: semver (`0.x.y`), with release notes per release on GitHub Releases. The current version is always shown in the footer.
 - Requirements: Developer ID signing + notarization (without them, Gatekeeper blocks updates).
 
 ## 11. Data Storage

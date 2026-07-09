@@ -196,7 +196,7 @@ macOS 메뉴바 포트폴리오 트래커. 메뉴바에 핀 자산 시세를 상
   - GitHub Releases에 notarized zip 업로드 + `appcast.xml` 게시(GitHub Pages).
   - repo는 **public** — Releases 배포/appcast 호스팅 단순화.
   - EdDSA 서명, 자동 체크 주기 1일, 다운로드→재시작 원클릭.
-- 버저닝: semver(`0.x.y`), 릴리즈마다 CHANGELOG. footer에 현재 버전 상시 표시.
+- 버저닝: semver(`0.x.y`), 릴리즈마다 GitHub Releases 노트. footer에 현재 버전 상시 표시.
 - 요구사항: Developer ID 서명 + notarization (없으면 Gatekeeper가 업데이트 차단).
 
 ## 11. 데이터 저장
