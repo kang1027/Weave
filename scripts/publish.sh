@@ -105,12 +105,12 @@ run "git push origin v$NEW"
 # ── 7. GitHub Release ──────────────────────────────────────────
 NOTES="${NOTES:-Weave $NEW
 
-설치/업데이트:
+**Install / update**
 \`\`\`sh
-brew upgrade --cask weave-pt   # 또는: brew install --cask kang1027/weave/weave-pt
+brew upgrade --cask weave-pt   # or: brew install --cask kang1027/weave/weave-pt
 \`\`\`
-기존 사용자는 Sparkle로 자동 업데이트됩니다.
-Homebrew를 안 쓰면 아래 \`Weave-$NEW.dmg\`를 받아 열고 Weave를 Applications로 드래그하세요.}"
+Existing users update automatically via Sparkle.
+Not using Homebrew? Download \`Weave-$NEW.dmg\` below, open it, and drag Weave to your Applications folder.}"
 if [ "$DRY_RUN" = 1 ]; then
   echo "  [dry-run] gh release create v$NEW $ZIP $DMG"
 else
