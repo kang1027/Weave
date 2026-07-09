@@ -46,11 +46,10 @@
 ### Homebrew (권장)
 
 ```sh
-brew tap kang1027/weave
-brew install --cask weave-pt
+brew install --cask kang1027/weave/weave-pt
 ```
 
-Developer ID로 서명 + Apple 공증되어 Gatekeeper 경고 없이 실행되고, Sparkle로 자동 업데이트된다. 업데이트는 `brew upgrade --cask weave-pt`.
+한 줄이면 tap과 설치가 한 번에 된다. Developer ID로 서명 + Apple 공증되어 Gatekeeper 경고 없이 실행되고, Sparkle로 자동 업데이트된다. 업데이트는 `brew upgrade --cask weave-pt`.
 
 ### 소스 빌드
 

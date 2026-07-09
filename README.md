@@ -46,11 +46,10 @@
 ### Homebrew (recommended)
 
 ```sh
-brew tap kang1027/weave
-brew install --cask weave-pt
+brew install --cask kang1027/weave/weave-pt
 ```
 
-Signed with a Developer ID and notarized by Apple, so it launches without Gatekeeper warnings and keeps itself up to date through Sparkle. Update anytime with `brew upgrade --cask weave-pt`.
+One command — it taps and installs in one go. Signed with a Developer ID and notarized by Apple, so it launches without Gatekeeper warnings and keeps itself up to date through Sparkle. Update anytime with `brew upgrade --cask weave-pt`.
 
 ### Build from source
 
