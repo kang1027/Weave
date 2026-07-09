@@ -21,6 +21,9 @@ enum Route: Hashable {
 
 @MainActor
 final class AppModel: ObservableObject {
+    /// 스크린샷 도구가 메뉴바 라벨 이미지에 접근하기 위한 약참조(dev 전용).
+    static weak var shared: AppModel?
+
     @Published var document: PortfolioDocument
     @Published var quotes: [UUID: Quote] = [:]
     @Published var fxRates: [String: Decimal] = [:]
@@ -116,6 +119,7 @@ final class AppModel: ObservableObject {
                 .error("포트폴리오 로드 실패: \(error.localizedDescription)")
             self.document = .empty
         }
+        AppModel.shared = self
     }
 
     /// 프로덕션 조립 — 스토어/캐시 경로 실패 시 임시 디렉토리 폴백.
@@ -263,11 +267,17 @@ final class AppModel: ObservableObject {
             return
         }
         hasStartedBackgroundWork = true
-        // 스크린샷용: 최근 상승 구간이 잘 보이도록 차트·배지를 1M로 맞춘다.
-        // (% 배지는 기간 시장 등락 기준이라 1M가 최근 흐름을 가장 우호적으로 보여준다.)
-        if ProcessInfo.processInfo.environment["WEAVE_SHOT"] != nil {
+        // 스크린샷용: 상태(홈 Combined / By Asset / 종목 세부)를 env로 지정해 캡처.
+        let shotEnv = ProcessInfo.processInfo.environment
+        if shotEnv["WEAVE_SHOT"] != nil {
+            let state = shotEnv["WEAVE_SHOT_STATE"] ?? "home-combined"
+            if state == "home-byasset" { homeChartMode = .perAsset }
+            // 모드 확정 뒤 기간을 잡아야 모드별 복원값에 안 덮인다. 1M가 최근 상승 흐름을 잘 보여준다.
             homeChartPeriod = .oneMonth
             assetReturnPeriod = .month
+            if state == "detail", let id = visibleAssets.first?.id {
+                push(.detail(id))
+            }
         }
         restartRefreshLoop()
         restartRotationLoop()
