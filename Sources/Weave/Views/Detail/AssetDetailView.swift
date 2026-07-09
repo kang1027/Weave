@@ -182,8 +182,14 @@ struct AssetDetailView: View {
                    let price = metric?.quote?.price, position.quantity > 0 {
                     let vsAvg = ((price - position.averageCost) / position.averageCost * 100)
                         .rounded(scale: 2)
+                    // 미실현 평가손익 금액(자산 통화) — "그래서 얼마?"를 % 옆에 함께.
+                    let pnl = (price - position.averageCost) * position.quantity
+                    let currency = metric?.quote?.currency ?? asset.currency
+                    let vsAvgText = model.t("vs avg \(MoneyFormatter.percent(vsAvg))")
                     ChangeBadge(
-                        text: model.t("vs avg \(MoneyFormatter.percent(vsAvg))"),
+                        text: model.settings.privacyMode
+                            ? vsAvgText
+                            : vsAvgText + " · " + MoneyFormatter.signedPrice(pnl, currency: currency),
                         style: .gray,
                         minWidth: 0
                     )
