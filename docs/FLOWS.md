@@ -71,6 +71,7 @@ Each flow follows the "action → expected behavior" format, and reviews/QA vali
 ## F5. Asset Detail
 
 - **F5.1 Header**: ‹ back · asset name · ＋ (add trade). Current price + change badge + badge vs. average cost (when holding).
+  Hovering the holding value shows invested cost and signed unrealized P&L.
 - **F5.2 Chart**: Actual candle close line + asset-color gradient, right y-axis (abbreviated price), bottom x-axis.
   Average-cost dashed line (RuleMark + label, only when holding). Buy (B, green) / sell (S, red) markers —
   at actual fill-price coordinates, with hover tooltips. On hovering an empty area, a crosshair (vertical + horizontal guide) + a date · close tooltip.

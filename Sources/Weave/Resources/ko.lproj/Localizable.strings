@@ -158,6 +158,7 @@
 "Reset to default icon" = "기본 아이콘으로";
 "Click to change icon" = "클릭해서 아이콘 변경";
 "Invested" = "원금";
+"Unrealized P&L" = "미실현손익";
 "%@ shares" = "%@주";
 "Day ring full at" = "Day 링 만점 기준";
 "Return ring full at" = "Return 링 만점 기준";

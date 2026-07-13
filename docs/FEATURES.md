@@ -90,7 +90,8 @@ Entered via ✎ in the Home footer. Consists of a top search bar + a held-asset 
 ## 4. Asset Detail
 
 - Header: back · asset name · add trade (＋).
-- Current price + change badge + vs. average-cost badge.
+- Current price + change badge + vs. average-cost badge. Hovering the holding value shows
+  invested cost and the signed unrealized P&L amount.
 - **Chart** (Swift Charts):
   - Actual candle close line + gradient fill (asset color), price on the right y-axis, dates on the bottom x-axis.
   - Average-cost dashed line (`RuleMark` + dash) + label.

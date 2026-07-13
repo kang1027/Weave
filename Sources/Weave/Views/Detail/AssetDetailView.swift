@@ -226,7 +226,12 @@ struct AssetDetailView: View {
             if isHoveringInvested, let invested {
                 TooltipBubble(
                     text: model.t("Invested") + " " + MoneyFormatter.price(invested, currency: currency),
-                    blurText: model.settings.privacyMode
+                    secondary: unrealized.map {
+                        model.t("Unrealized P&L") + " "
+                            + MoneyFormatter.signedPrice($0.amount, currency: currency)
+                    },
+                    blurText: model.settings.privacyMode,
+                    blurSecondary: model.settings.privacyMode
                 )
                 .offset(y: 26)
                 .allowsHitTesting(false)

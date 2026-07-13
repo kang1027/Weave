@@ -166,6 +166,8 @@ struct TooltipBubble: View {
     var secondary: String?
     /// 프라이버시 모드에서 본문(금액)만 블러.
     var blurText = false
+    /// 보조 행에도 금액이 포함될 때 함께 블러.
+    var blurSecondary = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -177,6 +179,7 @@ struct TooltipBubble: View {
                 Text(secondary)
                     .font(.system(size: 10))
                     .foregroundStyle(theme.text2)
+                    .privacyBlur(blurSecondary)
             }
         }
         .padding(.horizontal, 10)
