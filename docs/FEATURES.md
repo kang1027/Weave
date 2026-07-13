@@ -39,7 +39,8 @@ and clicking it opens a 360×720 popover where you manage the entire portfolio.
   The Assets donut groups the top 4 by weight + the rest into "Other" (gray).
 
 ### 2.2 Total area
-- Portfolio total valuation (converted to base currency) + a solid change-% badge.
+- Portfolio total valuation (converted to base currency) + a solid change-% badge. Hovering the total shows
+  invested cost and signed unrealized P&L.
 
 ### 2.3 Value History chart
 - Filter: **Combined** (portfolio value line + gradient fill) / **By Asset** (per-asset

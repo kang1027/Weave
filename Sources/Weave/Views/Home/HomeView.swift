@@ -97,7 +97,7 @@ struct HomeView: View {
         .padding(.bottom, 8)
     }
 
-    /// 총 평가금 + 손익 라인. 원금은 hover 툴팁으로. (일간 등락은 Day 링이 담당)
+    /// 총 평가금 + 손익 라인. 원금과 미실현손익은 hover 툴팁으로. (일간 등락은 Day 링이 담당)
     private func totalSection(_ portfolio: PortfolioMetrics) -> some View {
         let base = model.settings.baseCurrency
         let pnl = portfolio.unrealizedPnLBase
@@ -136,7 +136,11 @@ struct HomeView: View {
                     text: model.t("Invested")
                         + " "
                         + MoneyFormatter.price(portfolio.costBasisBase, currency: base),
-                    blurText: model.settings.privacyMode
+                    secondary: model.t("Unrealized P&L")
+                        + " "
+                        + MoneyFormatter.signedPrice(pnl, currency: base),
+                    blurText: model.settings.privacyMode,
+                    blurSecondary: model.settings.privacyMode
                 )
                 .offset(y: 30)
                 .allowsHitTesting(false)

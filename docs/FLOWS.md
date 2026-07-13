@@ -41,6 +41,7 @@ Each flow follows the "action → expected behavior" format, and reviews/QA vali
   Assets shows the top 4 by weight + "Other" (gray). Segments use a gap-less butt cap, starting at 12 o'clock and going clockwise.
   On hover, the segment thickens and a contribution amount/weight tooltip appears.
 - **F3.2 Total**: Total valuation converted to the base currency + a solid daily-change badge (▲/▼).
+  Hovering the total shows invested cost and signed unrealized P&L.
 - **F3.3 Combined chart**: A per-day Σ(holdings quantity × close × FX rate) line + gradient, with the right y-axis =
   abbreviated amount in the base currency (masked in privacy mode). If the FX time series fails, fall back to the spot FX rate.
   Buy marker tooltips also show the converted price when the asset currency ≠ base currency.
