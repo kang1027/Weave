@@ -528,11 +528,21 @@ struct DetailChart: View {
             let y = yPosition(for: markerLineValue(trade))
             if x >= plotFrame.minX - 9, x <= plotFrame.maxX + 9 {
                 TooltipBubble(text: markerTitle(trade), secondary: markerSub(trade))
-                    .position(x: x + tooltipShift(atX: x), y: y - 32)
+                    // 상단 마커의 툴팁이 차트 밖으로 튀어 가격/손익 영역과 겹치지 않게
+                    // 플롯 내부의 안전 영역으로 세로 위치를 제한한다.
+                    .position(x: x + tooltipShift(atX: x), y: tooltipY(for: y))
                     .allowsHitTesting(false)
                     .zIndex(30)
             }
         }
+    }
+
+    /// 거래 툴팁은 마커 위에 두되, 차트 플롯 밖으로 빠져나가지 않게 한다.
+    private func tooltipY(for markerY: CGFloat) -> CGFloat {
+        let halfHeight: CGFloat = 27
+        let minY = plotFrame.minY + halfHeight
+        let maxY = plotFrame.maxY - halfHeight
+        return min(max(markerY - 32, minY), maxY)
     }
 
     /// 마커 y값 — 체결가가 아니라 거래 시점 캔들 종가(가격선)에 얹는다. 체결가는 툴팁에.
