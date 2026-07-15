@@ -56,6 +56,7 @@ struct AssetDetailView: View {
                                 asset: asset,
                                 trades: model.document.trades(for: assetID),
                                 position: position,
+                                isLive: isLive,
                                 onSelectTrade: { tradeID in
                                     focusTrade(tradeID, using: scrollProxy)
                                 },

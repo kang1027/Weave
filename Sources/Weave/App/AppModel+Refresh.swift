@@ -49,7 +49,6 @@ extension AppModel {
         stopDetailLive()
         guard let asset = asset(id: assetID), !asset.isManual else { return }
 
-        isDetailLive = true
         detailLiveAssetID = assetID
         detailLiveTask = Task { [weak self] in
             while let self, !Task.isCancelled, self.detailLiveAssetID == assetID {
@@ -63,7 +62,6 @@ extension AppModel {
         detailLiveTask?.cancel()
         detailLiveTask = nil
         detailLiveAssetID = nil
-        isDetailLive = false
         detailLiveCandles = []
     }
 

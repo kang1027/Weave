@@ -13,6 +13,7 @@ struct DetailChart: View {
     let asset: Asset
     let trades: [Trade]
     let position: PositionSnapshot
+    let isLive: Bool
     /// B/S 마커 클릭 → Trades 리스트의 해당 행 포커스.
     var onSelectTrade: (UUID) -> Void = { _ in }
     /// 거래 행 클릭 → 차트의 해당 마커 포커스 요청(처리 후 nil로 리셋).
@@ -37,11 +38,11 @@ struct DetailChart: View {
     @State private var plotFrame = CGRect.zero
 
     private var candles: [Candle] {
-        model.isDetailLive ? model.detailLiveCandles : model.detailCandles
+        isLive ? model.detailLiveCandles : model.detailCandles
     }
     private var color: Color { theme.paletteColor(asset.colorIndex) }
     private var interval: CandleInterval {
-        model.isDetailLive ? .second : model.detailInterval
+        isLive ? .second : model.detailInterval
     }
 
     // MARK: - 창(window) 계산
@@ -119,7 +120,7 @@ struct DetailChart: View {
                 .padding(.horizontal, 16)
         }
         .onChange(of: candles) { resetWindow() }
-        .onChange(of: model.isDetailLive) { resetWindow() }
+        .onChange(of: isLive) { resetWindow() }
         .onChange(of: focusRequest) { _, request in
             guard let request else { return }
             focusMarker(tradeID: request)
@@ -127,7 +128,7 @@ struct DetailChart: View {
         }
         .onAppear {
             // 주식인데 인트라데이가 선택돼 있으면(크립토서 넘어온 경우) 1D로 스냅.
-            if !model.isDetailLive, !asset.market.supportsIntraday, model.detailInterval.isIntraday {
+            if !isLive, !asset.market.supportsIntraday, model.detailInterval.isIntraday {
                 model.detailInterval = .day
             }
             resetWindow()
@@ -254,19 +255,11 @@ struct DetailChart: View {
 
     private var controlsRow: some View {
         HStack(spacing: 6) {
-            if model.isDetailLive {
-                Text(model.t("LIVE · 1s"))
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(theme.greenText)
-                    .frame(height: 20)
-                    .padding(.horizontal, 10)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(theme.green.opacity(0.16)))
-            } else {
-                SegmentedPills(
-                    options: intervalOptions.map { ($0, $0.label) },
-                    selection: $model.detailInterval
-                )
-            }
+            SegmentedPills(
+                options: intervalOptions.map { ($0, $0.label) },
+                selection: $model.detailInterval,
+                isDisabled: isLive
+            )
             zoomButton(systemName: "minus.magnifyingglass", help: model.t("Zoom out")) {
                 zoom(by: 1.4)
             }

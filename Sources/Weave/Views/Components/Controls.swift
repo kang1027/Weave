@@ -82,6 +82,7 @@ struct SegmentedPills<T: Hashable>: View {
     let options: [(value: T, label: String)]
     @Binding var selection: T
     var fillsWidth = true
+    var isDisabled = false
 
     var body: some View {
         HStack(spacing: 4) {
@@ -102,9 +103,13 @@ struct SegmentedPills<T: Hashable>: View {
                             )
                     )
                     .contentShape(RoundedRectangle(cornerRadius: 6))
-                    .onTapGesture { selection = option.value }
+                    .onTapGesture {
+                        guard !isDisabled else { return }
+                        selection = option.value
+                    }
             }
         }
+        .opacity(isDisabled ? 0.55 : 1)
     }
 }
 
