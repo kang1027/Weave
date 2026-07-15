@@ -131,6 +131,7 @@
 "The file is not a valid Weave backup." = "올바른 Weave 백업 파일이 아니에요.";
 "Theme" = "테마";
 "Total" = "총액";
+"Total (%@)" = "총액 (%@)";
 "Track your portfolio" = "포트폴리오를 한눈에";
 "Trades" = "거래 내역";
 "US" = "미장";

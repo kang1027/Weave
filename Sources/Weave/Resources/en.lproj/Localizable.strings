@@ -131,6 +131,7 @@
 "The file is not a valid Weave backup." = "The file is not a valid Weave backup.";
 "Theme" = "Theme";
 "Total" = "Total";
+"Total (%@)" = "Total (%@)";
 "Track your portfolio" = "Track your portfolio";
 "Trades" = "Trades";
 "US" = "US";

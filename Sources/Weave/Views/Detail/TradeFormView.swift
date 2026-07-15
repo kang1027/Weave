@@ -101,7 +101,11 @@ struct TradeFormView: View {
                                 text: $priceText, field: .price
                             )
                             divider
-                            numberRow(label: model.t("Total"), text: $amountText, field: .amount)
+                            numberRow(
+                                label: model.t("Total (\(asset?.currency ?? ""))"),
+                                text: $amountText,
+                                field: .amount
+                            )
                             divider
                             dateRow
                             divider
