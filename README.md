@@ -68,6 +68,17 @@ swift test                 # unit tests
 scripts/bundle.sh          # build dist/Weave.app
 ```
 
+## Contributing
+
+Issues and pull requests are welcome. Before opening a PR:
+
+- Keep the change focused and explain the user-visible behavior.
+- Run `swift build` and `swift test`.
+- Use English Conventional Commit messages such as `feat:`, `fix:`, or `docs:`.
+- Keep Weave local-only: do not add accounts, telemetry, analytics, or secrets.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development and pull request guide.
+
 ## Data & privacy
 
 Your portfolio is stored only on this Mac (`Application Support/Weave`) and is never sent anywhere. Weave reads public quotes and candles from Binance, Naver, and Yahoo Finance — no accounts, no API keys, no telemetry. Details in [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md).

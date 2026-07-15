@@ -68,6 +68,17 @@ swift test                 # 단위 테스트
 scripts/bundle.sh          # dist/Weave.app 번들 생성
 ```
 
+## 기여하기
+
+이슈와 풀 리퀘스트를 환영합니다. PR을 열기 전에 다음을 확인하세요.
+
+- 변경 범위를 작게 유지하고 사용자에게 보이는 동작을 설명합니다.
+- `swift build`와 `swift test`를 실행합니다.
+- `feat:`, `fix:`, `docs:` 같은 영어 Conventional Commit 메시지를 사용합니다.
+- Weave의 로컬 전용 원칙을 지킵니다. 계정·텔레메트리·분석·시크릿을 추가하지 않습니다.
+
+전체 개발 및 PR 가이드는 [CONTRIBUTING.md](CONTRIBUTING.md)를 확인하세요.
+
 ## 데이터 · 프라이버시
 
 포트폴리오는 이 Mac 로컬(`Application Support/Weave`)에만 저장되며 외부로 전송되지 않습니다. Binance·Naver·Yahoo Finance의 공개 시세·캔들만 조회하고, 계정·API 키·텔레메트리는 전혀 없습니다. 자세한 내용은 [PRIVACY.md](PRIVACY.md)·[SECURITY.md](SECURITY.md)에 있습니다.
