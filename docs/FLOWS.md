@@ -135,7 +135,7 @@ Each flow follows the "action → expected behavior" format, and reviews/QA vali
 
 - **F9.1 Dev run**: `swift run Weave` — Sparkle/auto-start disabled (silently), all other features work.
 - **F9.2 Bundle**: `scripts/bundle.sh` → `dist/Weave.app` (Info.plist: LSUIElement,
-  SUFeedURL, version injection + Sparkle.framework + resource bundle).
+  CFBundleIconFile, SUFeedURL, version injection + Sparkle.framework + resource bundle).
 - **F9.3 Release**: `scripts/release.sh` → ED public-key guard → sign → notarize → zip →
   EdDSA signing, all automated. Uploading the GitHub Release and adding the `docs/appcast.xml` entry are
   manual steps the script guides you through (served via GitHub Pages).

@@ -135,7 +135,7 @@
 
 - **F9.1 개발 실행**: `swift run Weave` — Sparkle/자동시작 비활성(조용히), 나머지 전 기능 동작.
 - **F9.2 번들**: `scripts/bundle.sh` → `dist/Weave.app`(Info.plist: LSUIElement,
-  SUFeedURL, 버전 주입 + Sparkle.framework + 리소스 번들).
+  CFBundleIconFile, SUFeedURL, 버전 주입 + Sparkle.framework + 리소스 번들).
 - **F9.3 릴리즈**: `scripts/release.sh` → ED 공개키 가드 → 서명 → 공증 → zip →
   EdDSA 서명까지 자동. GitHub Release 업로드와 `docs/appcast.xml` 항목 추가는
   스크립트가 안내하는 수동 단계(GitHub Pages 서빙).

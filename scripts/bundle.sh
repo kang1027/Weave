@@ -24,6 +24,13 @@ if [ -d "$BIN_DIR/Weave_Weave.bundle" ]; then
   cp -R "$BIN_DIR/Weave_Weave.bundle" "$APP/Contents/Resources/"
 fi
 
+echo "▸ 앱 아이콘 복사"
+if [ ! -f "assets/Weave.icns" ]; then
+  echo "✗ assets/Weave.icns를 찾지 못함" >&2
+  exit 1
+fi
+cp "assets/Weave.icns" "$APP/Contents/Resources/Weave.icns"
+
 echo "▸ Sparkle.framework 복사"
 SPARKLE_FRAMEWORK=""
 for candidate in \
