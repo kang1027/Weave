@@ -97,7 +97,7 @@ rm -f "$ITEMFILE"
 
 # ── 6. 커밋 · 태그 · 푸시 ──────────────────────────────────────
 run "git add '$INFO' '$APPCAST'"
-run "git commit -q -m 'chore: 릴리즈 v$NEW'"
+run "git commit -q -m 'chore: release v$NEW'"
 run "git tag v$NEW"
 run "git push origin main"
 run "git push origin v$NEW"
