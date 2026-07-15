@@ -104,7 +104,7 @@ public struct NaverProvider: MarketDataProvider {
     public func candles(providerSymbol: String, interval: CandleInterval) async throws -> [Candle] {
         let timeframe: String
         switch interval {
-        case .m15, .h1, .h4:
+        case .second, .m15, .h1, .h4:
             // fchart는 인트라데이 미제공 — 앱 레이어가 야후(.KS/.KQ)로 브릿지한다.
             throw ProviderError.unsupportedSymbol(providerSymbol)
         case .day: timeframe = "day"

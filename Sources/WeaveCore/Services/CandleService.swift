@@ -112,6 +112,7 @@ public actor CandleService {
     private func isFresh(_ cached: CachedSeries, interval: CandleInterval) -> Bool {
         let age = now().timeIntervalSince(cached.fetchedAt)
         switch interval {
+        case .second: return false
         case .m15: return age < 5 * 60
         case .h1: return age < 15 * 60
         case .h4: return age < 30 * 60

@@ -49,11 +49,12 @@ extension AppModel {
         stopDetailLive()
         guard let asset = asset(id: assetID), !asset.isManual else { return }
 
+        isDetailLive = true
         detailLiveAssetID = assetID
         detailLiveTask = Task { [weak self] in
             while let self, !Task.isCancelled, self.detailLiveAssetID == assetID {
                 await self.refreshDetailQuote(assetID: assetID)
-                try? await Task.sleep(for: .seconds(3))
+                try? await Task.sleep(for: .seconds(1))
             }
         }
     }
@@ -62,6 +63,8 @@ extension AppModel {
         detailLiveTask?.cancel()
         detailLiveTask = nil
         detailLiveAssetID = nil
+        isDetailLive = false
+        detailLiveCandles = []
     }
 
     private func refreshDetailQuote(assetID: UUID) async {
@@ -70,12 +73,32 @@ extension AppModel {
         guard !Task.isCancelled, detailLiveAssetID == assetID else { return }
 
         quotes[assetID] = quote
+        appendDetailLiveCandle(price: quote.price, at: Date())
         staleAssetIDs.remove(assetID)
         if quote.currency.uppercased() != asset.currency.uppercased(),
            let index = document.assets.firstIndex(where: { $0.id == assetID }) {
             document.assets[index].currency = quote.currency.uppercased()
         }
         updateMenuBarTitle()
+    }
+
+    private func appendDetailLiveCandle(price: Decimal, at date: Date) {
+        let second = Date(timeIntervalSince1970: date.timeIntervalSince1970.rounded(.down))
+        if var last = detailLiveCandles.last, last.date == second {
+            last.high = max(last.high, price)
+            last.low = min(last.low, price)
+            last.close = price
+            detailLiveCandles[detailLiveCandles.count - 1] = last
+        } else {
+            detailLiveCandles.append(
+                Candle(date: second, open: price, high: price, low: price, close: price)
+            )
+        }
+
+        let limit = 180
+        if detailLiveCandles.count > limit {
+            detailLiveCandles.removeFirst(detailLiveCandles.count - limit)
+        }
     }
 
     /// 메뉴바 자산을 다음 것으로 전환(단축키). 로테이션 타이머도 리셋한다.

@@ -26,6 +26,7 @@ public enum ProviderError: Error, Equatable {
 public enum CandleFetchLimit {
     public static func limit(for interval: CandleInterval) -> Int {
         switch interval {
+        case .second: return 180
         case .m15: return 1000     // ~10일
         case .h1: return 1000      // ~41일
         case .h4: return 1000      // ~166일

@@ -33,6 +33,7 @@ public struct Candle: Codable, Equatable, Sendable {
 }
 
 public enum CandleInterval: String, Codable, Sendable, CaseIterable {
+    case second = "1s"
     case m15 = "15m"
     case h1 = "1h"
     case h4 = "4h"
@@ -43,6 +44,7 @@ public enum CandleInterval: String, Codable, Sendable, CaseIterable {
     /// 캔들 하나가 덮는 시간(월봉은 근사값 — 축 계산용).
     public var seconds: TimeInterval {
         switch self {
+        case .second: return 1
         case .m15: return 15 * 60
         case .h1: return 3_600
         case .h4: return 4 * 3_600
@@ -54,7 +56,7 @@ public enum CandleInterval: String, Codable, Sendable, CaseIterable {
 
     public var isIntraday: Bool {
         switch self {
-        case .m15, .h1, .h4: return true
+        case .second, .m15, .h1, .h4: return true
         case .day, .week, .month: return false
         }
     }
@@ -64,6 +66,7 @@ public enum CandleInterval: String, Codable, Sendable, CaseIterable {
 
     public var label: String {
         switch self {
+        case .second: return "1s"
         case .m15: return "15m"
         case .h1: return "1H"
         case .h4: return "4H"

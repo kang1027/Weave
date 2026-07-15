@@ -93,8 +93,8 @@ Entered via ✎ in the Home footer. Consists of a top search bar + a held-asset 
 - Header: back · asset name · add trade (＋).
 - Current price + change badge + vs. average-cost badge. Hovering the holding value shows
   invested cost and the signed unrealized P&L amount.
-- Header `LIVE` toggle: while enabled, fetches only this asset's quote every 3 seconds;
-  it stops automatically when leaving the detail screen.
+- Header `LIVE` toggle: while enabled, samples only this asset's quote every second and
+  renders a rolling 1-second chart; it stops automatically when leaving the detail screen.
 - **Chart** (Swift Charts):
   - Actual candle close line + gradient fill (asset color), price on the right y-axis, dates on the bottom x-axis.
   - Average-cost dashed line (`RuleMark` + dash) + label.
@@ -120,7 +120,8 @@ Entered via ✎ in the Home footer. Consists of a top search bar + a held-asset 
 
 - **Quote (current price)**: Binance ticker / Naver quote / Yahoo chart meta.
   Periodic polling (default 300s, configurable 60–900s). On failure, keeps the last value + shows stale.
-  The detail-screen `LIVE` toggle temporarily overrides this for the selected asset at a 3-second interval.
+  The detail-screen `LIVE` toggle temporarily overrides this for the selected asset with 1-second sampling
+  and a rolling live chart.
 - **Candle (history)**: Binance klines / Naver fchart / Yahoo chart.
   Intervals 15m/1H/4H/1D/1W/1M. Local cache (`Application Support/Weave/cache/`) —
   daily and above refresh once a day, intraday uses a 5–30 min TTL.

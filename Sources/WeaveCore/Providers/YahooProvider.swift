@@ -124,6 +124,7 @@ public struct YahooProvider: MarketDataProvider {
     public func candles(providerSymbol: String, interval: CandleInterval) async throws -> [Candle] {
         let (range, yahooInterval): (String, String)
         switch interval {
+        case .second: throw ProviderError.unsupportedSymbol(providerSymbol)
         case .m15: (range, yahooInterval) = ("1mo", "15m")   // 야후 15m 한도 60일
         case .h1: (range, yahooInterval) = ("3mo", "1h")
         case .h4: (range, yahooInterval) = ("6mo", "1h")     // 4h 미지원 — 1h 합성
@@ -148,6 +149,7 @@ public struct YahooProvider: MarketDataProvider {
         // (야후 15m은 소스가 최근 60일만 제공 — 그 이전은 빈 결과일 수 있다.)
         let (spanSeconds, yahooInterval): (TimeInterval, String)
         switch interval {
+        case .second: throw ProviderError.unsupportedSymbol(providerSymbol)
         case .m15: (spanSeconds, yahooInterval) = (60 * 86_400, "15m")
         case .h1: (spanSeconds, yahooInterval) = (90 * 86_400, "1h")
         case .h4: (spanSeconds, yahooInterval) = (180 * 86_400, "1h")

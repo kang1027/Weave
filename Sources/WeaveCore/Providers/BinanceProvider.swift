@@ -91,6 +91,7 @@ public struct BinanceProvider: MarketDataProvider {
     ) async throws -> [Candle] {
         let binanceInterval: String
         switch interval {
+        case .second: throw ProviderError.unsupportedSymbol(providerSymbol)
         case .m15: binanceInterval = "15m"
         case .h1: binanceInterval = "1h"
         case .h4: binanceInterval = "4h"

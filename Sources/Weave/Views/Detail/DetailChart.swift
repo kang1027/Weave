@@ -36,9 +36,13 @@ struct DetailChart: View {
     /// 차트 플롯 영역(차트 뷰 로컬 좌표) — 오버레이 좌표 계산용.
     @State private var plotFrame = CGRect.zero
 
-    private var candles: [Candle] { model.detailCandles }
+    private var candles: [Candle] {
+        model.isDetailLive ? model.detailLiveCandles : model.detailCandles
+    }
     private var color: Color { theme.paletteColor(asset.colorIndex) }
-    private var interval: CandleInterval { model.detailInterval }
+    private var interval: CandleInterval {
+        model.isDetailLive ? .second : model.detailInterval
+    }
 
     // MARK: - 창(window) 계산
 
@@ -115,6 +119,7 @@ struct DetailChart: View {
                 .padding(.horizontal, 16)
         }
         .onChange(of: candles) { resetWindow() }
+        .onChange(of: model.isDetailLive) { resetWindow() }
         .onChange(of: focusRequest) { _, request in
             guard let request else { return }
             focusMarker(tradeID: request)
@@ -122,7 +127,7 @@ struct DetailChart: View {
         }
         .onAppear {
             // 주식인데 인트라데이가 선택돼 있으면(크립토서 넘어온 경우) 1D로 스냅.
-            if !asset.market.supportsIntraday, interval.isIntraday {
+            if !model.isDetailLive, !asset.market.supportsIntraday, model.detailInterval.isIntraday {
                 model.detailInterval = .day
             }
             resetWindow()
@@ -249,10 +254,19 @@ struct DetailChart: View {
 
     private var controlsRow: some View {
         HStack(spacing: 6) {
-            SegmentedPills(
-                options: intervalOptions.map { ($0, $0.label) },
-                selection: $model.detailInterval
-            )
+            if model.isDetailLive {
+                Text(model.t("LIVE · 1s"))
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(theme.greenText)
+                    .frame(height: 20)
+                    .padding(.horizontal, 10)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(theme.green.opacity(0.16)))
+            } else {
+                SegmentedPills(
+                    options: intervalOptions.map { ($0, $0.label) },
+                    selection: $model.detailInterval
+                )
+            }
             zoomButton(systemName: "minus.magnifyingglass", help: model.t("Zoom out")) {
                 zoom(by: 1.4)
             }
@@ -561,6 +575,11 @@ struct DetailChart: View {
     }
 
     private func crosshairDateText(_ date: Date) -> String {
+        if interval == .second {
+            return date.formatted(
+                .dateTime.month(.defaultDigits).day().hour().minute().second().locale(model.locale)
+            )
+        }
         if interval.isIntraday {
             return date.formatted(
                 .dateTime.month(.defaultDigits).day().hour().minute().locale(model.locale)
@@ -739,6 +758,9 @@ private struct PriceChartBody: View, Equatable {
         locale: Locale
     ) -> String {
         let calendar = Calendar.current
+        if interval == .second {
+            return date.formatted(.dateTime.hour().minute().second().locale(locale))
+        }
         if interval.isIntraday {
             let hour = calendar.component(.hour, from: date)
             let minute = calendar.component(.minute, from: date)
