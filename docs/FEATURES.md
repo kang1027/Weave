@@ -182,7 +182,7 @@ Entered via ✎ in the Home footer. Consists of a top search bar + a held-asset 
   - Base currency (select: KRW/USD/JPY) — used **only for aggregate calculations** like total and the Combined chart
   - Asset display currency (select: **source currency as-is** (default) / convert to base currency)
     — with source currency, BTC shows in $ and Samsung Electronics in ₩, each in its own currency
-  - Data backup/restore (button) · clear candle cache
+  - Data backup/restore (button) · clear candle cache · permanently delete all data after a successful backup export
 - **Updates**
   - Auto update check (toggle) · check now (button) · release notes link
 - At the very bottom: a **Quit Weave** button (+ ⌘Q) — as a menu bar app there's no Dock quit path.

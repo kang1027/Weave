@@ -47,6 +47,11 @@ enum LogoStore {
         try? FileManager.default.removeItem(at: url(for: fileName))
     }
 
+    static func clearAll() {
+        cache.removeAllObjects()
+        try? FileManager.default.removeItem(at: directory)
+    }
+
     static func image(named fileName: String) -> NSImage? {
         if let cached = cache.object(forKey: fileName as NSString) {
             return cached

@@ -178,6 +178,12 @@ struct SettingsView: View {
                         SettingsButton(title: model.t("Import data…")) {
                             model.importBackup()
                         }
+                        SettingsButton(
+                            title: model.t("Delete all my data…"),
+                            isDestructive: true
+                        ) {
+                            model.requestDeleteAllData()
+                        }
                         SettingsButton(title: model.t("Clear candle cache")) {
                             model.clearCandleCache()
                         }
@@ -308,16 +314,20 @@ struct SettingsButton: View {
     @Environment(\.theme) private var theme
     let title: String
     var disabled = false
+    var isDestructive = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(theme.text)
+                .foregroundStyle(isDestructive ? theme.redText : theme.text)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
-                .background(RoundedRectangle(cornerRadius: 8).fill(theme.seg))
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isDestructive ? theme.red.opacity(0.12) : theme.seg)
+                )
                 .contentShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)

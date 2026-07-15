@@ -259,6 +259,16 @@ final class AppModel: ObservableObject {
 
     // MARK: - 주기 작업 (시세 폴링 · 메뉴바 로테이션)
 
+    func resetBackgroundWorkForDataWipe() {
+        refreshTask?.cancel()
+        rotationTask?.cancel()
+        searchTask?.cancel()
+        refreshTask = nil
+        rotationTask = nil
+        searchTask = nil
+        hasStartedBackgroundWork = false
+    }
+
     /// 팝오버가 열릴 때마다 불리지만 실제 시작은 최초 1회.
     /// 이후 열림에서는 60초 이상 지난 시세만 즉시 갱신.
     func startBackgroundWork() {

@@ -47,6 +47,15 @@
 "Delete" = "Delete";
 "Delete asset?" = "Delete asset?";
 "Delete trade?" = "Delete trade?";
+"Delete all my data…" = "Delete all my data…";
+"Delete all my data?" = "Delete all my data?";
+"Export backup and continue" = "Export backup and continue";
+"Export a backup before deleting. Your current data will be permanently removed." = "Export a backup before deleting. Your current data will be permanently removed.";
+"Backup saved. Delete everything?" = "Backup saved. Delete everything?";
+"This permanently deletes your portfolio, trades, settings, custom logos, and cached data. This cannot be undone." = "This permanently deletes your portfolio, trades, settings, custom logos, and cached data. This cannot be undone.";
+"Delete everything" = "Delete everything";
+"Data deleted" = "Data deleted";
+"All Weave data was permanently deleted." = "All Weave data was permanently deleted.";
 "Edit" = "Edit";
 "Edit Trade" = "Edit Trade";
 "Enter a valid quantity and price" = "Enter a valid quantity and price";

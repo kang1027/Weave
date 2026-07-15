@@ -126,7 +126,9 @@ Each flow follows the "action → expected behavior" format, and reviews/QA vali
   — switches immediately, with number/date formats tied to the locale).
 - **F8.3 Data**: Refresh cycle (restarts the polling loop) · base currency (KRW/USD/JPY — total · rings · chart
   recompute immediately) · asset display currency (source as-is / base-converted) · backup (JSON export) ·
-  restore (error on validation failure, on success replace everything + refresh) · clear candle cache.
+  restore (error on validation failure, on success replace everything + refresh) · clear candle cache · delete all data:
+  show a backup warning, require a successful export, then require a second destructive confirmation before removing the portfolio,
+  settings, custom logos, and quote/candle/FX caches.
 - **F8.4 Updates**: Auto-update toggle · check now (enabled only when there is a bundle + feed).
 - **F8.5 Quit**: Quit Weave button + ⌘Q.
 - **F8.6 Settings persistence**: All settings changes are saved immediately and persist across restarts.

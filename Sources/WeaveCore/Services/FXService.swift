@@ -63,6 +63,14 @@ public actor FXService {
         return result
     }
 
+    public func clearCache() {
+        rates = [:]
+        loadedDisk = false
+        if let cacheURL {
+            try? FileManager.default.removeItem(at: cacheURL)
+        }
+    }
+
     // MARK: - 디스크 캐시
 
     private func loadDiskIfNeeded() {

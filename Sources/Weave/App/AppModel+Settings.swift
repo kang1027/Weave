@@ -62,12 +62,13 @@ extension AppModel {
         UTType("app.weave.backup") ?? UTType(filenameExtension: "weave") ?? .data
     }
 
-    func exportBackup() {
+    @discardableResult
+    func exportBackup() -> Bool {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [backupType]
         panel.nameFieldStringValue = "weave-backup.weave"
         NSApp.activate(ignoringOtherApps: true)
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard panel.runModal() == .OK, let url = panel.url else { return false }
 
         let fm = FileManager.default
         let stage = fm.temporaryDirectory.appendingPathComponent("weave-export-\(UUID().uuidString)", isDirectory: true)
@@ -96,8 +97,105 @@ extension AppModel {
             try BackupArchive.zip(contentsOf: stage, to: tmpZip)
             if fm.fileExists(atPath: url.path) { try fm.removeItem(at: url) }
             try fm.moveItem(at: tmpZip, to: url)
+            return true
         } catch {
             presentAlert(title: t("Backup failed"), message: error.localizedDescription)
+            return false
+        }
+    }
+
+    // MARK: - 전체 데이터 삭제
+
+    func requestDeleteAllData() {
+        let warning = NSAlert()
+        warning.messageText = t("Delete all my data?")
+        warning.informativeText = t(
+            "Export a backup before deleting. Your current data will be permanently removed."
+        )
+        warning.alertStyle = .critical
+        warning.addButton(withTitle: t("Export backup and continue"))
+        warning.addButton(withTitle: t("Cancel"))
+        NSApp.activate(ignoringOtherApps: true)
+        guard warning.runModal() == .alertFirstButtonReturn else { return }
+
+        // 저장 패널 취소·export 실패 모두 false라서 삭제 단계로 진행하지 않는다.
+        guard exportBackup() else { return }
+
+        let confirm = NSAlert()
+        confirm.messageText = t("Backup saved. Delete everything?")
+        confirm.informativeText = t(
+            "This permanently deletes your portfolio, trades, settings, custom logos, and cached data. This cannot be undone."
+        )
+        confirm.alertStyle = .critical
+        confirm.addButton(withTitle: t("Delete everything"))
+        confirm.addButton(withTitle: t("Cancel"))
+        NSApp.activate(ignoringOtherApps: true)
+        guard confirm.runModal() == .alertFirstButtonReturn else { return }
+
+        deleteAllData()
+    }
+
+    private func deleteAllData() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            resetBackgroundWorkForDataWipe()
+            await candleService.clearCache()
+            await fxService.clearCache()
+            LogoStore.clearAll()
+            deleteStoredData()
+
+            document = .empty
+            quotes = [:]
+            fxRates = [:]
+            staleAssetIDs = []
+            route = []
+            menuBarTitle = MenuBarTitleBuilder.placeholder
+            menuBarImage = nil
+            nextRefreshAt = nil
+            lastRefreshAt = nil
+            rotationIndex = 0
+            searchQuery = ""
+            searchResults = []
+            isSearching = false
+            homeChartMode = .combined
+            homeChartPeriod = .oneWeek
+            assetReturnPeriod = .day
+            homeChartDomain = nil
+            isHomeChartLoading = false
+            chartLoadToken += 1
+            invalidateHomeChart()
+            detailCandles = []
+            isDetailChartLoading = false
+            detailFocusDate = nil
+            detailChartAssetID = nil
+            detailLoadToken += 1
+
+            startBackgroundWork()
+            presentAlert(title: t("Data deleted"), message: t("All Weave data was permanently deleted."))
+        }
+    }
+
+    private func deleteStoredData() {
+        guard let jsonStore = store as? JSONPortfolioStore else { return }
+
+        let fileManager = FileManager.default
+        let storeURL = jsonStore.fileURL.standardizedFileURL
+        let liveDirectory: URL? = {
+            guard let base = try? fileManager.url(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: false
+            ) else { return nil }
+            return base.appendingPathComponent(WeaveInfo.appName, isDirectory: true)
+        }()
+        let livePortfolio = liveDirectory?.appendingPathComponent("portfolio.json").standardizedFileURL
+
+        if let livePortfolio, storeURL == livePortfolio {
+            if let liveDirectory { try? fileManager.removeItem(at: liveDirectory) }
+        } else {
+            try? fileManager.removeItem(at: jsonStore.fileURL)
         }
     }
 
