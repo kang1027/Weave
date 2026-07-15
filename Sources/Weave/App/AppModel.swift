@@ -92,6 +92,8 @@ final class AppModel: ObservableObject {
 
     private let logger = Logger(subsystem: "app.weave", category: "AppModel")
     private var refreshTask: Task<Void, Never>?
+    var detailLiveTask: Task<Void, Never>?
+    var detailLiveAssetID: UUID?
     private var rotationTask: Task<Void, Never>?
     private var searchTask: Task<Void, Never>?
     private var hasStartedBackgroundWork = false

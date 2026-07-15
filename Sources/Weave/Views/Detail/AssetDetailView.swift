@@ -19,6 +19,7 @@ struct AssetDetailView: View {
     @State private var highlightedTradeID: UUID?
     /// 거래 행 클릭 → 차트 마커 포커스 요청.
     @State private var chartFocusTradeID: UUID?
+    @State private var isLive = false
     /// 인터벌 전환 후(로드 완료 시) 적용할 포커스 — 현재 인터벌 데이터 범위 밖 거래용.
     @State private var pendingFocusTradeID: UUID?
 
@@ -76,6 +77,10 @@ struct AssetDetailView: View {
         }
         .task(id: DetailLoadKey(interval: model.detailInterval, focusDate: model.detailFocusDate)) {
             await model.loadDetailChart(assetID: assetID)
+        }
+        .onDisappear {
+            isLive = false
+            model.stopDetailLive()
         }
         .onChange(of: model.detailCandles) {
             // 인터벌 전환으로 새 캔들이 도착하면, 대기 중이던 포커스를 적용한다.
@@ -147,6 +152,7 @@ struct AssetDetailView: View {
             Spacer()
             Group {
                 if !asset.isManual {
+                    liveButton(asset: asset)
                     IconButton(systemName: "plus") {
                         model.push(.tradeForm(assetID: assetID, editing: nil, prefill: nil))
                     }
@@ -159,6 +165,36 @@ struct AssetDetailView: View {
         .padding(.horizontal, 14)
         .padding(.top, 14)
         .padding(.bottom, 8)
+    }
+
+    private func liveButton(asset: Asset) -> some View {
+        Button {
+            isLive.toggle()
+            if isLive {
+                model.startDetailLive(assetID: asset.id)
+            } else {
+                model.stopDetailLive()
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(isLive ? theme.green : theme.text2)
+                    .frame(width: 5, height: 5)
+                Text(model.t("LIVE"))
+                    .font(.system(size: 10, weight: .bold))
+                    .kerning(0.4)
+            }
+            .foregroundStyle(isLive ? theme.greenText : theme.text2)
+            .frame(height: 26)
+            .padding(.horizontal, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(isLive ? theme.green.opacity(0.16) : theme.iconBg)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 7))
+        }
+        .buttonStyle(.plain)
+        .help(model.t("Live price updates"))
     }
 
     // MARK: - 현재가 + 배지

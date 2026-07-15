@@ -71,6 +71,8 @@
 "JP" = "JP";
 "KR" = "KR";
 "Language" = "Language";
+"LIVE" = "LIVE";
+"Live price updates" = "Live price updates";
 "Launch at login" = "Launch at login";
 "Manage assets" = "Manage assets";
 "Move down" = "Move down";
