@@ -69,10 +69,18 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// 홈 Value History 자산별 범례에서 차트 라인을 숨긴 자산 ID.
     public var hiddenHomeChartAssetIDs: [UUID]
 
+    public static func defaultBaseCurrency(for locale: Locale = .current) -> String {
+        switch locale.language.languageCode?.identifier.lowercased() {
+        case "ko": return "KRW"
+        case "ja": return "JPY"
+        default: return "USD"
+        }
+    }
+
     public init(
         theme: ThemePreference = .system,
         language: LanguagePreference = .system,
-        baseCurrency: String = "KRW",
+        baseCurrency: String = AppSettings.defaultBaseCurrency(),
         displayCurrencyMode: DisplayCurrencyMode = .source,
         quoteRefreshSeconds: Int = 300,
         rotationSeconds: Int = 10,

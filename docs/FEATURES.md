@@ -179,7 +179,8 @@ Entered via ✎ in the Home footer. Consists of a top search bar + a held-asset 
   - Language (select: System / 한국어 / English, default System)
 - **Data**
   - Price refresh interval (select: 1/5/10/15 min)
-  - Base currency (select: KRW/USD/JPY) — used **only for aggregate calculations** like total and the Combined chart
+  - Base currency (select: KRW/USD/JPY; new installs default to KRW for Korean systems, JPY for Japanese systems, USD otherwise)
+    — used **only for aggregate calculations** like total and the Combined chart
   - Asset display currency (select: **source currency as-is** (default) / convert to base currency)
     — with source currency, BTC shows in $ and Samsung Electronics in ₩, each in its own currency
   - Data backup/restore (button) · clear candle cache · permanently delete all data after a successful backup export

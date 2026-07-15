@@ -3,6 +3,12 @@ import Testing
 @testable import WeaveCore
 
 @Suite struct JSONPortfolioStoreTests {
+    @Test func defaultBaseCurrencyFollowsSystemLanguage() {
+        #expect(AppSettings.defaultBaseCurrency(for: Locale(identifier: "ko_KR")) == "KRW")
+        #expect(AppSettings.defaultBaseCurrency(for: Locale(identifier: "ja_JP")) == "JPY")
+        #expect(AppSettings.defaultBaseCurrency(for: Locale(identifier: "en_US")) == "USD")
+    }
+
     private func tempStore() -> JSONPortfolioStore {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("weave-tests-\(UUID().uuidString)")
