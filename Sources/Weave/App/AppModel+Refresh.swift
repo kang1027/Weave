@@ -115,10 +115,28 @@ extension AppModel {
             && settings.baseCurrency.uppercased() == "KRW"
     }
 
+    /// 값이 오기 전에 카드 자리를 잡아 둘지 — 업비트에 없던 코인은 잡지 않는다.
+    func reservesKimchiPremiumSpace(for asset: Asset) -> Bool {
+        showsKimchiPremium(for: asset) && !kimchiUnlistedSymbols.contains(asset.symbol.uppercased())
+    }
+
+    func cachedKimchiPremium(for asset: Asset) -> KimchiPremium? {
+        kimchiPremiumCache[asset.symbol.uppercased()]
+    }
+
     /// 업비트 원화 마켓에 없으면 nil. 네트워크 오류는 throw — 호출부가 마지막 값을 유지한다.
     func kimchiPremium(for asset: Asset) async throws -> KimchiPremium? {
         guard showsKimchiPremium(for: asset), let kimchiPremiumService else { return nil }
-        return try await kimchiPremiumService.premium(symbol: asset.symbol, binanceSymbol: asset.providerSymbol)
+        let key = asset.symbol.uppercased()
+        let premium = try await kimchiPremiumService.premium(symbol: key, binanceSymbol: asset.providerSymbol)
+        if let premium {
+            kimchiPremiumCache[key] = premium
+            kimchiUnlistedSymbols.remove(key)
+        } else {
+            kimchiPremiumCache[key] = nil
+            kimchiUnlistedSymbols.insert(key)
+        }
+        return premium
     }
 
     // MARK: - 메뉴바 타이틀

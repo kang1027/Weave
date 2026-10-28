@@ -8,32 +8,49 @@ private struct KimchiLoadKey: Equatable {
 }
 
 /// 크립토 상세 김프 카드 — 업비트 원화가 vs 바이낸스 달러가 × 환율, 30일 추이.
-/// 업비트 원화 마켓에 없는 코인이거나 아직 못 받았으면 아무것도 그리지 않는다.
+/// 값이 오기 전엔 같은 크기의 자리표시 카드로 자리를 잡아 차트가 밀려 내려가지 않게 한다.
+/// 업비트 원화 마켓에 없는 코인이면 아무것도 그리지 않는다.
 struct KimchiPremiumCard: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
     let asset: Asset
     @State private var premium: KimchiPremium?
+    @State private var reservesSpace: Bool
+
+    init(asset: Asset, initial: KimchiPremium?, reservesSpace: Bool) {
+        self.asset = asset
+        _premium = State(initialValue: initial)
+        _reservesSpace = State(initialValue: reservesSpace)
+    }
+
+    /// 자리표시용 — 텍스트는 가려지고 크기만 실제 값과 비슷하게 잡힌다.
+    private static let placeholder = KimchiPremium(
+        upbitPrice: 100_000_000, binancePrice: 70_000, usdKRW: 1_400,
+        history: [KimchiPremiumPoint(date: .distantPast, percent: 0), KimchiPremiumPoint(date: .distantPast, percent: 0)]
+    )
 
     var body: some View {
         // Group이면 비어 있을 때 .task가 붙을 뷰가 없다 — 빈 VStack은 크기 0으로 남아 로드를 시작한다.
         VStack(spacing: 0) {
             if let premium {
                 card(premium)
+            } else if reservesSpace {
+                card(Self.placeholder, isPlaceholder: true)
             }
         }
         // LIVE의 1초 갱신과 묶지 않는다 — 업비트 요청이 초마다 나가지 않게.
         .task(id: KimchiLoadKey(assetID: asset.id, refresh: model.nextRefreshAt)) {
             do {
                 premium = try await model.kimchiPremium(for: asset)
+                reservesSpace = premium != nil
             } catch {
-                // 일시적 오류면 마지막 값을 그대로 둔다.
+                // 일시적 오류면 마지막 값(또는 자리표시)을 그대로 둔다.
             }
         }
     }
 
-    private func card(_ premium: KimchiPremium) -> some View {
-        let tint = premium.percent >= 0 ? theme.orange : theme.blue
+    private func card(_ premium: KimchiPremium, isPlaceholder: Bool = false) -> some View {
+        let tint = isPlaceholder ? theme.track : premium.percent >= 0 ? theme.orange : theme.blue
         return PanelCard(padding: EdgeInsets(top: 11, leading: 12, bottom: 11, trailing: 12)) {
             VStack(spacing: 10) {
                 HStack(alignment: .center, spacing: 10) {
@@ -42,6 +59,7 @@ struct KimchiPremiumCard: View {
                             .font(.system(size: 10, weight: .semibold))
                             .kerning(0.8)
                             .foregroundStyle(theme.text2)
+                            .unredacted()
                         Text(MoneyFormatter.percent(premium.percent))
                             .font(.system(size: 20, weight: .bold))
                             .monospacedDigit()
@@ -75,6 +93,7 @@ struct KimchiPremiumCard: View {
                     )
                 }
             }
+            .redacted(reason: isPlaceholder ? .placeholder : [])
         }
         .padding(.horizontal, 14)
         .padding(.top, 14)

@@ -84,6 +84,11 @@ final class AppModel: ObservableObject {
     var detailChartAssetID: UUID?
     var detailLoadToken = 0
 
+    // 김프 카드 — 상세에 다시 들어올 때 바로 그리기 위한 마지막 값(심볼별).
+    var kimchiPremiumCache: [String: KimchiPremium] = [:]
+    /// 업비트 원화 마켓에 없던 심볼 — 카드 자리를 미리 잡지 않는다.
+    var kimchiUnlistedSymbols: Set<String> = []
+
     let store: any PortfolioStore
     let quoteService: QuoteService
     let candleService: CandleService

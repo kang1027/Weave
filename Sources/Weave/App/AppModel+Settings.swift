@@ -143,6 +143,8 @@ extension AppModel {
             await candleService.clearCache()
             await fxService.clearCache()
             await kimchiPremiumService?.clearCache()
+            kimchiPremiumCache = [:]
+            kimchiUnlistedSymbols = []
             LogoStore.clearAll()
             deleteStoredData()
 

@@ -50,7 +50,11 @@ struct AssetDetailView: View {
                         priceSection(asset: asset, metric: metric, position: position)
 
                         if model.showsKimchiPremium(for: asset) {
-                            KimchiPremiumCard(asset: asset)
+                            KimchiPremiumCard(
+                                asset: asset,
+                                initial: model.cachedKimchiPremium(for: asset),
+                                reservesSpace: model.reservesKimchiPremiumSpace(for: asset)
+                            )
                         }
 
                         if asset.isManual {
