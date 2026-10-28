@@ -142,6 +142,7 @@ extension AppModel {
             resetBackgroundWorkForDataWipe()
             await candleService.clearCache()
             await fxService.clearCache()
+            await kimchiPremiumService?.clearCache()
             LogoStore.clearAll()
             deleteStoredData()
 

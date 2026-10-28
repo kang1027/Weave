@@ -89,6 +89,8 @@ final class AppModel: ObservableObject {
     let candleService: CandleService
     let fxService: FXService
     let searchService: SearchService
+    /// 크립토 상세의 김프 카드용 — nil이면 카드를 숨긴다.
+    let kimchiPremiumService: KimchiPremiumService?
     let updater: UpdaterHandle
 
     private let logger = Logger(subsystem: "app.weave", category: "AppModel")
@@ -107,6 +109,7 @@ final class AppModel: ObservableObject {
         candleService: CandleService,
         fxService: FXService,
         searchService: SearchService,
+        kimchiPremiumService: KimchiPremiumService? = nil,
         updater: UpdaterHandle = UpdaterHandle()
     ) {
         self.store = store
@@ -114,6 +117,7 @@ final class AppModel: ObservableObject {
         self.candleService = candleService
         self.fxService = fxService
         self.searchService = searchService
+        self.kimchiPremiumService = kimchiPremiumService
         self.updater = updater
         do {
             self.document = try store.load()
@@ -143,12 +147,19 @@ final class AppModel: ObservableObject {
                 fileURL: FileManager.default.temporaryDirectory
                     .appendingPathComponent("Weave/portfolio.json")
             )
+        let fxService = FXService(yahoo: yahoo, cacheDirectory: cacheDir)
         return AppModel(
             store: store,
             quoteService: QuoteService(providers: providers),
             candleService: CandleService(providers: providers, cacheDirectory: cacheDir),
-            fxService: FXService(yahoo: yahoo, cacheDirectory: cacheDir),
-            searchService: SearchService(providers: providers)
+            fxService: fxService,
+            searchService: SearchService(providers: providers),
+            kimchiPremiumService: KimchiPremiumService(
+                upbit: UpbitProvider(http: http),
+                binance: binance,
+                yahoo: yahoo,
+                usdKRW: { try await fxService.rate(from: "USD", to: "KRW") }
+            )
         )
     }
 
