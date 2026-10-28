@@ -22,12 +22,20 @@ final class RemoteLogoCache {
 
     /// 이미 받아 둔 로고 — 첫 프레임부터 이니셜 배지 깜빡임 없이 그리기 위한 동기 조회.
     func cachedImage(for asset: Asset) -> NSImage? {
-        guard let source = AssetLogoSource(asset: asset) else { return nil }
-        return images[source.key]
+        AssetLogoSource(asset: asset).flatMap(cachedImage(for:))
+    }
+
+    func cachedImage(for source: AssetLogoSource) -> NSImage? {
+        images[source.key]
     }
 
     func image(for asset: Asset) async -> NSImage? {
         guard let source = AssetLogoSource(asset: asset) else { return nil }
+        return await image(for: source)
+    }
+
+    /// 검색 결과처럼 아직 Asset이 아닌 종목도 같은 캐시를 쓴다.
+    func image(for source: AssetLogoSource) async -> NSImage? {
         let key = source.key
         if let cached = images[key] { return cached }
         if let failed = failedAt[key], Date().timeIntervalSince(failed) < retryAfter { return nil }
