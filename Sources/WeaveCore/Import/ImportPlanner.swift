@@ -1,0 +1,283 @@
+import Foundation
+
+/// 소스가 알려준 종목 — 시장 + 표시 심볼("005930", "AAPL", "BTC").
+public struct ImportInstrument: Hashable, Sendable {
+    public var market: Market
+    public var symbol: String
+    public var name: String
+    public var currency: String
+
+    public init(market: Market, symbol: String, name: String, currency: String) {
+        self.market = market
+        self.symbol = symbol.uppercased()
+        self.name = name
+        self.currency = currency.uppercased()
+    }
+
+    /// 이름·통화 표기가 소스마다 달라도 같은 종목으로 본다.
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.market == rhs.market && lhs.symbol == rhs.symbol
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(market)
+        hasher.combine(symbol)
+    }
+
+    public func matches(_ asset: Asset) -> Bool {
+        asset.market == market && asset.symbol.uppercased() == symbol
+    }
+}
+
+/// 소스의 현재 보유. 평단은 소스가 주는 계좌 평단(없으면 nil).
+public struct ImportedHolding: Equatable, Sendable {
+    public var instrument: ImportInstrument
+    public var quantity: Decimal
+    public var averageCost: Decimal?
+
+    public init(instrument: ImportInstrument, quantity: Decimal, averageCost: Decimal?) {
+        self.instrument = instrument
+        self.quantity = quantity
+        self.averageCost = averageCost
+    }
+}
+
+/// 소스의 체결 한 건. externalID는 소스 안에서 유일해야 한다.
+public struct ImportedExecution: Equatable, Sendable {
+    public var externalID: String
+    public var instrument: ImportInstrument
+    public var side: TradeSide
+    public var quantity: Decimal
+    public var price: Decimal
+    public var date: Date
+
+    public init(
+        externalID: String,
+        instrument: ImportInstrument,
+        side: TradeSide,
+        quantity: Decimal,
+        price: Decimal,
+        date: Date
+    ) {
+        self.externalID = externalID
+        self.instrument = instrument
+        self.side = side
+        self.quantity = quantity
+        self.price = price
+        self.date = date
+    }
+}
+
+/// 한 번 동기화에서 소스가 준 전부.
+public struct SourceSnapshot: Sendable {
+    public var sourceID: UUID
+    public var holdings: [ImportedHolding]
+    public var executions: [ImportedExecution]
+    /// 체결 내역을 받아온 시작 시각 — 증권사 API는 조회 기간에 한도가 있다.
+    public var historyStart: Date
+
+    public init(sourceID: UUID, holdings: [ImportedHolding], executions: [ImportedExecution], historyStart: Date) {
+        self.sourceID = sourceID
+        self.holdings = holdings
+        self.executions = executions
+        self.historyStart = historyStart
+    }
+}
+
+/// 문서에 넣을 거래 한 건(자산 ID는 적용 단계에서 정해진다).
+public struct PlannedTrade: Equatable, Sendable {
+    public var instrument: ImportInstrument
+    public var side: TradeSide
+    public var quantity: Decimal
+    public var price: Decimal
+    public var date: Date
+    /// 기초 잔고면 nil.
+    public var externalID: String?
+
+    public var isOpeningBalance: Bool { externalID == nil }
+}
+
+/// 직접 입력한 거래와 같은 체결로 보이는 짝 — 기본은 가져온 기록으로 합친다.
+public struct DuplicateCandidate: Equatable, Sendable {
+    public var manualTradeID: UUID
+    public var externalID: String
+}
+
+/// 사용자가 확인해야 하는 보유 불일치.
+public struct HoldingMismatch: Equatable, Sendable {
+    public enum Reason: Equatable, Sendable {
+        /// 받아온 체결로 계산한 보유가 실제 보유보다 많다 — 출금·이체 등 이력에 없는 움직임.
+        case historyExceedsHolding
+        /// 기초 잔고가 필요한데 소스가 평단을 주지 않았다.
+        case missingAverageCost
+        /// 기초 잔고가 이미 있는데 보유가 이력보다 또 많다 — 입고·이체 등 이력에 없는 움직임.
+        case holdingExceedsHistory
+    }
+
+    public var instrument: ImportInstrument
+    /// 실제 보유 − 체결로 계산한 보유.
+    public var difference: Decimal
+    public var reason: Reason
+}
+
+public struct ImportPlan: Equatable, Sendable {
+    public var sourceID: UUID
+    /// 새 체결 + 기초 잔고.
+    public var trades: [PlannedTrade]
+    public var duplicates: [DuplicateCandidate]
+    public var mismatches: [HoldingMismatch]
+    /// 소액이라 건너뛴 종목(이미 자산으로 있는 종목은 건너뛰지 않는다).
+    public var skippedDust: [ImportInstrument]
+    /// 아직 자산이 없는 종목 — 적용 전에 자산을 만들어야 한다.
+    public var missingAssets: [ImportInstrument]
+
+    public var newTradeCount: Int { trades.filter { !$0.isOpeningBalance }.count }
+    public var openingBalances: [PlannedTrade] { trades.filter(\.isOpeningBalance) }
+    public var isEmpty: Bool { trades.isEmpty && duplicates.isEmpty && mismatches.isEmpty }
+}
+
+/// 동기화 결과를 문서와 맞대서 무엇을 넣을지 정한다. 문서는 바꾸지 않는다.
+public enum ImportPlanner {
+    /// - dust: 소액이라 숨길 종목 — 시세가 필요해서 호출부가 고른다.
+    /// - calendar: 직접 입력 거래와 같은 날인지 볼 달력(사용자 달력).
+    public static func plan(
+        snapshot: SourceSnapshot,
+        document: PortfolioDocument,
+        dust: Set<ImportInstrument> = [],
+        calendar: Calendar = .current
+    ) -> ImportPlan {
+        let sourceID = snapshot.sourceID
+        let assetFor: (ImportInstrument) -> Asset? = { instrument in
+            document.assets.first(where: instrument.matches)
+        }
+        let skipped = dust.filter { assetFor($0) == nil }
+
+        // 1) 이미 가져온 체결과 같은 스냅샷 안의 중복은 건너뛴다.
+        let imported = Set(
+            document.trades.filter { $0.sourceID == sourceID }.compactMap(\.externalID)
+        )
+        var seen = Set<String>()
+        let executions = snapshot.executions
+            .filter { !skipped.contains($0.instrument) }
+            .filter { !imported.contains($0.externalID) && seen.insert($0.externalID).inserted }
+            .sorted { $0.date < $1.date }
+
+        // 2) 직접 입력한 같은 체결 찾기 — 같은 자산·방향·수량, 같은 날, 단가 1% 이내.
+        var claimedManual = Set<UUID>()
+        var duplicates: [DuplicateCandidate] = []
+        for execution in executions {
+            guard let asset = assetFor(execution.instrument) else { continue }
+            let match = document.trades.first { trade in
+                trade.assetID == asset.id
+                    && !trade.isImported
+                    && !claimedManual.contains(trade.id)
+                    && trade.side == execution.side
+                    && trade.quantity == execution.quantity
+                    && calendar.isDate(trade.date, inSameDayAs: execution.date)
+                    && isClose(trade.price, execution.price, tolerance: Decimal(string: "0.01")!)
+            }
+            if let match {
+                claimedManual.insert(match.id)
+                duplicates.append(DuplicateCandidate(manualTradeID: match.id, externalID: execution.externalID))
+            }
+        }
+
+        var trades = executions.map {
+            PlannedTrade(
+                instrument: $0.instrument, side: $0.side, quantity: $0.quantity,
+                price: $0.price, date: $0.date, externalID: $0.externalID
+            )
+        }
+
+        // 3) 보유와 이력 맞추기 — 이 소스의 기존 거래 + 새 체결을 재생해 보유와 비교한다.
+        var mismatches: [HoldingMismatch] = []
+        let existingBySource = document.trades.filter { $0.sourceID == sourceID }
+        var instruments: [ImportInstrument] = snapshot.holdings.map(\.instrument)
+        for instrument in executions.map(\.instrument) + existingBySource.compactMap({ trade in
+            document.assets.first { $0.id == trade.assetID }.map {
+                ImportInstrument(market: $0.market, symbol: $0.symbol, name: $0.name, currency: $0.currency)
+            }
+        }) where !instruments.contains(instrument) {
+            instruments.append(instrument)
+        }
+
+        for instrument in instruments where !skipped.contains(instrument) {
+            let holding = snapshot.holdings.first { $0.instrument == instrument }
+            let existing = assetFor(instrument).map { asset in
+                existingBySource.filter { $0.assetID == asset.id }
+            } ?? []
+            // 재생용이라 자산 ID는 아무 값이나 쓴다 — PositionCalculator는 보지 않는다.
+            let history = existing + trades.filter { $0.instrument == instrument }.map { $0.asTrade(assetID: UUID()) }
+            let replayed = PositionCalculator.snapshot(trades: history)
+            let gap = (holding?.quantity ?? 0) - replayed.quantity
+            if gap < 0 {
+                mismatches.append(HoldingMismatch(instrument: instrument, difference: gap, reason: .historyExceedsHolding))
+            } else if gap > 0 {
+                // 기초 잔고는 계좌·종목당 하나 — 그 뒤에 생긴 차이는 사람이 봐야 한다.
+                guard !existing.contains(where: \.isOpeningBalance) else {
+                    mismatches.append(HoldingMismatch(instrument: instrument, difference: gap, reason: .holdingExceedsHistory))
+                    continue
+                }
+                guard let averageCost = holding?.averageCost, averageCost > 0 else {
+                    mismatches.append(HoldingMismatch(instrument: instrument, difference: gap, reason: .missingAverageCost))
+                    continue
+                }
+                let earliest = history.map(\.date).min() ?? snapshot.historyStart
+                trades.append(PlannedTrade(
+                    instrument: instrument,
+                    side: .buy,
+                    quantity: gap,
+                    price: openingCost(gap: gap, history: history, targetAverage: averageCost),
+                    date: min(earliest, snapshot.historyStart).addingTimeInterval(-1),
+                    externalID: nil
+                ))
+            }
+        }
+
+        let missing = uniqued(trades.map(\.instrument)).filter { assetFor($0) == nil }
+        return ImportPlan(
+            sourceID: sourceID,
+            trades: trades.sorted { $0.date < $1.date },
+            duplicates: duplicates,
+            mismatches: mismatches,
+            skippedDust: skipped.sorted { $0.symbol < $1.symbol },
+            missingAssets: missing
+        )
+    }
+
+    /// 기초 잔고 단가 — 이후 체결을 재생했을 때 평단이 소스 평단과 같아지게 역산한다.
+    /// 이동평균이라 최종 평단은 시작 단가 c의 1차식(α·c + β)이다.
+    static func openingCost(gap: Decimal, history: [Trade], targetAverage: Decimal) -> Decimal {
+        let start = (history.map(\.date).min() ?? Date()).addingTimeInterval(-1)
+        func finalAverage(_ cost: Decimal) -> Decimal {
+            let opening = Trade(assetID: UUID(), side: .buy, quantity: gap, price: cost, date: start)
+            return PositionCalculator.snapshot(trades: [opening] + history).averageCost
+        }
+        let beta = finalAverage(0)
+        let alpha = finalAverage(1) - beta
+        guard alpha > 0 else { return targetAverage }
+        let cost = (targetAverage - beta) / alpha
+        // 이력과 소스 평단이 안 맞으면(수수료 반영 방식 차이 등) 음수가 나올 수 있다 — 소스 평단으로 둔다.
+        return cost > 0 ? cost.rounded(scale: 8) : targetAverage
+    }
+
+    private static func isClose(_ lhs: Decimal, _ rhs: Decimal, tolerance: Decimal) -> Bool {
+        guard rhs != 0 else { return lhs == 0 }
+        return abs(lhs - rhs) / abs(rhs) <= tolerance
+    }
+
+    private static func uniqued(_ instruments: [ImportInstrument]) -> [ImportInstrument] {
+        var seen = Set<ImportInstrument>()
+        return instruments.filter { seen.insert($0).inserted }
+    }
+}
+
+extension PlannedTrade {
+    func asTrade(assetID: UUID, sourceID: UUID? = nil) -> Trade {
+        Trade(
+            assetID: assetID, side: side, quantity: quantity, price: price, date: date,
+            sourceID: sourceID, externalID: externalID,
+            openingBalance: isOpeningBalance ? true : nil
+        )
+    }
+}
