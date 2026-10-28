@@ -117,9 +117,7 @@ struct SearchResultRow: View {
     private var logo: some View {
         Group {
             if result.market == .crypto,
-               let url = URL(
-                   string: "https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/128/color/\(result.symbol.lowercased()).png"
-               ) {
+               let url = AssetLogoSource.cryptoIconURL(symbol: result.symbol) {
                 AsyncImage(url: url) { phase in
                     if let image = phase.image {
                         image.resizable().scaledToFit().padding(2)

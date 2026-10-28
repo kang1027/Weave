@@ -1,12 +1,13 @@
 import SwiftUI
 import WeaveCore
 
-/// 자산 로고 — 크립토는 아이콘 CDN, 그 외/실패 시 자산색 이니셜 배지 폴백.
+/// 자산 로고 — 크립토는 아이콘 CDN, 주식은 네이버 증권 로고, 그 외/실패 시 자산색 이니셜 배지 폴백.
 struct AssetLogoView: View {
     @Environment(\.theme) private var theme
     let asset: Asset
     var size: CGFloat = 28
     var isCircle = false
+    @State private var remoteLogo: NSImage?
 
     var body: some View {
         Group {
@@ -16,15 +17,11 @@ struct AssetLogoView: View {
                 Image(nsImage: custom)
                     .resizable()
                     .scaledToFill()
-            } else if let url = Self.logoURL(for: asset) {
-                AsyncImage(url: url) { phase in
-                    if let image = phase.image {
-                        image.resizable().scaledToFit()
-                            .padding(size * 0.08)
-                    } else {
-                        initialBadge
-                    }
-                }
+            } else if let remote = remoteLogo ?? RemoteLogoCache.shared.cachedImage(for: asset) {
+                Image(nsImage: remote)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(size * 0.08)
             } else {
                 initialBadge
             }
@@ -32,6 +29,16 @@ struct AssetLogoView: View {
         .frame(width: size, height: size)
         .background(color.opacity(0.15))
         .clipShape(shape)
+        .task(id: logoTaskID) {
+            remoteLogo = nil
+            guard asset.customLogoFileName == nil else { return }
+            remoteLogo = await RemoteLogoCache.shared.image(for: asset)
+        }
+    }
+
+    /// 자산이 바뀌거나 커스텀 로고가 지워지면 원격 로고를 다시 찾는다.
+    private var logoTaskID: String {
+        "\(AssetLogoSource(asset: asset)?.key ?? "")|\(asset.customLogoFileName ?? "")"
     }
 
     private var shape: AnyShape {
@@ -49,14 +56,6 @@ struct AssetLogoView: View {
             .font(.system(size: size * 0.45, weight: .bold))
             .foregroundStyle(color)
             .frame(width: size, height: size)
-    }
-
-    static func logoURL(for asset: Asset) -> URL? {
-        guard asset.market == .crypto else { return nil }
-        let symbol = asset.symbol.lowercased()
-        return URL(
-            string: "https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/128/color/\(symbol).png"
-        )
     }
 }
 
