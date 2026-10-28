@@ -104,7 +104,7 @@ struct KimchiPremiumCard: View {
             Text(title)
                 .font(.system(size: 10.5, weight: .semibold))
                 .foregroundStyle(theme.text2)
-            Text(MoneyFormatter.price(price.rounded(scale: 0), currency: "KRW"))
+            Text(Self.krwText(price))
                 .font(.system(size: 13, weight: .bold))
                 .monospacedDigit()
                 .foregroundStyle(theme.text)
@@ -124,6 +124,14 @@ struct KimchiPremiumCard: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(RoundedRectangle(cornerRadius: 9).fill(theme.bg))
+    }
+
+    /// 원화 가격 — 1원 미만 코인(업비트 SHIB 등)이 ₩0으로 보이지 않게 작은 값은 유효숫자로.
+    static func krwText(_ value: Decimal) -> String {
+        guard value < 100 else { return MoneyFormatter.price(value.rounded(scale: 0), currency: "KRW") }
+        return "₩" + value.formatted(
+            .number.precision(.significantDigits(1...4)).locale(Locale(identifier: "en_US"))
+        )
     }
 
     private func rangeText(_ history: [KimchiPremiumPoint]) -> String {

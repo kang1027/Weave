@@ -31,7 +31,13 @@ public actor FXService {
 
     /// from 통화 1단위 = 반환값 × to 통화.
     /// - maxAge: 캐시를 믿는 시간. 김프처럼 환율 몇 원이 결과를 바꾸는 곳은 짧게 준다.
-    public func rate(from: String, to: String, maxAge: TimeInterval = 3600) async throws -> Decimal {
+    /// - staleLimit: 조회 실패 시 대신 쓸 수 있는 낡은 값의 최대 나이. 넘으면 throw.
+    public func rate(
+        from: String,
+        to: String,
+        maxAge: TimeInterval = 3600,
+        staleLimit: TimeInterval = .infinity
+    ) async throws -> Decimal {
         let from = from.uppercased()
         let to = to.uppercased()
         if from == to { return 1 }
@@ -48,7 +54,9 @@ public actor FXService {
             return quote.price
         } catch {
             // 실패 시 만료된 값이라도 사용 — 환율은 급변하지 않는다.
-            if let cached = rates[key] { return cached.rate }
+            if let cached = rates[key], now().timeIntervalSince(cached.fetchedAt) < staleLimit {
+                return cached.rate
+            }
             throw error
         }
     }

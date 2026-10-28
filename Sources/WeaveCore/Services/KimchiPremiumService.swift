@@ -66,6 +66,8 @@ public actor KimchiPremiumService {
     private let usdKRW: @Sendable () async throws -> Decimal
     private let now: @Sendable () -> Date
     private var histories: [String: (points: [KimchiPremiumPoint], fetchedAt: Date)] = [:]
+    /// 추이 조회 실패 시각 — 실패가 이어질 때 시세 갱신마다 3개 요청을 다시 보내지 않게.
+    private var historyFailedAt: [String: Date] = [:]
     private var unlistedAt: [String: Date] = [:]
 
     public init(
@@ -101,6 +103,12 @@ public actor KimchiPremiumService {
             binancePrice: try await binanceQuote.price,
             usdKRW: try await rate
         )
+        // 가격이나 환율이 0이면 +0%로 보이지 않게 실패로 돌린다.
+        guard KimchiPremium.percent(
+            upbitKRW: premium.upbitPrice, binanceUSD: premium.binancePrice, usdKRW: premium.usdKRW
+        ) != nil else {
+            throw ProviderError.invalidResponse
+        }
 
         var points = await history(symbol: key, binanceSymbol: binanceSymbol)
         // 오늘 일봉은 아직 진행 중 — 마지막 점을 현재 김프로 맞춘다.
@@ -109,11 +117,14 @@ public actor KimchiPremiumService {
         }
         points.append(KimchiPremiumPoint(date: now(), percent: premium.percent))
         premium.history = points
+        // 화면이 바뀌어 취소됐으면 추이가 빠졌을 수 있는 값을 넘기지 않는다.
+        try Task.checkCancellation()
         return premium
     }
 
     public func clearCache() {
         histories = [:]
+        historyFailedAt = [:]
         unlistedAt = [:]
     }
 
@@ -121,6 +132,9 @@ public actor KimchiPremiumService {
     private func history(symbol: String, binanceSymbol: String) async -> [KimchiPremiumPoint] {
         if let cached = histories[symbol], now().timeIntervalSince(cached.fetchedAt) < 3_600 {
             return cached.points
+        }
+        if let failed = historyFailedAt[symbol], now().timeIntervalSince(failed) < 300 {
+            return histories[symbol]?.points ?? []
         }
         do {
             async let upbitCandles = upbit.dailyCandles(symbol: symbol, count: Self.historyDays)
@@ -134,8 +148,10 @@ public actor KimchiPremiumService {
                 usdKRW: try await fxCandles
             )
             histories[symbol] = (points, now())
+            historyFailedAt[symbol] = nil
             return points
         } catch {
+            if !Task.isCancelled { historyFailedAt[symbol] = now() }
             return histories[symbol]?.points ?? []
         }
     }

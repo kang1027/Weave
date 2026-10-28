@@ -104,6 +104,43 @@ private func candle(_ date: Date, _ close: Decimal) -> Candle {
         #expect(await state.tickerCalls == 2)
     }
 
+    @Test func zeroBinancePriceIsAnErrorNotZeroPercent() async throws {
+        let state = FakeUpbitState()
+        await state.set("/v1/ticker", #"[{"trade_price":1428000}]"#)
+        let service = KimchiPremiumService(
+            upbit: UpbitProvider(http: FakeUpbitHTTP(state: state)),
+            binance: FakeMarket(price: 0),
+            yahoo: FakeMarket(),
+            usdKRW: { 1_400 }
+        )
+        await #expect(throws: ProviderError.invalidResponse) {
+            try await service.premium(symbol: "BTC", binanceSymbol: "BTCUSDT")
+        }
+    }
+
+    @Test func failingHistoryIsNotRefetchedOnEveryCall() async throws {
+        let state = FakeUpbitState()
+        await state.set("/v1/ticker", #"[{"trade_price":1428000}]"#)
+        let failures = CandleFailures()
+        let clock = Clock(day("2026-10-28"))
+        let service = KimchiPremiumService(
+            upbit: UpbitProvider(http: FakeUpbitHTTP(state: state)),
+            binance: FailingCandles(failures: failures),
+            yahoo: FakeMarket(),
+            usdKRW: { 1_400 },
+            now: { clock.now }
+        )
+        // 추이 없이도 현재 김프는 나온다.
+        let first = try #require(try await service.premium(symbol: "BTC", binanceSymbol: "BTCUSDT"))
+        #expect(first.history.count == 1)
+        _ = try await service.premium(symbol: "BTC", binanceSymbol: "BTCUSDT")
+        #expect(await failures.calls == 1)
+
+        clock.now += 301
+        _ = try await service.premium(symbol: "BTC", binanceSymbol: "BTCUSDT")
+        #expect(await failures.calls == 2)
+    }
+
     @Test func premiumEndsHistoryWithTheCurrentValue() async throws {
         let state = FakeUpbitState()
         await state.set("/v1/ticker", #"[{"trade_price":1428000}]"#)
@@ -127,6 +164,26 @@ private func candle(_ date: Date, _ close: Decimal) -> Candle {
         // 10/27 +1%, 진행 중인 10/28 일봉은 현재 김프(+2%)로 바뀐다.
         #expect(premium.history.map(\.percent) == [1, 2])
         #expect(premium.history.last?.date == now)
+    }
+}
+
+/// 일봉 조회를 늘 실패시키고 횟수를 센다.
+private actor CandleFailures {
+    var calls = 0
+    func record() { calls += 1 }
+}
+
+private struct FailingCandles: MarketDataProvider {
+    let kind: ProviderKind = .binance
+    let failures: CandleFailures
+
+    func search(query: String) async throws -> [SearchResult] { [] }
+    func quote(providerSymbol: String) async throws -> Quote {
+        Quote(price: 1_000, changePercent: 0, currency: "USD")
+    }
+    func candles(providerSymbol: String, interval: CandleInterval) async throws -> [Candle] {
+        await failures.record()
+        throw HTTPError.badStatus(500)
     }
 }
 
