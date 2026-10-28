@@ -7,9 +7,12 @@ struct AssetLogoView: View {
     @Environment(\.theme) private var theme
     let asset: Asset
     var size: CGFloat = 28
-    @State private var remoteLogo: NSImage?
+    /// 원격 로고가 도착했다는 신호 — 이미지는 늘 현재 자산 키로 캐시에서 찾는다(다른 자산 로고가 남지 않게).
+    @State private var loadedKey: String?
 
     var body: some View {
+        // 로고 도착 시 이 뷰를 다시 그리도록 body에서 읽어 둔다.
+        let _ = loadedKey
         Group {
             if let fileName = asset.customLogoFileName,
                let custom = LogoStore.image(named: fileName) {
@@ -17,7 +20,7 @@ struct AssetLogoView: View {
                 Image(nsImage: custom)
                     .resizable()
                     .scaledToFill()
-            } else if let remote = remoteLogo ?? RemoteLogoCache.shared.cachedImage(for: asset) {
+            } else if let remote = RemoteLogoCache.shared.cachedImage(for: asset) {
                 Image(nsImage: remote)
                     .resizable()
                     .scaledToFit()
@@ -29,9 +32,12 @@ struct AssetLogoView: View {
         .background(color.opacity(0.15))
         .clipShape(Circle())
         .task(id: logoTaskID) {
-            remoteLogo = nil
-            guard asset.customLogoFileName == nil else { return }
-            remoteLogo = await RemoteLogoCache.shared.image(for: asset)
+            guard asset.customLogoFileName == nil,
+                  RemoteLogoCache.shared.cachedImage(for: asset) == nil else { return }
+            let key = logoTaskID
+            if await RemoteLogoCache.shared.image(for: asset) != nil, !Task.isCancelled {
+                loadedKey = key
+            }
         }
     }
 

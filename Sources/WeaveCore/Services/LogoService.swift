@@ -49,6 +49,11 @@ public actor LogoService {
         try? FileManager.default.removeItem(at: directory)
     }
 
+    /// 받아 둔 파일을 앱이 이미지로 못 읽었을 때 지운다 — 다음 요청에서 다시 받는다.
+    public func discard(_ source: AssetLogoSource) {
+        try? FileManager.default.removeItem(at: fileURL(key: source.key))
+    }
+
     private func fetch(_ source: AssetLogoSource) async -> Data? {
         var allMissing = true
         for url in source.candidates {
@@ -79,8 +84,8 @@ public actor LogoService {
         let bytes = [UInt8](data.prefix(4))
         if bytes == [0x89, 0x50, 0x4E, 0x47] { return true }
         if bytes.starts(with: [0xFF, 0xD8, 0xFF]) { return true }
-        guard let head = String(data: data.prefix(512), encoding: .utf8) else { return false }
-        return head.contains("<svg")
+        // 512바이트 컷이 멀티바이트 문자 중간에 걸려도 판별되게 손실 허용 디코딩.
+        return String(decoding: data.prefix(512), as: UTF8.self).contains("<svg")
     }
 
     // MARK: - 디스크 캐시

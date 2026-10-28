@@ -98,3 +98,13 @@ private struct FakeLogoHTTP: HTTPClient {
         #expect(!LogoService.isImage(Data()))
     }
 }
+
+@Suite struct LogoServiceSniffTests {
+    @Test func svgSniffSurvivesACutMultibyteCharacter() {
+        // 512바이트 경계에 한글(3바이트)이 걸리게 앞을 채운다.
+        let prefix = "<svg xmlns=\"http://www.w3.org/2000/svg\"><!--" + String(repeating: "a", count: 466)
+        let data = Data((prefix + "로고-->").utf8)
+        #expect(data.count > 512)
+        #expect(LogoService.isImage(data))
+    }
+}
