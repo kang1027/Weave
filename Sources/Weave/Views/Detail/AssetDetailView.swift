@@ -113,7 +113,7 @@ struct AssetDetailView: View {
                     // hover 시 "바꿀 수 있음" 어포던스 — 연필 오버레이 + 확대 + 손 커서.
                     .overlay {
                         if isHoveringLogo {
-                            RoundedRectangle(cornerRadius: 22 * 0.29)
+                            Circle()
                                 .fill(.black.opacity(0.45))
                             Image(systemName: "pencil")
                                 .font(.system(size: 10, weight: .bold))
@@ -122,7 +122,7 @@ struct AssetDetailView: View {
                     }
                     .scaleEffect(isHoveringLogo ? 1.15 : 1)
                     .animation(.easeOut(duration: 0.15), value: isHoveringLogo)
-                    .contentShape(RoundedRectangle(cornerRadius: 7))
+                    .contentShape(Circle())
                     .onHover { hovering in
                         isHoveringLogo = hovering
                         if hovering {
