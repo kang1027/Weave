@@ -51,6 +51,19 @@ private var utc: Calendar {
         #expect(decoded.trades.first?.isOpeningBalance == false)
     }
 
+    @Test func storageVersionStaysReadableForOldAppsUntilSomethingIsLinked() throws {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        func version(_ doc: PortfolioDocument) throws -> Int? {
+            let object = try JSONSerialization.jsonObject(with: encoder.encode(doc)) as? [String: Any]
+            return object?["version"] as? Int
+        }
+        #expect(try version(PortfolioDocument()) == 2)
+        #expect(try version(PortfolioDocument(sources: [source])) == 3)
+        let imported = Trade(assetID: UUID(), side: .buy, quantity: 1, price: 1, sourceID: source.id, externalID: "E")
+        #expect(try version(PortfolioDocument(trades: [imported])) == 3)
+    }
+
     @Test func sourcesAndImportFieldsRoundTrip() throws {
         let trade = Trade(assetID: UUID(), side: .buy, quantity: 1, price: 2, sourceID: source.id, externalID: "E1", openingBalance: true)
         let original = PortfolioDocument(trades: [trade], sources: [source])
@@ -149,6 +162,49 @@ private var utc: Calendar {
         let replay = PositionCalculator.snapshot(trades: plan.trades.map { $0.asTrade(assetID: UUID()) })
         #expect(replay.quantity == 10)
         #expect(replay.averageCost.rounded(scale: 4) == 80)
+    }
+
+    @Test func sellOfSharesBoughtBeforeTheHistoryIsCoveredByTheOpeningBalance() {
+        // 보유 10주인데 이력엔 5주 매도뿐 — 기간 전에 15주가 있었다.
+        let plan = ImportPlanner.plan(
+            snapshot: snapshot(
+                holdings: [ImportedHolding(instrument: hynix, quantity: 10, averageCost: 80)],
+                executions: [execution("S1", hynix, .sell, 5, 120, "2026-02-10")]
+            ),
+            document: document()
+        )
+        #expect(plan.mismatches.isEmpty)
+        #expect(plan.openingBalances.first?.quantity == 15)
+        let replay = PositionCalculator.snapshot(trades: plan.trades.map { $0.asTrade(assetID: UUID()) })
+        #expect(replay.quantity == 10)
+        #expect(replay.averageCost == 80)
+    }
+
+    @Test func historyThatDipsBelowZeroGoesToReview() {
+        // 5주 팔고 3주 사서 1주 보유 — 기초 잔고 3주를 얹어도 매도 시점에 모자란다(이력에 없는 출금).
+        let plan = ImportPlanner.plan(
+            snapshot: snapshot(
+                holdings: [ImportedHolding(instrument: hynix, quantity: 1, averageCost: 80)],
+                executions: [
+                    execution("S1", hynix, .sell, 5, 120, "2026-02-10"),
+                    execution("B1", hynix, .buy, 3, 90, "2026-02-20")
+                ]
+            ),
+            document: document()
+        )
+        #expect(plan.openingBalances.isEmpty)
+        #expect(plan.mismatches.map(\.reason) == [.historyExceedsHolding])
+    }
+
+    @Test func manualTradesBlockAnAutomaticOpeningBalance() {
+        let hynixAsset = asset(hynix)
+        let manual = Trade(assetID: hynixAsset.id, side: .buy, quantity: 8, price: 250_000, date: date("2025-06-01"))
+        let plan = ImportPlanner.plan(
+            snapshot: snapshot(holdings: [ImportedHolding(instrument: hynix, quantity: 8, averageCost: 298_500)]),
+            document: document(assets: [hynixAsset], trades: [manual])
+        )
+        #expect(plan.openingBalances.isEmpty)
+        #expect(plan.mismatches == [HoldingMismatch(instrument: hynix, difference: 8, reason: .manualTradesMayOverlap)])
     }
 
     @Test func flagsHoldingsThatTheHistoryCannotExplain() {

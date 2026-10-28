@@ -65,8 +65,8 @@ struct AssetDetailView: View {
                             .padding(.top, 10)
                             .id("detail-chart")
 
-                            // 연결한 계좌·지갑에서 가져온 거래가 있을 때만 — 직접 입력만이면 한 곳뿐이다.
-                            if trades.contains(where: \.isImported) {
+                            // 지금 연결한 계좌·지갑에 남아 있는 몫이 있을 때만 — 직접 입력만이면 한 곳뿐이다.
+                            if HoldingLocations.breakdown(trades: trades).contains(where: { $0.sourceID != nil }) {
                                 CapsHeader(text: model.t("Holdings by location"))
                                 HoldingLocationsCard(asset: asset, trades: model.document.trades(for: assetID))
                             }

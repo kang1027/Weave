@@ -214,6 +214,9 @@ Entered via ✎ in the Home footer. Consists of a top search bar + a held-asset 
 - `sources` lists linked accounts and wallets (kind · display name · masked account/address label · last sync).
   Keys and full addresses are not stored in the document. A trade imported from a source keeps its
   `sourceID` and the source's execution ID (`externalID`); manual trades have neither.
+- The file is saved as `version` 3 only once a source or an imported trade exists. Otherwise it stays at
+  version 2 so v0.1.x builds can still open it. A v0.1.x build refuses a version 3 file instead of
+  silently dropping the linked data.
 
 ### Linked accounts (in progress — no source can be connected yet)
 
@@ -227,8 +230,9 @@ keys require an allowlisted static IP.
 - **Opening balance**: when the holding is larger than the fetched history explains, an opening-balance buy
   is added just before the history starts. Its price is solved so that replaying the history gives the
   source's average cost. One opening balance per source and asset.
-- **Needs review**: history larger than the holding (withdrawals, transfers), a missing average cost, or a
-  second gap after the opening balance. These are not filled in automatically.
+- **Needs review**: history larger than the holding, or a history that dips below zero (withdrawals,
+  transfers); a missing average cost; a second gap after the opening balance; or manual trades on the same
+  asset that could double count with an opening balance. These are not filled in automatically.
 - **Dust**: holdings under a threshold (₩10,000 planned) are skipped unless the asset already exists.
 - **Locked**: imported trades can't be edited or deleted in the app (the source is the original).
 - **Holdings by location**: the detail screen shows how much of the asset sits in each source and in

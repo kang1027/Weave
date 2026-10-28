@@ -112,6 +112,8 @@ public struct HoldingMismatch: Equatable, Sendable {
         case missingAverageCost
         /// 기초 잔고가 이미 있는데 보유가 이력보다 또 많다 — 입고·이체 등 이력에 없는 움직임.
         case holdingExceedsHistory
+        /// 직접 입력한 거래가 있어 기초 잔고와 겹칠 수 있다 — 조회 기간 전 매수를 손으로 넣어 둔 경우 등.
+        case manualTradesMayOverlap
     }
 
     public var instrument: ImportInstrument
@@ -208,30 +210,51 @@ public enum ImportPlanner {
             } ?? []
             // 재생용이라 자산 ID는 아무 값이나 쓴다 — PositionCalculator는 보지 않는다.
             let history = existing + trades.filter { $0.instrument == instrument }.map { $0.asTrade(assetID: UUID()) }
-            let replayed = PositionCalculator.snapshot(trades: history)
-            let gap = (holding?.quantity ?? 0) - replayed.quantity
-            if gap < 0 {
-                mismatches.append(HoldingMismatch(instrument: instrument, difference: gap, reason: .historyExceedsHolding))
-            } else if gap > 0 {
-                // 기초 잔고는 계좌·종목당 하나 — 그 뒤에 생긴 차이는 사람이 봐야 한다.
-                guard !existing.contains(where: \.isOpeningBalance) else {
-                    mismatches.append(HoldingMismatch(instrument: instrument, difference: gap, reason: .holdingExceedsHistory))
-                    continue
-                }
-                guard let averageCost = holding?.averageCost, averageCost > 0 else {
-                    mismatches.append(HoldingMismatch(instrument: instrument, difference: gap, reason: .missingAverageCost))
-                    continue
-                }
-                let earliest = history.map(\.date).min() ?? snapshot.historyStart
-                trades.append(PlannedTrade(
-                    instrument: instrument,
-                    side: .buy,
-                    quantity: gap,
-                    price: openingCost(gap: gap, history: history, targetAverage: averageCost),
-                    date: min(earliest, snapshot.historyStart).addingTimeInterval(-1),
-                    externalID: nil
-                ))
+            // 매도를 보유로 자르지 않은 순수량 — 기간 전에 산 걸 기간 안에 판 만큼도 기초 잔고로 채워야 한다.
+            let net = history.reduce(Decimal(0)) { $0 + ($1.side == .buy ? $1.quantity : -$1.quantity) }
+            let gap = (holding?.quantity ?? 0) - net
+            func flag(_ reason: HoldingMismatch.Reason) {
+                mismatches.append(HoldingMismatch(instrument: instrument, difference: gap, reason: reason))
             }
+            if gap < 0 {
+                flag(.historyExceedsHolding)
+                continue
+            }
+            guard gap > 0 else {
+                // 수량은 맞아도 중간에 가진 것보다 많이 판 기록이 있으면 이력이 빠진 것이다.
+                if PositionCalculator.firstOversell(in: history) != nil { flag(.historyExceedsHolding) }
+                continue
+            }
+            // 기초 잔고는 계좌·종목당 하나 — 그 뒤에 생긴 차이는 사람이 봐야 한다.
+            if existing.contains(where: \.isOpeningBalance) {
+                flag(.holdingExceedsHistory)
+                continue
+            }
+            if let asset = assetFor(instrument), document.trades.contains(where: {
+                $0.assetID == asset.id && !$0.isImported && !claimedManual.contains($0.id)
+            }) {
+                flag(.manualTradesMayOverlap)
+                continue
+            }
+            guard let averageCost = holding?.averageCost, averageCost > 0 else {
+                flag(.missingAverageCost)
+                continue
+            }
+            let date = min(history.map(\.date).min() ?? snapshot.historyStart, snapshot.historyStart)
+                .addingTimeInterval(-1)
+            let opening = Trade(
+                assetID: UUID(), side: .buy, quantity: gap,
+                price: openingCost(gap: gap, history: history, targetAverage: averageCost), date: date
+            )
+            // 기초 잔고를 얹어도 중간에 마이너스가 되면 이력에 없는 출금이 있다.
+            if PositionCalculator.firstOversell(in: [opening] + history) != nil {
+                flag(.historyExceedsHolding)
+                continue
+            }
+            trades.append(PlannedTrade(
+                instrument: instrument, side: .buy, quantity: gap,
+                price: opening.price, date: date, externalID: nil
+            ))
         }
 
         let missing = uniqued(trades.map(\.instrument)).filter { assetFor($0) == nil }
