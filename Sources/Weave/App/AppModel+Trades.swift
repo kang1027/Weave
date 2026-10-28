@@ -5,6 +5,8 @@ extension AppModel {
     enum TradeError: Error, Equatable {
         case exceedsHolding(available: Decimal)
         case invalidInput
+        /// 연결한 계좌에서 가져온 거래 — 원본이 소스라 앱에서 바꾸지 않는다.
+        case imported
     }
 
     /// 거래 추가/수정 공통 검증 — 매도는 그 시점 보유 수량 초과 불가.
@@ -78,6 +80,7 @@ extension AppModel {
         guard let index = document.trades.firstIndex(where: { $0.id == trade.id }) else {
             return .invalidInput
         }
+        guard !document.trades[index].isImported else { return .imported }
         document.trades[index] = trade
         persist()
         invalidateHomeChart()
@@ -85,7 +88,7 @@ extension AppModel {
     }
 
     func deleteTrade(id: UUID) {
-        document.trades.removeAll { $0.id == id }
+        document.trades.removeAll { $0.id == id && !$0.isImported }
         persist()
         invalidateHomeChart()
     }

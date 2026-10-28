@@ -108,6 +108,12 @@
 "Realized" = "실현손익";
 "Realized %@" = "실현손익 %@";
 "Realized P&L" = "실현손익 누계";
+"Holdings by location" = "보관 위치";
+"Entered manually" = "직접 입력";
+"Linked account" = "연결한 계좌";
+"Opening balance" = "기초 잔고";
+"Imported from %@" = "%@에서 가져옴";
+"Imported trades can't be changed here" = "가져온 거래는 여기서 고칠 수 없어요";
 "Total P&L %@" = "총 손익 %@";
 "Record shortcut" = "단축키 등록";
 "Refresh now" = "지금 새로고침";

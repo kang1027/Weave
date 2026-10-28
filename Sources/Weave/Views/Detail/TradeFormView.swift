@@ -413,6 +413,8 @@ struct TradeFormView: View {
             return model.t("Can't sell more than you hold (\(qty))")
         case .invalidInput:
             return model.t("Enter a valid quantity and price")
+        case .imported:
+            return model.t("Imported trades can't be changed here")
         }
     }
 

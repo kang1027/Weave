@@ -108,6 +108,12 @@
 "Realized" = "Realized";
 "Realized %@" = "Realized %@";
 "Realized P&L" = "Realized P&L";
+"Holdings by location" = "Holdings by location";
+"Entered manually" = "Entered manually";
+"Linked account" = "Linked account";
+"Opening balance" = "Opening balance";
+"Imported from %@" = "Imported from %@";
+"Imported trades can't be changed here" = "Imported trades can't be changed here";
 "Total P&L %@" = "Total P&L %@";
 "Record shortcut" = "Record shortcut";
 "Refresh now" = "Refresh now";
