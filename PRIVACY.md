@@ -8,17 +8,20 @@ Everything is kept on your Mac only:
 
 - `~/Library/Application Support/Weave/portfolio.json` — your assets, trades, and settings.
 - `~/Library/Application Support/Weave/logos/` — any custom asset icons you upload.
-- A local candle/quote cache to avoid re-fetching market data.
+- A local candle/quote/logo cache to avoid re-fetching market data and asset logos.
 
 There is **no account, no sign-in, no cloud sync, and no server owned by this project.** Nothing you enter is transmitted anywhere.
 
 ## Network requests
 
-Weave only makes requests to fetch **public market data**:
+Weave only makes requests to fetch **public market data** and asset logos:
 
 - **Binance** — crypto quotes and candles.
-- **Naver Finance** — Korean stock quotes and candles.
+- **Naver Finance** — Korean stock quotes and candles, plus Korea/US/Japan stock logos.
 - **Yahoo Finance** — US/Japan stock quotes, candles, and FX rates.
+- **jsDelivr** — crypto icons from the open-source `cryptocurrency-icons` set.
+
+Each logo is downloaded once and cached locally.
 
 These requests contain only the symbol/endpoint being queried. Weave sends **no account identifiers, no API keys, and no personal data**. There is **no analytics, telemetry, tracking, or crash reporting** of any kind.
 
