@@ -142,6 +142,7 @@ extension AppModel {
             resetBackgroundWorkForDataWipe()
             await candleService.clearCache()
             await fxService.clearCache()
+            await RemoteLogoCache.shared.reset()
             LogoStore.clearAll()
             deleteStoredData()
 

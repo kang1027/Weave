@@ -20,6 +20,13 @@ final class RemoteLogoCache {
         self.service = service ?? LogoService(http: URLSessionHTTPClient(), cacheDirectory: cacheDir)
     }
 
+    /// 모든 데이터 삭제 — 메모리 이미지와 디스크 캐시, 없음 기록까지 비운다.
+    func reset() async {
+        images = [:]
+        failedAt = [:]
+        await service.clearCache()
+    }
+
     /// 이미 받아 둔 로고 — 첫 프레임부터 이니셜 배지 깜빡임 없이 그리기 위한 동기 조회.
     func cachedImage(for asset: Asset) -> NSImage? {
         AssetLogoSource(asset: asset).flatMap(cachedImage(for:))
@@ -55,6 +62,8 @@ final class RemoteLogoCache {
         // SVG(네이버 주식 로고)는 NSImage가 벡터 그대로 읽는다. 못 읽으면 이니셜 배지로 남는다.
         guard let data, let image = NSImage(data: data) else {
             failedAt[key] = Date()
+            // 깨졌거나 이 macOS가 못 읽는 파일이면 지워서 쿨다운 뒤 다시 받게 한다.
+            if data != nil { await service.discard(source) }
             return nil
         }
         images[key] = image
