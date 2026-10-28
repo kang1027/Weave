@@ -19,6 +19,7 @@ Weave only makes requests to fetch **public market data**:
 - **Binance** — crypto quotes and candles.
 - **Naver Finance** — Korean stock quotes and candles.
 - **Yahoo Finance** — US/Japan stock quotes, candles, and FX rates.
+- **Upbit** — public KRW crypto prices for the kimchi premium card (only when your base currency is KRW). No Upbit account or API key is used.
 
 These requests contain only the symbol/endpoint being queried. Weave sends **no account identifiers, no API keys, and no personal data**. There is **no analytics, telemetry, tracking, or crash reporting** of any kind.
 
