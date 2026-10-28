@@ -30,14 +30,15 @@ public actor FXService {
     }
 
     /// from 통화 1단위 = 반환값 × to 통화.
-    public func rate(from: String, to: String) async throws -> Decimal {
+    /// - maxAge: 캐시를 믿는 시간. 김프처럼 환율 몇 원이 결과를 바꾸는 곳은 짧게 준다.
+    public func rate(from: String, to: String, maxAge: TimeInterval = 3600) async throws -> Decimal {
         let from = from.uppercased()
         let to = to.uppercased()
         if from == to { return 1 }
 
         loadDiskIfNeeded()
         let key = "\(from)->\(to)"
-        if let cached = rates[key], now().timeIntervalSince(cached.fetchedAt) < 3600 {
+        if let cached = rates[key], now().timeIntervalSince(cached.fetchedAt) < maxAge {
             return cached.rate
         }
         do {

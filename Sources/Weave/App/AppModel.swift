@@ -163,7 +163,8 @@ final class AppModel: ObservableObject {
                 upbit: UpbitProvider(http: http),
                 binance: binance,
                 yahoo: yahoo,
-                usdKRW: { try await fxService.rate(from: "USD", to: "KRW") }
+                // 환율 1원이 김프 약 0.07%라 홈 총액용 1시간 캐시보다 짧게 쓴다.
+                usdKRW: { try await fxService.rate(from: "USD", to: "KRW", maxAge: 300) }
             )
         )
     }

@@ -97,7 +97,7 @@ Entered via ✎ in the Home footer. Consists of a top search bar + a held-asset 
   renders a rolling 1-second chart; it stops automatically when leaving the detail screen.
 - **Kimchi premium card** (crypto, base currency KRW only): the Upbit KRW price, the Binance price
   converted to KRW (`$price × USD/KRW`), and the premium %, plus a 30-day daily premium sparkline with
-  its min~max range. Refreshed on each quote refresh, not by `LIVE`. Hidden for coins without an
+  its min~max range. Refreshed on each quote refresh, not by `LIVE`, with a USD/KRW rate at most 5 minutes old. Hidden for coins without an
   Upbit KRW market.
 - **Chart** (Swift Charts):
   - Actual candle close line + gradient fill (asset color), price on the right y-axis, dates on the bottom x-axis.
