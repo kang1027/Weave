@@ -16,7 +16,8 @@ struct KimchiPremiumCard: View {
     @State private var premium: KimchiPremium?
 
     var body: some View {
-        Group {
+        // Group이면 비어 있을 때 .task가 붙을 뷰가 없다 — 빈 VStack은 크기 0으로 남아 로드를 시작한다.
+        VStack(spacing: 0) {
             if let premium {
                 card(premium)
             }
@@ -68,7 +69,9 @@ struct KimchiPremiumCard: View {
                         title: model.t("Binance"),
                         price: premium.binancePriceKRW,
                         caption: MoneyFormatter.price(premium.binancePrice, currency: "USD")
-                            + " × " + MoneyFormatter.quantity(premium.usdKRW, maxFractionDigits: 2)
+                            + " × " + premium.usdKRW.formatted(
+                                .number.precision(.fractionLength(2)).locale(Locale(identifier: "en_US"))
+                            )
                     )
                 }
             }
