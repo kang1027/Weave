@@ -123,8 +123,7 @@ enum MenuBarImageRenderer {
         logo: NSImage?,
         in rect: NSRect
     ) {
-        let radius = rect.width * 0.29
-        let clip = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+        let clip = NSBezierPath(ovalIn: rect)
         if let logo {
             NSGraphicsContext.saveGraphicsState()
             clip.addClip()
