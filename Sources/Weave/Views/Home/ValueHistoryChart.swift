@@ -365,7 +365,7 @@ private struct MarkerDot: View {
                     .allowsHitTesting(false)
             }
 
-            AssetLogoView(asset: marker.asset, size: 18, isCircle: true)
+            AssetLogoView(asset: marker.asset, size: 18)
                 .overlay(Circle().strokeBorder(color, lineWidth: 1.5))
                 .background(Circle().fill(theme.pointBg))
                 .scaleEffect(isHovered ? 1.18 : 1)

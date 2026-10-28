@@ -2,11 +2,11 @@ import SwiftUI
 import WeaveCore
 
 /// 자산 로고 — 크립토는 아이콘 CDN, 주식은 네이버 증권 로고, 그 외/실패 시 자산색 이니셜 배지 폴백.
+/// 두 로고 소스가 모두 원형이라 커스텀 로고·이니셜 배지도 원형으로 맞춘다.
 struct AssetLogoView: View {
     @Environment(\.theme) private var theme
     let asset: Asset
     var size: CGFloat = 28
-    var isCircle = false
     @State private var remoteLogo: NSImage?
 
     var body: some View {
@@ -21,14 +21,13 @@ struct AssetLogoView: View {
                 Image(nsImage: remote)
                     .resizable()
                     .scaledToFit()
-                    .padding(size * 0.08)
             } else {
                 initialBadge
             }
         }
         .frame(width: size, height: size)
         .background(color.opacity(0.15))
-        .clipShape(shape)
+        .clipShape(Circle())
         .task(id: logoTaskID) {
             remoteLogo = nil
             guard asset.customLogoFileName == nil else { return }
@@ -39,12 +38,6 @@ struct AssetLogoView: View {
     /// 자산이 바뀌거나 커스텀 로고가 지워지면 원격 로고를 다시 찾는다.
     private var logoTaskID: String {
         "\(AssetLogoSource(asset: asset)?.key ?? "")|\(asset.customLogoFileName ?? "")"
-    }
-
-    private var shape: AnyShape {
-        isCircle
-            ? AnyShape(Circle())
-            : AnyShape(RoundedRectangle(cornerRadius: size * 0.29))
     }
 
     private var color: Color {

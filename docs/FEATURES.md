@@ -79,7 +79,7 @@ Entered via ✎ in the Home footer. Consists of a top search bar + a held-asset 
 - On selection, the asset is created with provider · symbol · currency · logo auto-set. Duplicate adds are prevented.
 - **Manual Asset**: for assets that can't be searched (real estate, unlisted, etc.). Name/currency/valuation entered manually,
   no price refresh. Option to exclude from the Combined chart (or show as a fixed average-cost line).
-- Logo: crypto uses the `cryptocurrency-icons` set; Korea/US/Japan stocks use Naver stock logos. Logos are downloaded once and cached under `cache/logos/`. Assets without a logo (ETFs, etc.) fall back to an initial badge.
+- Logo: crypto uses the `cryptocurrency-icons` set; Korea/US/Japan stocks use Naver stock logos. Logos are downloaded once and cached under `cache/logos/`. Assets without a logo (ETFs, etc.) fall back to an initial badge. Every logo, including custom uploads and initial badges, is shown as a circle.
 
 ### 3.2 Held-asset management
 - Asset row: logo · name · menu bar display toggle · color change · hide · delete.

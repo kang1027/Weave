@@ -122,14 +122,14 @@ struct SearchResultRow: View {
     private var logo: some View {
         Group {
             if let image = remoteLogo ?? logoSource.flatMap(RemoteLogoCache.shared.cachedImage(for:)) {
-                Image(nsImage: image).resizable().scaledToFit().padding(2)
+                Image(nsImage: image).resizable().scaledToFit()
             } else {
                 initialBadge
             }
         }
         .frame(width: 28, height: 28)
         .background(theme.iconBg)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(Circle())
         .task(id: logoSource?.key) {
             remoteLogo = nil
             guard let source = logoSource else { return }
