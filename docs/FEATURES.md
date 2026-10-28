@@ -211,6 +211,28 @@ Entered via ✎ in the Home footer. Consists of a top search bar + a held-asset 
 - `Application Support/Weave/portfolio.json` — assets · trades (buy/sell) · settings.
 - The schema has a `version` field, with a migration chain on load.
 - Quote/candle/FX caches are separate files (separated from the portfolio data, harmless to delete).
+- `sources` lists linked accounts and wallets (kind · display name · masked account/address label · last sync).
+  Keys and full addresses are not stored in the document. A trade imported from a source keeps its
+  `sourceID` and the source's execution ID (`externalID`); manual trades have neither.
+
+### Linked accounts (in progress — no source can be connected yet)
+
+The import rules are implemented in `WeaveCore` (`ImportPlanner` · `ImportApplier`) and tested. Brokers
+(Korea Investment, Toss Securities) and wallets will plug in later. Upbit is left out because its API
+keys require an allowlisted static IP.
+
+- **Already imported**: executions whose `externalID` is already in the document are skipped, as are repeats in the same sync.
+- **Same trade entered manually**: same asset · side · quantity, same day, price within 1% → suggested as a
+  duplicate. By default the imported record replaces the manual one.
+- **Opening balance**: when the holding is larger than the fetched history explains, an opening-balance buy
+  is added just before the history starts. Its price is solved so that replaying the history gives the
+  source's average cost. One opening balance per source and asset.
+- **Needs review**: history larger than the holding (withdrawals, transfers), a missing average cost, or a
+  second gap after the opening balance. These are not filled in automatically.
+- **Dust**: holdings under a threshold (₩10,000 planned) are skipped unless the asset already exists.
+- **Locked**: imported trades can't be edited or deleted in the app (the source is the original).
+- **Holdings by location**: the detail screen shows how much of the asset sits in each source and in
+  manual trades, once the asset has an imported trade.
 
 ---
 
