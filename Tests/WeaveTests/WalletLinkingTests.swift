@@ -37,7 +37,6 @@ private final class FakeMempool: HTTPSending, @unchecked Sendable {
 
 private struct FixedPrices: CryptoPriceSource {
     var price: Decimal
-    func usdtBaseAssets() async throws -> Set<String> { ["BTC", "ETH"] }
     func prices(baseAssets: [String]) async throws -> [String: Decimal] {
         Dictionary(uniqueKeysWithValues: baseAssets.map { ($0, price) })
     }
@@ -96,11 +95,80 @@ private func makeModel(_ document: PortfolioDocument, mempool: FakeMempool, cred
         // 같은 주소는 두 번 연결하지 않는다.
         #expect(await model.connectWallet(kind: .bitcoin, name: "", addresses: [address], chains: []) == .failure(.alreadyLinked))
 
-        // 해제하면 이동 기록이 지워지고 직접 입력분이 그대로 남는다(자산도 남는다).
+        // 지갑으로 옮긴 매수는 지울 수 없다 — 지우면 잠긴 이동이 직접 입력분을 마이너스로 만든다.
+        #expect(model.deleteTrade(id: bought.id) == .neededByMove)
+
+        // 해제 — 이동 기록이 지워지고 지갑에 남아 있던 0.3이 직접 입력분으로 돌아온다.
         model.disconnectSource(id: sourceID)
         #expect(model.document.trades.allSatisfy { $0.sourceID == nil && !$0.isTransfer })
+        let manual = model.document.trades
+        #expect(PositionCalculator.firstOversell(in: manual) == nil)
+        #expect(PositionCalculator.snapshot(trades: manual).quantity == Decimal(string: "0.3")!)
         #expect(model.document.assets.map(\.id) == [bitcoin.id])
         #expect(credentials.count == 0)
+    }
+
+    @MainActor
+    @Test func disconnectKeepsReturnedCoinsThatWereSoldLater() async throws {
+        let mempool = FakeMempool()
+        mempool.set(address, 100_000_000)
+        let model = makeModel(.empty, mempool: mempool, credentials: MemoryCredentials())
+        let sourceID = try await model.connectWallet(kind: .bitcoin, name: "", addresses: [address], chains: []).get()
+        model.applyPendingImport(sourceID: sourceID)
+        let bitcoin = try #require(model.document.assets.first)
+
+        // 0.6을 거래소로 보내 직접 입력분으로 돌아왔고, 거기서 팔았다.
+        mempool.set(address, 40_000_000)
+        await model.syncSource(id: sourceID)
+        #expect(model.addTrade(assetID: bitcoin.id, side: .sell, quantity: Decimal(string: "0.6")!, price: 90_000, date: Date(), note: "") == nil)
+
+        // 돌아온 기록을 지우면 그 매도가 마이너스가 되니 일반 거래로 남긴다 — 실현손익도 그대로다.
+        model.disconnectSource(id: sourceID)
+        let trades = model.document.trades
+        #expect(trades.count == 2)
+        #expect(trades.allSatisfy { !$0.isLocked })
+        #expect(PositionCalculator.firstOversell(in: trades) == nil)
+        let sale = try #require(trades.first { $0.side == .sell })
+        #expect(model.realizedPnL(of: sale) == 6_000)
+        #expect(trades.contains { $0.note.hasPrefix("← ") })
+    }
+
+    @MainActor
+    @Test func disconnectWithoutLaterSalesRestoresTheManualHoldings() async throws {
+        let bitcoin = Asset(name: "Bitcoin", symbol: "BTC", provider: .binance, providerSymbol: "BTCUSDT", market: .crypto, currency: "USD")
+        let bought = Trade(assetID: bitcoin.id, side: .buy, quantity: 1, price: 50_000, date: Date(timeIntervalSince1970: 1_750_000_000))
+        let mempool = FakeMempool()
+        mempool.set(address, 80_000_000)
+        let model = makeModel(PortfolioDocument(assets: [bitcoin], trades: [bought]), mempool: mempool, credentials: MemoryCredentials())
+        let sourceID = try await model.connectWallet(kind: .bitcoin, name: "", addresses: [address], chains: []).get()
+        model.applyPendingImport(sourceID: sourceID)
+        model.disconnectSource(id: sourceID)
+        #expect(model.document.trades == [bought])
+    }
+
+    @MainActor
+    @Test func coinsSentBetweenWalletsAreNotCountedTwice() async throws {
+        let other = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
+        let mempool = FakeMempool()
+        mempool.set(address, 100_000_000)
+        mempool.set(other, 0)
+        let model = makeModel(.empty, mempool: mempool, credentials: MemoryCredentials())
+        let first = try await model.connectWallet(kind: .bitcoin, name: "A", addresses: [address], chains: []).get()
+        model.applyPendingImport(sourceID: first)
+        let second = try await model.connectWallet(kind: .bitcoin, name: "B", addresses: [other], chains: []).get()
+        if model.pendingImports[second] != nil { model.applyPendingImport(sourceID: second) }
+        func total() -> Decimal {
+            PortfolioCalculator.compute(assets: model.document.assets, trades: model.document.trades, quotes: [:], fxRates: ["USD": 1], baseCurrency: "USD")
+                .perAsset.first?.position.quantity ?? 0
+        }
+        #expect(total() == 1)
+
+        // A → B로 0.5를 옮겼다. B만 동기화해도 지갑 전체가 함께 돌아 줄어든 A부터 반영된다.
+        mempool.set(address, 50_000_000)
+        mempool.set(other, 50_000_000)
+        await model.syncSource(id: second)
+        #expect(total() == 1)
+        #expect(model.document.trades.filter { $0.isBalanceAdjustment }.isEmpty)
     }
 
     @MainActor

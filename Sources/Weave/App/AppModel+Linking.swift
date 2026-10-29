@@ -119,6 +119,7 @@ extension AppModel {
         guard !isWalletLinked(cleaned) else { return .failure(.alreadyLinked) }
         guard let prices = cryptoPrices else { return .failure(.server("no-prices")) }
 
+        let generation = linkGeneration
         let config = WalletConfig(kind: kind, addresses: cleaned, chains: kind == .evm ? chains : [])
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let source = LinkedSource(
@@ -128,7 +129,11 @@ extension AppModel {
         )
         do {
             let snapshot = try await WalletConnector.fetch(config: config, sourceID: source.id, http: linkHTTP, prices: prices)
-            // 받는 사이 같은 주소가 먼저 연결됐을 수 있다.
+            // 다른 지갑에서 이 지갑으로 옮긴 코인이 있으면 그 지갑의 감소분이 먼저 직접 입력분으로 돌아와야
+            // 새 지갑이 거기서 평단 그대로 가져간다.
+            await syncWallets()
+            // 받는 사이 데이터를 지웠거나 같은 주소가 먼저 연결됐을 수 있다.
+            guard generation == linkGeneration else { return .failure(.server("cancelled")) }
             guard !isWalletLinked(cleaned) else { return .failure(.alreadyLinked) }
             try credentialStore.save(config, for: source.id)
             document.sources.append(source)
@@ -163,7 +168,31 @@ extension AppModel {
         linkMismatches[id] = nil
         linkSkippedTrades[id] = nil
         lastLinkSyncAttempt[id] = nil
-        document.trades.removeAll { $0.sourceID == id || $0.transferSourceID == id }
+        // 지갑과 주고받은 직접 입력 쪽 기록은 지워서 직접 입력분을 되돌린다. 단, 돌아온 코인을 그 뒤에 직접 팔았다면
+        // 지우는 순간 직접 입력분이 마이너스가 되니 그 자산의 기록은 일반 거래로 남긴다.
+        let sourceName = document.source(id: id)?.name ?? ""
+        let manualLegs = Dictionary(
+            grouping: document.trades.filter { $0.sourceID == nil && $0.transferSourceID == id },
+            by: \.assetID
+        )
+        var kept = Set<UUID>()
+        for (assetID, legs) in manualLegs {
+            let remaining = document.trades.filter {
+                $0.assetID == assetID && $0.sourceID == nil && $0.transferSourceID != id
+            }
+            if PositionCalculator.firstOversell(in: remaining) != nil {
+                kept.formUnion(legs.map(\.id))
+            }
+        }
+        document.trades.removeAll { ($0.sourceID == id || $0.transferSourceID == id) && !kept.contains($0.id) }
+        for index in document.trades.indices where kept.contains(document.trades[index].id) {
+            let side = document.trades[index].side
+            document.trades[index].transferSourceID = nil
+            document.trades[index].externalID = nil
+            if document.trades[index].note.isEmpty {
+                document.trades[index].note = side == .sell ? "→ \(sourceName)" : "← \(sourceName)"
+            }
+        }
         for assetID in removedAssets {
             LogoStore.delete(fileName: asset(id: assetID)?.customLogoFileName)
             quotes[assetID] = nil
@@ -227,17 +256,27 @@ extension AppModel {
 
     /// 갱신 주기마다 불린다. 검토를 기다리는 연결은 사용자가 볼 때까지 다시 부르지 않는다.
     func syncLinkedSources(now: Date = Date()) async {
-        for source in document.sources where pendingImports[source.id] == nil {
-            if let last = lastLinkSyncAttempt[source.id], now.timeIntervalSince(last) < Self.linkSyncInterval {
-                continue
-            }
+        let due = document.sources.filter { source in
+            guard pendingImports[source.id] == nil else { return false }
+            guard let last = lastLinkSyncAttempt[source.id] else { return true }
+            return now.timeIntervalSince(last) >= Self.linkSyncInterval
+        }
+        for source in due where !source.kind.isWallet {
             await syncSource(id: source.id)
+        }
+        if due.contains(where: \.kind.isWallet) {
+            await syncWallets()
         }
     }
 
     /// 한 연결을 동기화한다. 처음 가져올 때는 검토 화면에 올리고, 그 뒤로는 바로 반영한다.
+    /// 지갑은 하나만 부르면 지갑끼리 옮긴 코인이 어긋나서 지갑 전체를 함께 동기화한다.
     func syncSource(id: UUID) async {
         guard let source = document.source(id: id), linkStatus[id] != .syncing else { return }
+        if source.kind.isWallet {
+            await syncWallets()
+            return
+        }
         let generation = linkGeneration
         lastLinkSyncAttempt[id] = Date()
         linkStatus[id] = .syncing
@@ -250,6 +289,38 @@ extension AppModel {
         } catch {
             guard generation == linkGeneration, document.source(id: id) != nil else { return }
             linkStatus[id] = .failed(LinkFailure(error))
+        }
+    }
+
+    /// 지갑을 모두 받아 줄어든 지갑부터 직접 입력분으로 돌려놓고, 그다음 늘어난 지갑이 거기서 가져가게 한다.
+    /// 순서가 반대면 A→B로 옮긴 코인이 B에선 시세로 새로 잡히고 A에선 직접 입력분으로 돌아가 두 번 잡힌다.
+    func syncWallets() async {
+        let wallets = document.sources.filter {
+            $0.kind.isWallet && pendingImports[$0.id] == nil && linkStatus[$0.id] != .syncing
+        }
+        guard !wallets.isEmpty else { return }
+        let generation = linkGeneration
+        for wallet in wallets {
+            lastLinkSyncAttempt[wallet.id] = Date()
+            linkStatus[wallet.id] = .syncing
+        }
+        var received: [(id: UUID, snapshot: SourceSnapshot)] = []
+        for wallet in wallets {
+            do {
+                received.append((wallet.id, try await fetchSnapshot(wallet)))
+            } catch {
+                guard generation == linkGeneration, document.source(id: wallet.id) != nil else { continue }
+                linkStatus[wallet.id] = .failed(LinkFailure(error))
+            }
+        }
+        guard generation == linkGeneration else { return }
+        let live = received.filter { document.source(id: $0.id) != nil }
+        for (id, snapshot) in live where document.source(id: id)?.lastSyncedAt != nil {
+            applyImport(ImportPlanner.plan(snapshot: snapshot, document: document, onlyDecreases: true), syncedAt: snapshot.takenAt)
+        }
+        for (id, snapshot) in live {
+            receive(snapshot, for: id, firstSync: document.source(id: id)?.lastSyncedAt == nil)
+            linkStatus[id] = .synced(Date())
         }
     }
 

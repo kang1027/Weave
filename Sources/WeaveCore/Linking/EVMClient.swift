@@ -15,6 +15,7 @@ public struct EVMClient: Sendable {
 
     /// 심볼별 잔고. 같은 심볼(USDC·USDC.e 등)은 합친다.
     public func balances(owner: String, chain: EVMChain, tokens: [EVMToken]) async throws -> [String: Decimal] {
+        guard WalletConfig.isEVMAddress(owner) else { throw WalletError.invalidResponse }
         // 가스 코인은 Multicall3의 getEthBalance로 함께 읽는다.
         let calls = [(target: Self.multicall, data: Self.getEthBalance(owner), symbol: chain.nativeSymbol, decimals: 18)]
             + tokens.map { (target: $0.contract, data: Self.balanceOf(owner), symbol: $0.symbol, decimals: $0.decimals) }
@@ -90,27 +91,40 @@ public struct EVMClient: Sendable {
     }
 
     /// (bool success, bytes returnData)[]
+    /// 응답은 RPC가 주는 대로라 모든 오프셋·길이를 응답 크기 안으로 묶어 읽는다 — 깨진 응답이 크래시가 되지 않게.
     static func decodeAggregate3(_ data: Data) -> [(success: Bool, data: Data)]? {
         let bytes = [UInt8](data)
+        /// 응답 길이를 넘지 않는 작은 값만 받는다. 넘으면 깨진 응답.
         func readWord(_ offset: Int) -> Int? {
-            guard offset >= 0, offset + 32 <= bytes.count else { return nil }
-            // 오프셋·길이는 작다 — 앞 24바이트가 0이 아니면 깨진 응답.
+            guard offset >= 0, offset <= bytes.count - 32 else { return nil }
             guard bytes[offset..<(offset + 24)].allSatisfy({ $0 == 0 }) else { return nil }
-            return bytes[(offset + 24)..<(offset + 32)].reduce(0) { $0 << 8 | Int($1) }
+            let value = bytes[(offset + 24)..<(offset + 32)].reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+            return value <= UInt64(bytes.count) ? Int(value) : nil
         }
-        guard let arrayOffset = readWord(0), let count = readWord(arrayOffset) else { return nil }
-        let headStart = arrayOffset + 32
+        func add(_ lhs: Int, _ rhs: Int) -> Int? {
+            lhs <= bytes.count - rhs ? lhs + rhs : nil
+        }
+        guard
+            bytes.count >= 64,
+            let arrayOffset = readWord(0),
+            let count = readWord(arrayOffset),
+            let headStart = add(arrayOffset, 32),
+            count <= (bytes.count - headStart) / 32
+        else { return nil }
         var results: [(Bool, Data)] = []
         for index in 0..<count {
             guard
                 let elementOffset = readWord(headStart + index * 32),
-                let success = readWord(headStart + elementOffset),
-                let bytesOffset = readWord(headStart + elementOffset + 32),
-                let length = readWord(headStart + elementOffset + bytesOffset)
+                let element = add(headStart, elementOffset),
+                let success = readWord(element),
+                let successWord = add(element, 32),
+                let bytesOffset = readWord(successWord),
+                let lengthAt = add(element, bytesOffset),
+                let length = readWord(lengthAt),
+                let start = add(lengthAt, 32),
+                let end = add(start, length)
             else { return nil }
-            let start = headStart + elementOffset + bytesOffset + 32
-            guard start + length <= bytes.count else { return nil }
-            results.append((success == 1, Data(bytes[start..<(start + length)])))
+            results.append((success == 1, Data(bytes[start..<end])))
         }
         return results
     }
@@ -131,9 +145,13 @@ public struct EVMClient: Sendable {
         Data(repeating: 0, count: 24) + withUnsafeBytes(of: value.bigEndian) { Data($0) }
     }
 
+    /// 주소는 `WalletConfig.isEVMAddress`로 확인된 것만 들어온다.
     private static func word(address: String) -> Data {
         let hex = address.lowercased().hasPrefix("0x") ? String(address.dropFirst(2)) : address
-        return Data(repeating: 0, count: 12) + (Data(hex: hex) ?? Data(repeating: 0, count: 20))
+        guard let raw = Data(hex: hex), raw.count == 20 else {
+            preconditionFailure("unchecked EVM address")
+        }
+        return Data(repeating: 0, count: 12) + raw
     }
 
     private static func padded(_ data: Data) -> Data {

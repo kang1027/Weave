@@ -141,6 +141,8 @@
 "%lld to review" = "확인 필요 %lld건";
 "Sync now" = "지금 동기화";
 "Just now" = "방금";
+"Part of this buy moved to a wallet, so it can't be removed" = "이 매수 일부가 지갑으로 옮겨져서 지울 수 없어요";
+"Can't delete this trade" = "거래를 지울 수 없어요";
 "Connect and import balances" = "연결하고 잔고 가져오기";
 "MOVE" = "이동";
 "At average cost" = "평단 그대로";

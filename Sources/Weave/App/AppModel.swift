@@ -128,7 +128,8 @@ final class AppModel: ObservableObject {
     /// 키 보관소 — 테스트는 메모리 보관소로 바꿔 끼운다.
     var credentialStore: any CredentialStoring = KeychainCredentialStore()
     /// 증권사 API 요청 — 오류 본문까지 봐야 해서 시세용 HTTPClient와 따로 둔다.
-    var linkHTTP: any HTTPSending = URLSessionHTTPClient()
+    /// 계좌·지갑 응답이 디스크 캐시에 남지 않게 따로 연 임시 세션을 쓴다.
+    var linkHTTP: any HTTPSending = URLSessionHTTPClient(session: URLSession(configuration: .ephemeral))
     /// 지갑 코인 시세(바이낸스). 없으면 지갑을 연결하지 않는다.
     var cryptoPrices: (any CryptoPriceSource)?
 

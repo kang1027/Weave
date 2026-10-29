@@ -30,8 +30,9 @@ These requests contain only the symbol/endpoint being queried. Weave sends **no 
 ## Linked accounts (optional)
 
 Nothing below happens unless you link an account or wallet in **Settings › Linked accounts**. The keys and
-wallet addresses you enter are stored in the **macOS Keychain** for this Mac only — never in `portfolio.json`
-or in backups.
+wallet addresses you enter are stored in the **macOS Keychain** for this Mac only. `portfolio.json` and backups
+keep only a short label: a masked account number (`••••8901`) or the first 6 and last 4 characters of an address.
+Requests to these services skip the on-disk URL cache.
 
 - **Toss Securities Open API** (`openapi.tossinvest.com`) — Weave sends the client ID and secret you entered to
   Toss to get an access token, then reads your account list, holdings, and order history about every 5 minutes

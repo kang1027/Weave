@@ -59,9 +59,8 @@ public enum WalletConnector {
             }
         }
 
-        let listed = try await prices.usdtBaseAssets()
-        let symbols = amounts.filter { $0.value > 0 && listed.contains($0.key) }.keys.sorted()
-        let quotes = symbols.isEmpty ? [:] : try await prices.prices(baseAssets: symbols)
+        let symbols = amounts.filter { $0.value > 0 }.keys.sorted()
+        let quotes = try await prices.prices(baseAssets: symbols)
         return snapshot(sourceID: sourceID, amounts: amounts, quotes: quotes, now: now)
     }
 
@@ -71,26 +70,33 @@ public enum WalletConnector {
         quotes: [String: Decimal],
         now: Date
     ) -> SourceSnapshot {
-        let holdings = amounts.keys.sorted().compactMap { symbol -> ImportedHolding? in
-            guard let quantity = amounts[symbol], let price = quotes[symbol], quantity * price >= dustValue else {
-                return nil
-            }
-            return ImportedHolding(
-                instrument: ImportInstrument(
-                    market: .crypto, symbol: symbol, name: CryptoNames.name(for: symbol), currency: "USD"
-                ),
-                quantity: quantity,
-                averageCost: nil,
-                marketPrice: price
+        var holdings: [ImportedHolding] = []
+        var unpriced: Set<ImportInstrument> = []
+        var dust: Set<ImportInstrument> = []
+        for symbol in amounts.keys.sorted() {
+            guard let quantity = amounts[symbol], quantity > 0 else { continue }
+            let instrument = ImportInstrument(
+                market: .crypto, symbol: symbol, name: CryptoNames.name(for: symbol), currency: "USD"
             )
+            // 잔고는 있는데 시세가 없다(상장 폐지·거래 중단) — 0으로 보면 지갑에서 다 빠진 걸로 기록되니 이번엔 건너뛴다.
+            guard let price = quotes[symbol] else {
+                unpriced.insert(instrument)
+                continue
+            }
+            holdings.append(ImportedHolding(
+                instrument: instrument, quantity: quantity, averageCost: nil, marketPrice: price
+            ))
+            if quantity * price < dustValue { dust.insert(instrument) }
         }
         return SourceSnapshot(
             sourceID: sourceID,
             holdings: holdings,
             executions: [],
             historyStart: now,
+            unsettled: unpriced,
             takenAt: now,
-            inheritsManualHoldings: true
+            inheritsManualHoldings: true,
+            dust: dust
         )
     }
 }

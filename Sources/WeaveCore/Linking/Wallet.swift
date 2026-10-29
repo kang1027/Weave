@@ -82,10 +82,10 @@ public struct WalletConfig: Codable, Equatable, Sendable {
 
     // MARK: - 주소 확인
 
-    /// 0x + 16진수 40자리.
+    /// 0x + ASCII 16진수 40자리(전각 숫자 등은 받지 않는다).
     public static func isEVMAddress(_ address: String) -> Bool {
         address.count == 42 && address.hasPrefix("0x")
-            && address.dropFirst(2).allSatisfy { $0.isHexDigit }
+            && address.dropFirst(2).allSatisfy { $0.isASCII && $0.isHexDigit }
     }
 
     /// 메인넷 주소 형식만 본다(체크섬은 조회 서비스가 거른다). 테스트넷 주소는 받지 않는다.
@@ -112,8 +112,6 @@ public enum WalletError: Error, Equatable, Sendable {
 
 /// 코인 시세 출처 — 바이낸스 USDT 마켓.
 public protocol CryptoPriceSource: Sendable {
-    /// 바이낸스 USDT 마켓에 있는 코인 심볼.
-    func usdtBaseAssets() async throws -> Set<String>
-    /// 심볼별 현재가(USD).
+    /// 심볼별 현재가(USD). USDT 마켓이 없거나 거래가 멈춘 코인은 빠진다.
     func prices(baseAssets: [String]) async throws -> [String: Decimal]
 }

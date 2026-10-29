@@ -148,26 +148,20 @@ public struct BinanceProvider: MarketDataProvider {
 // MARK: - 지갑 시세
 
 extension BinanceProvider: CryptoPriceSource {
-    public func usdtBaseAssets() async throws -> Set<String> {
-        Set(try await catalog.usdtPairs().map(\.baseAsset))
-    }
-
-    /// 현재가를 한 번에 받는다. 목록에 없는 심볼이 하나라도 있으면 바이낸스가 요청 전체를 거부하니 거른 뒤 부른다.
+    /// 전체 현재가를 한 번에 받아 고른다. 심볼을 지정해 부르면 그중 하나만 상장 폐지돼도 요청 전체가 거부된다.
     public func prices(baseAssets: [String]) async throws -> [String: Decimal] {
         guard !baseAssets.isEmpty else { return [:] }
-        let symbols = baseAssets.map { "\"\($0)USDT\"" }.joined(separator: ",")
-        var components = URLComponents(string: "https://api.binance.com/api/v3/ticker/price")!
-        components.queryItems = [URLQueryItem(name: "symbols", value: "[\(symbols)]")]
-        guard let url = components.url else { throw ProviderError.invalidResponse }
         struct Item: Decodable {
             var symbol: String
             var price: String
         }
+        let url = URL(string: "https://api.binance.com/api/v3/ticker/price")!
         let items = try JSONDecoder().decode([Item].self, from: try await http.get(url))
-        return Dictionary(uniqueKeysWithValues: items.compactMap { item in
-            guard item.symbol.hasSuffix("USDT"), let price = Decimal.clean(item.price) else { return nil }
+        let wanted = Set(baseAssets.map { "\($0)USDT" })
+        return Dictionary(items.compactMap { item in
+            guard wanted.contains(item.symbol), let price = Decimal.clean(item.price), price > 0 else { return nil }
             return (String(item.symbol.dropLast(4)), price)
-        })
+        }, uniquingKeysWith: { first, _ in first })
     }
 }
 

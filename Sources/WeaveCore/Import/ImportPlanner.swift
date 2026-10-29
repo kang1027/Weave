@@ -84,6 +84,8 @@ public struct SourceSnapshot: Sendable {
     public var takenAt: Date
     /// 지갑 — 체결 기록 없이 잔고만 있다. 늘고 준 만큼을 직접 입력분과 평단 그대로 주고받는다.
     public var inheritsManualHoldings: Bool
+    /// 소액 잔고 — 이 소스가 아직 안 가진 종목이면 새로 들이지 않는다(이미 가진 종목은 그대로 대조해서 경계에서 오락가락하지 않는다).
+    public var dust: Set<ImportInstrument>
 
     public init(
         sourceID: UUID,
@@ -92,7 +94,8 @@ public struct SourceSnapshot: Sendable {
         historyStart: Date,
         unsettled: Set<ImportInstrument> = [],
         takenAt: Date = Date(),
-        inheritsManualHoldings: Bool = false
+        inheritsManualHoldings: Bool = false,
+        dust: Set<ImportInstrument> = []
     ) {
         self.sourceID = sourceID
         self.holdings = holdings
@@ -101,6 +104,7 @@ public struct SourceSnapshot: Sendable {
         self.unsettled = unsettled
         self.takenAt = takenAt
         self.inheritsManualHoldings = inheritsManualHoldings
+        self.dust = dust
     }
 }
 
@@ -181,13 +185,18 @@ public enum ImportPlanner {
         snapshot: SourceSnapshot,
         document: PortfolioDocument,
         dust: Set<ImportInstrument> = [],
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        onlyDecreases: Bool = false
     ) -> ImportPlan {
         let sourceID = snapshot.sourceID
         let assetFor: (ImportInstrument) -> Asset? = { instrument in
             document.assets.first(where: instrument.matches)
         }
+        let heldBySource = Set(document.trades.filter { $0.sourceID == sourceID }.map(\.assetID))
         let skipped = dust.filter { assetFor($0) == nil }
+            .union(snapshot.dust.filter { instrument in
+                assetFor(instrument).map { !heldBySource.contains($0.id) } ?? true
+            })
         let held = Set(snapshot.holdings.filter { $0.quantity > 0 }.map(\.instrument))
         let closed = Set(snapshot.executions.map(\.instrument)).filter { !held.contains($0) && assetFor($0) == nil }
 
@@ -280,7 +289,7 @@ public enum ImportPlanner {
                 }
                 if gap < 0 {
                     move(.sell, -gap, at: PositionCalculator.snapshot(trades: history).averageCost)
-                } else if gap > 0 {
+                } else if gap > 0, !onlyDecreases {
                     let manual = assetFor(instrument).map { asset in
                         document.trades.filter { $0.assetID == asset.id && $0.sourceID == nil }
                     } ?? []

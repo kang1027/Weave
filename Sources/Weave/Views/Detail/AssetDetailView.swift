@@ -112,7 +112,14 @@ struct AssetDetailView: View {
             confirmTitle: model.t("Delete"),
             isDestructive: true,
             cancelTitle: model.t("Cancel"),
-            onConfirm: { model.deleteTrade(id: $0.id) }
+            onConfirm: { trade in
+                if model.deleteTrade(id: trade.id) == .neededByMove {
+                    model.presentAlert(
+                        title: model.t("Can't delete this trade"),
+                        message: model.t("Part of this buy moved to a wallet, so it can't be removed")
+                    )
+                }
+            }
         )
     }
 

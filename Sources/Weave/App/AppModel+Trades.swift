@@ -7,6 +7,8 @@ extension AppModel {
         case invalidInput
         /// 연결한 계좌에서 가져온 거래 — 원본이 소스라 앱에서 바꾸지 않는다.
         case imported
+        /// 지갑으로 옮긴 코인의 매수라 지우면 직접 입력분이 마이너스가 된다.
+        case neededByMove
     }
 
     /// 직접 입력분 거래만(지갑과 주고받은 이동 포함). 연결한 계좌 보유분은 그 계좌가 원본이라 직접 입력 매도로 줄이지 않는다.
@@ -31,7 +33,9 @@ extension AppModel {
     ) -> TradeError? {
         guard quantity > 0, price >= 0 else { return .invalidInput }
 
-        let existing = manualTrades(for: assetID).filter { $0.id != editingID }
+        // 고치기 전 전체(고치는 거래 포함) — 원래 일관됐는지는 이걸로 본다.
+        let baseline = manualTrades(for: assetID)
+        let existing = baseline.filter { $0.id != editingID }
         if side == .sell {
             let available = PositionCalculator.availableQuantity(at: date, trades: existing)
             if quantity > available {
@@ -45,7 +49,7 @@ extension AppModel {
             id: editingID ?? UUID(), assetID: assetID, side: side,
             quantity: quantity, price: price, date: date
         )
-        if PositionCalculator.firstOversell(in: existing) == nil,
+        if PositionCalculator.firstOversell(in: baseline) == nil,
            let oversell = PositionCalculator.firstOversell(in: existing + [candidate]) {
             let available = PositionCalculator.availableQuantity(
                 at: oversell.date, trades: existing
@@ -97,10 +101,21 @@ extension AppModel {
         return nil
     }
 
-    func deleteTrade(id: UUID) {
-        document.trades.removeAll { $0.id == id && !$0.isLocked }
+    /// 지갑으로 옮긴 코인의 매수를 지우면 잠긴 이동이 직접 입력분을 마이너스로 만든다 — 그런 삭제는 막는다.
+    @discardableResult
+    func deleteTrade(id: UUID) -> TradeError? {
+        guard let trade = document.trades.first(where: { $0.id == id }) else { return nil }
+        guard !trade.isLocked else { return .imported }
+        let manual = manualTrades(for: trade.assetID)
+        if PositionCalculator.firstOversell(in: manual) == nil,
+           let oversell = PositionCalculator.firstOversell(in: manual.filter { $0.id != id }),
+           oversell.isTransfer {
+            return .neededByMove
+        }
+        document.trades.removeAll { $0.id == id }
         persist()
         invalidateHomeChart()
+        return nil
     }
 
     /// 과거 날짜 선택 시 그날 종가 프리필 — 캔들 캐시 활용.
@@ -117,8 +132,10 @@ extension AppModel {
     }
 
     /// 특정 매도 거래의 실현손익(자산 통화).
+    /// 지갑 이동은 자산 전체 손익에서 빼고 계산한다(PortfolioCalculator와 같은 기준).
     func realizedPnL(of trade: Trade) -> Decimal? {
-        PositionCalculator.realizedPnL(of: trade, in: document.trades(for: trade.assetID))
+        guard !trade.isTransfer else { return nil }
+        return PositionCalculator.realizedPnL(of: trade, in: document.trades(for: trade.assetID).filter { !$0.isTransfer })
     }
 }
 

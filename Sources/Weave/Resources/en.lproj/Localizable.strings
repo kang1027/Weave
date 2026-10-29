@@ -141,6 +141,8 @@
 "%lld to review" = "%lld to review";
 "Sync now" = "Sync now";
 "Just now" = "Just now";
+"Part of this buy moved to a wallet, so it can't be removed" = "Part of this buy moved to a wallet, so it can't be removed";
+"Can't delete this trade" = "Can't delete this trade";
 "Connect and import balances" = "Connect and import balances";
 "MOVE" = "MOVE";
 "At average cost" = "At average cost";

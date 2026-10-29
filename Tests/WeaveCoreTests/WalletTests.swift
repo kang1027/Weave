@@ -43,14 +43,7 @@ private actor FakeRPC: HTTPSending {
     }
 }
 
-private struct FixedPrices: CryptoPriceSource {
-    var listed: Set<String>
-    var quotes: [String: Decimal]
-    func usdtBaseAssets() async throws -> Set<String> { listed }
-    func prices(baseAssets: [String]) async throws -> [String: Decimal] {
-        quotes.filter { baseAssets.contains($0.key) }
-    }
-}
+
 
 @Suite struct WalletTests {
     // MARK: - ABI
@@ -115,18 +108,85 @@ private struct FixedPrices: CryptoPriceSource {
         #expect(WalletConfig(kind: .evm, addresses: [owner], chains: [.ethereum, .arbitrum]).label == "0xd8dA…6045 · Ethereum, Arbitrum")
     }
 
-    @Test func snapshotKeepsListedCoinsWorthADollar() async throws {
+    @Test func snapshotMarksDustAndCoinsWithoutAPrice() async throws {
         let snapshot = WalletConnector.snapshot(
             sourceID: UUID(),
-            amounts: ["BTC": Decimal(string: "0.5")!, "PEPE": 100, "ETH": Decimal(string: "0.0001")!],
+            amounts: ["BTC": Decimal(string: "0.5")!, "PEPE": 100, "ETH": Decimal(string: "0.0001")!, "ARB": 0],
             quotes: ["BTC": 80_000, "ETH": 2_000],
             now: date("2026-03-01")
         )
-        // PEPE는 시세가 없고, ETH 0.0001개는 $0.2라 먼지로 뺀다.
-        #expect(snapshot.holdings.map(\.instrument.symbol) == ["BTC"])
+        #expect(snapshot.holdings.map(\.instrument.symbol) == ["BTC", "ETH"])
         #expect(snapshot.holdings.first?.marketPrice == 80_000)
         #expect(snapshot.holdings.first?.averageCost == nil)
+        // ETH 0.0001개는 $0.2라 먼지, PEPE는 잔고가 있는데 시세가 없어 이번엔 대조하지 않는다.
+        #expect(snapshot.dust.map(\.symbol) == ["ETH"])
+        #expect(snapshot.unsettled.map(\.symbol) == ["PEPE"])
         #expect(snapshot.inheritsManualHoldings)
+    }
+
+    @Test func dustAndUnpricedCoinsNeverEmptyAWallet() {
+        let wallet = LinkedSource(kind: .evmWallet, name: "메인 지갑", label: "0x…")
+        let usdc = ImportInstrument(market: .crypto, symbol: "USDC", name: "USD Coin", currency: "USD")
+        let asset = Asset(name: "USD Coin", symbol: "USDC", provider: .binance, providerSymbol: "USDCUSDT", market: .crypto, currency: "USD")
+        let pepe = ImportInstrument(market: .crypto, symbol: "PEPE", name: "Pepe", currency: "USD")
+        let pepeAsset = Asset(name: "Pepe", symbol: "PEPE", provider: .binance, providerSymbol: "PEPEUSDT", market: .crypto, currency: "USD")
+        let held = [
+            Trade(assetID: asset.id, side: .buy, quantity: Decimal(string: "1.2")!, price: 1, date: date("2026-01-01"), sourceID: wallet.id, openingBalance: true),
+            Trade(assetID: pepeAsset.id, side: .buy, quantity: 1_000_000, price: Decimal(string: "0.00001")!, date: date("2026-01-01"), sourceID: wallet.id, openingBalance: true)
+        ]
+        let doc = PortfolioDocument(assets: [asset, pepeAsset], trades: held, sources: [wallet])
+        // USDC가 $0.9로 줄어 먼지가 됐고, PEPE는 시세를 못 받았다.
+        let snapshot = SourceSnapshot(
+            sourceID: wallet.id,
+            holdings: [ImportedHolding(instrument: usdc, quantity: Decimal(string: "0.9")!, averageCost: nil, marketPrice: 1)],
+            executions: [], historyStart: date("2026-03-01"), unsettled: [pepe], takenAt: date("2026-03-01"),
+            inheritsManualHoldings: true, dust: [usdc]
+        )
+        let plan = ImportPlanner.plan(snapshot: snapshot, document: doc)
+        // 이미 가진 USDC는 먼지여도 그대로 대조하고(0.3 돌려놓기), PEPE는 건드리지 않는다.
+        #expect(plan.transfers.map(\.instrument.symbol) == ["USDC"])
+        #expect(plan.transfers.map(\.quantity) == [Decimal(string: "0.3")!])
+
+        // 처음 보는 먼지는 들이지 않는다.
+        let fresh = ImportPlanner.plan(snapshot: snapshot, document: PortfolioDocument(sources: [wallet]))
+        #expect(fresh.trades.isEmpty)
+    }
+
+    @Test func movesStayOutOfTheAssetAverageAndRealizedPnL() {
+        let wallet = LinkedSource(kind: .bitcoinWallet, name: "콜드 월렛", label: "bc1q…")
+        let asset = Asset(name: "Bitcoin", symbol: "BTC", provider: .binance, providerSymbol: "BTCUSDT", market: .crypto, currency: "USD")
+        // 직접 입력 1 BTC @30,000, 지갑엔 3 BTC, 시세 60,000.
+        var doc = PortfolioDocument(assets: [asset], trades: [
+            Trade(assetID: asset.id, side: .buy, quantity: 1, price: 30_000, date: date("2025-01-01"))
+        ], sources: [wallet])
+        let plan = ImportPlanner.plan(snapshot: walletSnapshot(wallet.id, quantity: 3, price: 60_000, on: "2026-03-01"), document: doc)
+        ImportApplier.apply(plan, to: &doc)
+        let result = PortfolioCalculator.compute(assets: [asset], trades: doc.trades, quotes: [:], fxRates: ["USD": 1], baseCurrency: "USD")
+        let position = try! #require(result.perAsset.first).position
+        #expect(position.quantity == 3)
+        #expect(position.averageCost == 50_000)
+        #expect(position.realizedPnL == 0)
+    }
+
+    @Test func garbageMulticallResponsesFailWithoutCrashing() {
+        let huge = String(repeating: "f", count: 64)
+        let cases = [
+            "", "00",
+            String(repeating: "0", count: 62) + "20" + huge,
+            String(repeating: "0", count: 62) + "20" + String(repeating: "0", count: 48) + "7fffffffffffffff",
+            String(repeating: "0", count: 62) + "20" + String(repeating: "0", count: 63) + "1" + String(repeating: "0", count: 48) + "7fffffffffffffe0"
+        ]
+        for hex in cases {
+            #expect(EVMClient.decodeAggregate3(Data(hex: hex) ?? Data()) == nil)
+        }
+        #expect(!WalletConfig.isEVMAddress("0x" + String(repeating: "０", count: 40)))
+    }
+
+    @Test func tradeQuantitiesSurviveTheJSONRoundTrip() throws {
+        let trade = Trade(assetID: UUID(), side: .buy, quantity: Decimal(string: "3.527077482689935715")!, price: Decimal(string: "0.000000000000062433")!)
+        let decoded = try JSONDecoder().decode(Trade.self, from: JSONEncoder().encode(trade))
+        #expect(decoded.quantity == trade.quantity)
+        #expect(decoded.price == trade.price)
     }
 
     // MARK: - 직접 입력분과 주고받기
