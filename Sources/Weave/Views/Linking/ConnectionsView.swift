@@ -5,19 +5,18 @@ import WeaveCore
 struct ConnectionsView: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
-    @State private var disconnectTarget: LinkedSource?
 
     var body: some View {
         VStack(spacing: 0) {
             ScreenHeader(title: model.t("Linked accounts"), onBack: { model.pop() }) {
-                IconButton(systemName: "plus") { model.push(.addToss) }
+                IconButton(systemName: "plus") { model.push(.addSource) }
             }
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     LinkNotice(
                         systemName: "lock.fill",
-                        text: model.t("Keys stay in this Mac's keychain. Weave only reads holdings and order history, never places orders.")
+                        text: model.t("Keys and addresses stay in this Mac's keychain. Weave only reads balances and order history, never places orders or moves coins.")
                     )
 
                     if model.document.sources.isEmpty {
@@ -29,7 +28,7 @@ struct ConnectionsView: View {
                                     if index > 0 {
                                         Rectangle().fill(theme.hair).frame(height: 1)
                                     }
-                                    SourceRow(source: source) { disconnectTarget = source }
+                                    SourceRow(source: source)
                                 }
                             }
                         }
@@ -40,27 +39,18 @@ struct ConnectionsView: View {
                 .padding(.bottom, 12)
             }
         }
-        .confirmDialog(
-            $disconnectTarget,
-            title: { _ in model.t("Disconnect account?") },
-            message: { model.disconnectMessage($0) },
-            confirmTitle: model.t("Disconnect"),
-            isDestructive: true,
-            cancelTitle: model.t("Cancel"),
-            onConfirm: { model.disconnectSource(id: $0.id) }
-        )
     }
 
     private var emptyState: some View {
         PanelCard {
             VStack(spacing: 10) {
-                Text(model.t("Link a broker account to bring in holdings and trades automatically."))
+                Text(model.t("Link a broker account or a crypto wallet to bring in holdings automatically."))
                     .font(.system(size: 12))
                     .foregroundStyle(theme.text2)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
-                LinkPrimaryButton(title: model.t("Link Toss Securities")) {
-                    model.push(.addToss)
+                LinkPrimaryButton(title: model.t("Add a link")) {
+                    model.push(.addSource)
                 }
             }
         }
@@ -71,39 +61,52 @@ private struct SourceRow: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
     let source: LinkedSource
-    let onDisconnect: () -> Void
     @State private var publicIP: String?
     @State private var isCheckingIP = false
 
     private var status: LinkStatus? { model.linkStatus[source.id] }
-    private var isSyncing: Bool { status == .syncing }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                SourceLogo(kind: source.kind, size: 28)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(source.name)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(theme.text)
-                    Text(summary)
-                        .font(.system(size: 10.5))
-                        .monospacedDigit()
-                        .foregroundStyle(theme.text2)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 2) {
-                    statusLabel
-                    if let synced = source.lastSyncedAt {
-                        TimelineView(.periodic(from: .now, by: 30)) { context in
-                            Text(relative(synced, now: context.date))
-                                .font(.system(size: 10))
-                                .foregroundStyle(theme.text2)
+            // 누르면 연결 상세 — 어디서 무엇을 읽는지, 가져온 보유와 가져오지 않은 잔고.
+            Button {
+                model.push(.sourceDetail(source.id))
+            } label: {
+                HStack(spacing: 10) {
+                    SourceLogo(kind: source.kind, size: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(source.name)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(theme.text)
+                            .lineLimit(1)
+                        Text(summary)
+                            .font(.system(size: 10.5))
+                            .monospacedDigit()
+                            .foregroundStyle(theme.text2)
+                            .lineLimit(1)
+                        Text(holdingsSummary)
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundStyle(theme.text2)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 8)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        statusLabel
+                        if let synced = source.lastSyncedAt {
+                            TimelineView(.periodic(from: .now, by: 30)) { context in
+                                Text(relative(synced, now: context.date))
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(theme.text2)
+                            }
                         }
                     }
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(theme.text2)
                 }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
 
             if case .failed(let failure) = status {
                 failureView(failure)
@@ -131,22 +134,30 @@ private struct SourceRow: View {
                 .buttonStyle(.plain)
             }
 
-            HStack(spacing: 6) {
-                LinkSecondaryButton(title: model.t("Sync now"), disabled: isSyncing) {
-                    Task { await model.syncSource(id: source.id) }
-                }
-                LinkSecondaryButton(title: model.t("Disconnect…"), isDestructive: true, action: onDisconnect)
-            }
         }
         .padding(.vertical, 10)
     }
 
+    /// 종류와 계좌·주소 — EVM 지갑은 보는 체인 수까지.
     private var summary: String {
-        [
-            source.label,
-            model.t("\(model.heldAssetCount(sourceID: source.id)) holding(s)"),
-            model.t("\(model.importedTradeCount(sourceID: source.id)) trade(s)")
-        ].filter { !$0.isEmpty }.joined(separator: " · ")
+        var parts = [model.sourceKindName(source.kind)]
+        if !source.label.isEmpty { parts.append(source.label) }
+        if let config = model.walletConfigs[source.id], config.kind == .evm {
+            parts.append(model.t("\(config.chains.count) chain(s)"))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// 가져온 보유 요약 — "ETH · USDC · WBTC +3" (많이 가진 순).
+    private var holdingsSummary: String {
+        let holdings = model.holdings(sourceID: source.id)
+        guard !holdings.isEmpty else {
+            return source.lastSyncedAt == nil && model.pendingImports[source.id] == nil
+                ? "" : model.t("No holdings imported")
+        }
+        let shown = holdings.prefix(4).map(\.asset.symbol).joined(separator: " · ")
+        let rest = holdings.count - min(holdings.count, 4)
+        return rest > 0 ? "\(shown) +\(rest)" : shown
     }
 
     @ViewBuilder
@@ -217,6 +228,12 @@ struct SourceLogo: View {
                 .frame(width: size * 0.62, height: size * 0.62)
                 .frame(width: size, height: size)
                 .background(Circle().fill(.white))
+        } else if kind == .bitcoinWallet {
+            Image(systemName: "bitcoinsign")
+                .font(.system(size: size * 0.46, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: size, height: size)
+                .background(Circle().fill(Color(hex: 0xF7931A)))
         } else {
             Image(systemName: symbol)
                 .font(.system(size: size * 0.42, weight: .medium))

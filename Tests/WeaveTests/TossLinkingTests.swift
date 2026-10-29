@@ -16,10 +16,10 @@ private struct OfflineHTTP: HTTPClient {
 
 private final class MemoryCredentials: CredentialStoring, @unchecked Sendable {
     private let lock = NSLock()
-    private var items: [UUID: TossCredentials] = [:]
+    private var items: [UUID: Data] = [:]
 
-    func tossCredentials(for sourceID: UUID) throws -> TossCredentials? { lock.withLock { items[sourceID] } }
-    func save(_ credentials: TossCredentials, for sourceID: UUID) throws { lock.withLock { items[sourceID] = credentials } }
+    func data(for sourceID: UUID) throws -> Data? { lock.withLock { items[sourceID] } }
+    func save(_ data: Data, for sourceID: UUID) throws { lock.withLock { items[sourceID] = data } }
     func delete(for sourceID: UUID) { lock.withLock { items[sourceID] = nil } }
     var count: Int { lock.withLock { items.count } }
 }
@@ -115,7 +115,7 @@ private func makeModel(toss: FakeToss, credentials: MemoryCredentials) -> AppMod
         #expect(model.document.assets.first { $0.symbol == "AAPL" }?.provider == .yahoo)
         #expect(model.document.trades.count == 2)
         #expect(model.document.source(id: sourceID)?.lastSyncedAt != nil)
-        #expect(model.heldAssetCount(sourceID: sourceID) == 2)
+        #expect(model.holdings(sourceID: sourceID).count == 2)
 
         // 4) 다음 동기화는 검토 없이 새 체결만 넣는다.
         toss["/api/v1/holdings"] = holdings([("005930", "삼성전자", "KRW", "12", "70500"), ("AAPL", "Apple Inc.", "USD", "2", "150")])
@@ -139,6 +139,8 @@ private func makeModel(toss: FakeToss, credentials: MemoryCredentials) -> AppMod
         #expect(model.document.sources.isEmpty)
         #expect(model.document.trades.isEmpty)
         #expect(model.document.assets.map(\.id) == [manualAsset.id])
+        // 키체인 지우기는 키체인 큐에서 따로 끝난다.
+        for _ in 0..<100 where credentials.count != 0 { try await Task.sleep(for: .milliseconds(10)) }
         #expect(credentials.count == 0)
     }
 
@@ -178,7 +180,7 @@ private func makeModel(toss: FakeToss, credentials: MemoryCredentials) -> AppMod
     }
 
     @MainActor
-    @Test func blockedIPSavesNothingAndExplainsWhy() async {
+    @Test func blockedIPSavesNothingAndExplainsWhy() async throws {
         let toss = FakeToss()
         toss["/oauth2/token"] = (403, #"{"error":"access_denied","error_description":"IP address not allowed"}"#)
         let credentials = MemoryCredentials()
@@ -187,6 +189,8 @@ private func makeModel(toss: FakeToss, credentials: MemoryCredentials) -> AppMod
         let result = await model.connectToss(clientID: "id", clientSecret: "secret")
         #expect(result == .failure(.ipNotAllowed))
         #expect(model.document.sources.isEmpty)
+        // 키체인 지우기는 키체인 큐에서 따로 끝난다.
+        for _ in 0..<100 where credentials.count != 0 { try await Task.sleep(for: .milliseconds(10)) }
         #expect(credentials.count == 0)
         #expect(model.linkFailureText(.ipNotAllowed).contains("WTS"))
     }

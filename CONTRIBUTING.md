@@ -11,6 +11,7 @@ git clone https://github.com/kang1027/Weave.git
 cd Weave
 scripts/fetch-sparkle.sh   # one-time — vendors Sparkle
 swift run Weave            # run
+scripts/run-dev.sh         # run, signed so the keychain remembers "Always Allow" (linked accounts)
 swift test                 # unit tests
 scripts/bundle.sh          # build dist/Weave.app
 ```

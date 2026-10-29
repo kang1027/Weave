@@ -14,7 +14,9 @@ public enum PortfolioCalculator {
         var metrics: [AssetMetrics] = []
 
         for asset in visible {
-            let position = PositionCalculator.snapshot(trades: trades.filter { $0.assetID == asset.id })
+            // 지갑 이동은 직접 입력분과 지갑 사이를 오갈 뿐이라 자산 전체 평단·실현손익에서 뺀다.
+            // 이동 단가(직접 입력 평단)가 자산 평단과 다르면 가짜 실현손익이 생긴다.
+            let position = PositionCalculator.snapshot(trades: trades.filter { $0.assetID == asset.id && !$0.isTransfer })
             let quote = quotes[asset.id]
             let fx = fxRates[asset.currency.uppercased()] ?? (asset.currency.uppercased() == baseCurrency.uppercased() ? 1 : 0)
 

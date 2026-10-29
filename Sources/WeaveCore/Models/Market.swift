@@ -22,4 +22,6 @@ public enum ProviderKind: String, Codable, Sendable, CaseIterable {
     case naver
     case yahoo
     case manual
+    /// 이자·스테이킹 토큰 — 원금 교환비(체인) × 원금 시세(바이낸스).
+    case onchain
 }

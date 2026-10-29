@@ -269,7 +269,9 @@ struct AssetListRow: View {
             return model.t("Manual")
         }
         let qty = metric.asset.formattedQuantity(metric.position.quantity)
-        let buys = model.t("\(metric.position.buyCount) buys")
+        // 지갑 이동은 사고판 게 아니라 세지 않는다.
+        let buyCount = model.document.trades(for: metric.asset.id).filter { $0.side == .buy && !$0.isTransfer }.count
+        let buys = model.t("\(buyCount) buys")
         let holding = metric.asset.hasNumericSymbol
             ? model.t("\(qty) shares")
             : "\(qty) \(metric.asset.symbol)"

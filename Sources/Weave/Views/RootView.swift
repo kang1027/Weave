@@ -13,6 +13,16 @@ struct RootView: View {
         ZStack {
             theme.bg.ignoresSafeArea()
             content
+                .overlay(alignment: .top) {
+                    // 알리기만 한다 — 아래 화면 클릭을 가로채지 않는다.
+                    if model.isAwaitingKeychain {
+                        KeychainNotice()
+                            .padding(.top, 52)
+                            .allowsHitTesting(false)
+                            .transition(.opacity)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.2), value: model.isAwaitingKeychain)
 
             // 전역 ⌘Q — 설정에 버튼을 두지 않아도 어디서든 종료되게 숨겨둔다.
             Button(action: model.quit) { EmptyView() }
@@ -48,6 +58,12 @@ struct RootView: View {
             AddTossView()
         case .importReview(let sourceID):
             ImportReviewView(sourceID: sourceID)
+        case .addSource:
+            AddSourceView()
+        case .addWallet(let kind):
+            AddWalletView(kind: kind)
+        case .sourceDetail(let sourceID):
+            SourceDetailView(sourceID: sourceID)
         case nil:
             if model.document.assets.isEmpty {
                 OnboardingView()
@@ -55,5 +71,29 @@ struct RootView: View {
                 HomeView()
             }
         }
+    }
+}
+
+/// 키체인 허용 창을 기다리는 동안 — 창이 다른 창 뒤에 숨어도 무엇을 기다리는지 보이게.
+private struct KeychainNotice: View {
+    @Environment(\.theme) private var theme
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "key.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(theme.orange)
+                .padding(.top, 1)
+            Text(model.t("Waiting for keychain access. Click Always Allow in the keychain prompt."))
+                .font(.system(size: 11))
+                .foregroundStyle(theme.text)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(RoundedRectangle(cornerRadius: 10).fill(theme.tooltipBg))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(theme.orange.opacity(0.5), lineWidth: 1))
+        .padding(.horizontal, 14)
     }
 }

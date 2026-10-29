@@ -6,6 +6,9 @@ public enum LinkedSourceKind: String, Codable, Sendable, CaseIterable {
     case toss
     case bitcoinWallet
     case evmWallet
+
+    /// 체결 기록 없이 잔고만 있는 지갑.
+    public var isWallet: Bool { self == .bitcoinWallet || self == .evmWallet }
 }
 
 /// 거래를 가져오는 연결 하나. 키·전체 주소는 키체인에 두고 문서엔 표시용 요약만 남긴다.

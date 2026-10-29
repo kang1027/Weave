@@ -427,6 +427,8 @@ struct TradeFormView: View {
             return model.t("Enter a valid quantity and price")
         case .imported:
             return model.t("Imported trades can't be changed here")
+        case .neededByMove:
+            return model.t("Part of this buy moved to a wallet, so it can't be removed")
         }
     }
 

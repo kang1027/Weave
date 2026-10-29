@@ -29,16 +29,27 @@ These requests contain only the symbol/endpoint being queried. Weave sends **no 
 
 ## Linked accounts (optional)
 
-Nothing below happens unless you link an account in **Settings › Linked accounts**. The keys you enter are
-stored in the **macOS Keychain** for this Mac only — never in `portfolio.json` or in backups.
+Nothing below happens unless you link an account or wallet in **Settings › Linked accounts**. The keys and
+wallet addresses you enter are stored in the **macOS Keychain** for this Mac only. `portfolio.json` and backups
+keep only a short label: a masked account number (`••••8901`) or the first 6 and last 4 characters of an address.
+Requests to these services skip the on-disk URL cache.
 
 - **Toss Securities Open API** (`openapi.tossinvest.com`) — Weave sends the client ID and secret you entered to
   Toss to get an access token, then reads your account list, holdings, and order history about every 5 minutes
   while the app runs. It never calls order APIs. Toss only answers IPs you allowed in its WTS settings.
 - **ipify** (`api.ipify.org`) — only when you tap **Check this network's IP**, to show which IP to allow in Toss.
   It returns your public IP; nothing else is sent.
+- **mempool.space** — for a linked Bitcoin wallet, the addresses you entered, to read their confirmed balance.
+- **Public chain RPCs** (`ethereum-rpc.publicnode.com`, `arb1.arbitrum.io`, `mainnet.base.org`,
+  `mainnet.optimism.io`, `polygon-bor-rpc.publicnode.com`) — for a linked EVM wallet, the address, to read the
+  balances of a fixed list of known tokens on the chains you picked. If you hold an Aave yield or staking
+  token, the Ethereum RPC is also asked for that token's exchange rate when prices refresh (no address is sent).
+- **Binance** — current prices of the coins found in a wallet.
 
-Disconnecting an account deletes its keys from the Keychain together with the trades imported from it.
+Wallet balances are public on-chain data, but these services can see which addresses are looked up from your
+IP. Weave never asks for a seed phrase or private key and can't move coins.
+
+Disconnecting deletes the keys or addresses from the Keychain together with the trades imported from that link.
 **Delete all my data** does the same for every linked account.
 
 ## Updates

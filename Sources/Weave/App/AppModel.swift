@@ -20,6 +20,9 @@ enum Route: Hashable {
     case connections
     case addToss
     case importReview(UUID)
+    case addSource
+    case addWallet(WalletConfig.Kind)
+    case sourceDetail(UUID)
 }
 
 @MainActor
@@ -126,7 +129,19 @@ final class AppModel: ObservableObject {
     /// 키 보관소 — 테스트는 메모리 보관소로 바꿔 끼운다.
     var credentialStore: any CredentialStoring = KeychainCredentialStore()
     /// 증권사 API 요청 — 오류 본문까지 봐야 해서 시세용 HTTPClient와 따로 둔다.
-    var linkHTTP: any HTTPSending = URLSessionHTTPClient()
+    /// 계좌·지갑 응답이 디스크 캐시에 남지 않게 따로 연 임시 세션을 쓴다.
+    var linkHTTP: any HTTPSending = URLSessionHTTPClient(session: URLSession(configuration: .ephemeral))
+    /// 지갑 코인 시세(바이낸스). 없으면 지갑을 연결하지 않는다.
+    var cryptoPrices: (any CryptoPriceSource)?
+    /// 마지막으로 받은 스냅샷 — 연결 상세에서 가져오지 않은 잔고(소액·시세 없음)까지 보여 준다.
+    @Published var lastSnapshots: [UUID: SourceSnapshot] = [:]
+    /// 키체인에서 읽은 지갑 설정 — 화면이 그릴 때마다 키체인을 읽지 않게.
+    @Published var walletConfigs: [UUID: WalletConfig] = [:]
+    /// 키체인에서 읽은 증권사 키 — 동기화마다 키체인을 다시 열지 않게 앱이 켜져 있는 동안 기억한다.
+    var tossCredentialCache: [UUID: TossCredentials] = [:]
+    /// 키체인 허용 창을 기다리는 중 — 창이 다른 창 뒤에 숨어 있어도 무엇을 기다리는지 알린다.
+    @Published var isAwaitingKeychain = false
+    var keychainPending = 0
 
     init(
         store: any PortfolioStore,
@@ -173,10 +188,12 @@ final class AppModel: ObservableObject {
                     .appendingPathComponent("Weave/portfolio.json")
             )
         let fxService = FXService(yahoo: yahoo, cacheDirectory: cacheDir)
-        return AppModel(
+        // 지갑의 이자·스테이킹 토큰 시세 — 검색엔 안 나오고 시세·차트만 낸다.
+        let onchain = OnchainVaultProvider(http: URLSessionHTTPClient(session: URLSession(configuration: .ephemeral)), underlying: binance)
+        let model = AppModel(
             store: store,
-            quoteService: QuoteService(providers: providers),
-            candleService: CandleService(providers: providers, cacheDirectory: cacheDir),
+            quoteService: QuoteService(providers: providers + [onchain]),
+            candleService: CandleService(providers: providers + [onchain], cacheDirectory: cacheDir),
             fxService: fxService,
             searchService: SearchService(providers: providers),
             kimchiPremiumService: KimchiPremiumService(
@@ -188,6 +205,8 @@ final class AppModel: ObservableObject {
                 usdKRW: { try await fxService.rate(from: "USD", to: "KRW", maxAge: 300, staleLimit: 3600) }
             )
         )
+        model.cryptoPrices = binance
+        return model
     }
 
     // MARK: - 파생 상태

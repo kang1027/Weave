@@ -145,6 +145,26 @@ public struct BinanceProvider: MarketDataProvider {
     }
 }
 
+// MARK: - 지갑 시세
+
+extension BinanceProvider: CryptoPriceSource {
+    /// 전체 현재가를 한 번에 받아 고른다. 심볼을 지정해 부르면 그중 하나만 상장 폐지돼도 요청 전체가 거부된다.
+    public func prices(baseAssets: [String]) async throws -> [String: Decimal] {
+        guard !baseAssets.isEmpty else { return [:] }
+        struct Item: Decodable {
+            var symbol: String
+            var price: String
+        }
+        let url = URL(string: "https://api.binance.com/api/v3/ticker/price")!
+        let items = try JSONDecoder().decode([Item].self, from: try await http.get(url))
+        let wanted = Set(baseAssets.map { "\($0)USDT" })
+        return Dictionary(items.compactMap { item in
+            guard wanted.contains(item.symbol), let price = Decimal.clean(item.price), price > 0 else { return nil }
+            return (String(item.symbol.dropLast(4)), price)
+        }, uniquingKeysWith: { first, _ in first })
+    }
+}
+
 // MARK: - 심볼 카탈로그 (exchangeInfo 로컬 캐시)
 
 struct BinancePair: Codable, Equatable, Sendable {
