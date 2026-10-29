@@ -49,6 +49,14 @@ struct AssetDetailView: View {
                     VStack(spacing: 0) {
                         priceSection(asset: asset, metric: metric, position: position)
 
+                        if model.showsKimchiPremium(for: asset) {
+                            KimchiPremiumCard(
+                                asset: asset,
+                                initial: model.cachedKimchiPremium(for: asset),
+                                reservesSpace: model.reservesKimchiPremiumSpace(for: asset)
+                            )
+                        }
+
                         if asset.isManual {
                             manualSection(asset: asset)
                         } else {
