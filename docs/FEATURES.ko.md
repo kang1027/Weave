@@ -181,7 +181,6 @@ macOS 메뉴바 포트폴리오 트래커. 메뉴바에 핀 자산 시세를 상
   - 메뉴바 로테이션 간격(select: 5초/10초/30초/끔)
 - **Appearance**
   - 테마(select: 시스템/Slate/Light, 기본 시스템)
-  - 언어(select: 시스템/한국어/English, 기본 시스템)
 - **Data**
   - 시세 갱신 주기(select: 1/5/10/15분)
   - 기준 통화(select: KRW/USD/JPY; 신규 설치 기본값은 한국어 시스템 KRW, 일본어 시스템 JPY, 그 외 USD)
@@ -193,10 +192,9 @@ macOS 메뉴바 포트폴리오 트래커. 메뉴바에 핀 자산 시세를 상
   - 자동 업데이트 확인(토글) · 지금 확인(버튼) · 릴리즈 노트 링크
 - 맨 아래: **Weave 종료** 버튼(+ ⌘Q) — 메뉴바 앱이라 Dock 종료 동선이 없음.
 - Footer: 버전 + 다음 갱신 카운트다운.
-- **다국어**: 한국어/영어 2개, `{ko,en}.lproj/Localizable.strings` 기반(키=영어 원문;
-  xcstrings는 SwiftPM CLI 빌드가 컴파일하지 못해 lproj 채택). 기본은 시스템
-  로케일, 설정에서 앱 단위 오버라이드. 숫자·통화·날짜 포맷은 로케일 규칙
-  (`FormatStyle`)을 따름.
+- **언어**: 앱은 영어 전용이다. 문구는 `en.lproj/Localizable.strings`(키=영어 원문; xcstrings는 SwiftPM CLI
+  빌드가 컴파일하지 못해 lproj)를 거친다. 날짜·숫자는 시스템 언어와 상관없이 영어 화면에 맞게 `en_US` 로케일을
+  쓴다. 기준 통화 기본값은 여전히 시스템 언어로 정한다.
 
 ## 10. 앱 업데이트 & 버전관리
 
