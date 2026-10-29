@@ -31,11 +31,7 @@ struct HoldingLocationsCard: View {
     private func row(_ location: HoldingLocation) -> some View {
         let source = location.sourceID.flatMap(model.document.source(id:))
         return HStack(spacing: 10) {
-            Image(systemName: icon(for: source?.kind))
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(theme.text2)
-                .frame(width: 26, height: 26)
-                .background(Circle().fill(theme.iconBg))
+            SourceLogo(kind: source?.kind, size: 26)
             VStack(alignment: .leading, spacing: 2) {
                 Text(source?.name ?? model.t(location.sourceID == nil ? "Entered manually" : "Linked account"))
                     .font(.system(size: 12.5, weight: .semibold))
@@ -72,14 +68,6 @@ struct HoldingLocationsCard: View {
         }
         .frame(height: 6)
         .clipShape(RoundedRectangle(cornerRadius: 3))
-    }
-
-    private func icon(for kind: LinkedSourceKind?) -> String {
-        switch kind {
-        case .koreaInvestment, .toss: return "building.columns"
-        case .bitcoinWallet, .evmWallet: return "wallet.pass"
-        case nil: return "pencil"
-        }
     }
 
     private func quantityText(_ quantity: Decimal) -> String {

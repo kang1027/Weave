@@ -6,7 +6,7 @@ import WeaveCore
 enum L10n {
     /// SwiftPM executable resources are copied into the app's Resources directory
     /// by bundle.sh. Use Bundle.main there; keep Bundle.module for swift run/tests.
-    private static var resourceBundle: Bundle {
+    static var resourceBundle: Bundle {
         if let url = Bundle.main.url(forResource: "Weave_Weave", withExtension: "bundle"),
            let bundle = Bundle(url: url) {
             return bundle

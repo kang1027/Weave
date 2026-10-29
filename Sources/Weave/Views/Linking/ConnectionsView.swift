@@ -81,11 +81,7 @@ private struct SourceRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                Image(systemName: "building.columns")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(theme.text2)
-                    .frame(width: 28, height: 28)
-                    .background(Circle().fill(theme.iconBg))
+                SourceLogo(kind: source.kind, size: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(source.name)
                         .font(.system(size: 13, weight: .semibold))
@@ -202,6 +198,42 @@ private struct SourceRow: View {
 }
 
 // MARK: - 연결 화면 공용
+
+/// 연결 종류 로고 — 증권사 로고가 있으면 흰 원 위에, 없으면 SF Symbol.
+struct SourceLogo: View {
+    @Environment(\.theme) private var theme
+    let kind: LinkedSourceKind?
+    let size: CGFloat
+
+    private static let tossImage: NSImage? = L10n.resourceBundle
+        .url(forResource: "toss-securities", withExtension: "png")
+        .flatMap(NSImage.init(contentsOf:))
+
+    var body: some View {
+        if kind == .toss, let image = Self.tossImage {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: size * 0.62, height: size * 0.62)
+                .frame(width: size, height: size)
+                .background(Circle().fill(.white))
+        } else {
+            Image(systemName: symbol)
+                .font(.system(size: size * 0.42, weight: .medium))
+                .foregroundStyle(theme.text2)
+                .frame(width: size, height: size)
+                .background(Circle().fill(theme.iconBg))
+        }
+    }
+
+    private var symbol: String {
+        switch kind {
+        case .koreaInvestment, .toss: return "building.columns"
+        case .bitcoinWallet, .evmWallet: return "wallet.pass"
+        case nil: return "pencil"
+        }
+    }
+}
 
 struct LinkNotice: View {
     @Environment(\.theme) private var theme
