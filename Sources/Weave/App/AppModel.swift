@@ -87,11 +87,18 @@ final class AppModel: ObservableObject {
     var detailChartAssetID: UUID?
     var detailLoadToken = 0
 
+    // 김프 카드 — 상세에 다시 들어올 때 바로 그리기 위한 마지막 값(심볼별).
+    var kimchiPremiumCache: [String: KimchiPremium] = [:]
+    /// 업비트 원화 마켓에 없던 심볼 — 카드 자리를 미리 잡지 않는다.
+    var kimchiUnlistedSymbols: Set<String> = []
+
     let store: any PortfolioStore
     let quoteService: QuoteService
     let candleService: CandleService
     let fxService: FXService
     let searchService: SearchService
+    /// 크립토 상세의 김프 카드용 — nil이면 카드를 숨긴다.
+    let kimchiPremiumService: KimchiPremiumService?
     let updater: UpdaterHandle
 
     private let logger = Logger(subsystem: "app.weave", category: "AppModel")
@@ -127,6 +134,7 @@ final class AppModel: ObservableObject {
         candleService: CandleService,
         fxService: FXService,
         searchService: SearchService,
+        kimchiPremiumService: KimchiPremiumService? = nil,
         updater: UpdaterHandle = UpdaterHandle()
     ) {
         self.store = store
@@ -134,6 +142,7 @@ final class AppModel: ObservableObject {
         self.candleService = candleService
         self.fxService = fxService
         self.searchService = searchService
+        self.kimchiPremiumService = kimchiPremiumService
         self.updater = updater
         do {
             self.document = try store.load()
@@ -163,12 +172,21 @@ final class AppModel: ObservableObject {
                 fileURL: FileManager.default.temporaryDirectory
                     .appendingPathComponent("Weave/portfolio.json")
             )
+        let fxService = FXService(yahoo: yahoo, cacheDirectory: cacheDir)
         return AppModel(
             store: store,
             quoteService: QuoteService(providers: providers),
             candleService: CandleService(providers: providers, cacheDirectory: cacheDir),
-            fxService: FXService(yahoo: yahoo, cacheDirectory: cacheDir),
-            searchService: SearchService(providers: providers)
+            fxService: fxService,
+            searchService: SearchService(providers: providers),
+            kimchiPremiumService: KimchiPremiumService(
+                upbit: UpbitProvider(http: http),
+                binance: binance,
+                yahoo: yahoo,
+                // 환율 1원이 김프 약 0.07%라 홈 총액용 1시간 캐시보다 짧게 쓰고,
+                // 조회가 실패해도 1시간 넘은 환율로는 계산하지 않는다(카드는 마지막 값을 유지).
+                usdKRW: { try await fxService.rate(from: "USD", to: "KRW", maxAge: 300, staleLimit: 3600) }
+            )
         )
     }
 

@@ -105,6 +105,40 @@ extension AppModel {
         restartRotationLoop()
     }
 
+    // MARK: - 김프
+
+    /// 김프 카드를 띄울 자산 — 원화 기준으로 보는 사용자의 바이낸스 코인만.
+    func showsKimchiPremium(for asset: Asset) -> Bool {
+        kimchiPremiumService != nil
+            && asset.market == .crypto
+            && asset.provider == .binance
+            && settings.baseCurrency.uppercased() == "KRW"
+    }
+
+    /// 값이 오기 전에 카드 자리를 잡아 둘지 — 업비트에 없던 코인은 잡지 않는다.
+    func reservesKimchiPremiumSpace(for asset: Asset) -> Bool {
+        showsKimchiPremium(for: asset) && !kimchiUnlistedSymbols.contains(asset.symbol.uppercased())
+    }
+
+    func cachedKimchiPremium(for asset: Asset) -> KimchiPremium? {
+        kimchiPremiumCache[asset.symbol.uppercased()]
+    }
+
+    /// 업비트 원화 마켓에 없으면 nil. 네트워크 오류는 throw — 호출부가 마지막 값을 유지한다.
+    func kimchiPremium(for asset: Asset) async throws -> KimchiPremium? {
+        guard showsKimchiPremium(for: asset), let kimchiPremiumService else { return nil }
+        let key = asset.symbol.uppercased()
+        let premium = try await kimchiPremiumService.premium(symbol: key, binanceSymbol: asset.providerSymbol)
+        if let premium {
+            kimchiPremiumCache[key] = premium
+            kimchiUnlistedSymbols.remove(key)
+        } else {
+            kimchiPremiumCache[key] = nil
+            kimchiUnlistedSymbols.insert(key)
+        }
+        return premium
+    }
+
     // MARK: - 메뉴바 타이틀
 
     /// 로테이션 대상: 핀 자산이 있으면 그것만(메뉴바 토글보다 우선), 없으면 메뉴바 표시가 켜진 자산 순환.

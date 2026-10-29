@@ -143,6 +143,9 @@ extension AppModel {
             forgetCredentials()
             await candleService.clearCache()
             await fxService.clearCache()
+            await kimchiPremiumService?.clearCache()
+            kimchiPremiumCache = [:]
+            kimchiUnlistedSymbols = []
             LogoStore.clearAll()
             deleteStoredData()
             // 메모리에 남은 로고·없음 기록이 디스크에 되살아나지 않게 비운다.
