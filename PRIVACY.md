@@ -43,7 +43,7 @@ The packaged app checks for updates via [Sparkle](https://sparkle-project.org). 
 
 ## Data leaving your Mac
 
-The only time your data leaves the device is when **you** choose **Export** and pick a destination — Weave writes a self-contained `.weave` backup to the location you select. Importing reads a file you choose. Neither step contacts any server.
+Apart from the broker keys described under Linked accounts, the only time your data leaves the device is when **you** choose **Export** and pick a destination — Weave writes a self-contained `.weave` backup to the location you select. Importing reads a file you choose. Neither step contacts any server.
 
 ## Market data & disclaimer
 
