@@ -164,6 +164,14 @@ struct AssetListRow: View {
         } label: {
             HStack(spacing: 10) {
                 AssetLogoView(asset: metric.asset)
+                    .overlay(alignment: .bottomTrailing) {
+                        if let source = linkedSources.first {
+                            SourceBadge(kind: source.kind)
+                                .offset(x: 3, y: 3)
+                                .help(linkedSources.map(\.name).joined(separator: " · "))
+                                .accessibilityLabel(Text(source.name))
+                        }
+                    }
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 5) {
                         // Value History(자산별) 라인과 같은 색 점 — 범례 역할.
@@ -262,6 +270,12 @@ struct AssetListRow: View {
             }
             Button(model.t("Delete"), role: .destructive, action: onDelete)
         }
+    }
+
+    /// 이 자산이 지금 들어 있는 연결 — 많이 가진 곳부터. 배지는 첫 곳만, 툴팁엔 전부.
+    private var linkedSources: [LinkedSource] {
+        HoldingLocations.breakdown(trades: model.document.trades(for: metric.asset.id))
+            .compactMap { $0.sourceID.flatMap(model.document.source(id:)) }
     }
 
     private var subtitle: String {

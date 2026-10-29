@@ -55,6 +55,8 @@ and clicking it opens a 360×720 popover where you manage the entire portfolio.
 
 ### 2.4 Assets list
 - Row: logo · name · holding quantity / buy count · current price · solid change badge.
+  - An asset held in a linked account or wallet gets a small badge on its logo (the Toss logo, or a wallet
+    icon) for the place that holds the most of it. Hovering lists every linked place.
 - Sorting: fixed descending by valuation.
 - Row click → asset detail. Context menu: pin / hide / delete.
 

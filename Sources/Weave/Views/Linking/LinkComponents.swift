@@ -45,6 +45,29 @@ struct SourceLogo: View {
     }
 }
 
+/// 자산 로고에 겹쳐 붙이는 작은 출처 배지 — 토스는 로고, 지갑은 지갑 아이콘.
+/// 지갑에 코인 아이콘을 쓰면 비트코인 로고 위에 또 비트코인이 붙어 헷갈린다.
+struct SourceBadge: View {
+    @Environment(\.theme) private var theme
+    let kind: LinkedSourceKind
+    var size: CGFloat = 14
+
+    var body: some View {
+        Group {
+            if kind == .toss {
+                SourceLogo(kind: .toss, size: size)
+            } else {
+                Image(systemName: kind.isWallet ? "wallet.pass.fill" : "building.columns.fill")
+                    .font(.system(size: size * 0.5, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: size, height: size)
+                    .background(Circle().fill(theme.link))
+            }
+        }
+        .background(Circle().fill(theme.bg).padding(-1.5))
+    }
+}
+
 /// 코인 아이콘(원격 아이콘셋) — 아직 없으면 회색 원.
 struct CoinIcon: View {
     @Environment(\.theme) private var theme
