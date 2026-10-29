@@ -37,7 +37,8 @@ struct ImportReviewView: View {
                         }
                         skippedSection(pending)
                         if !pending.plan.closedPositions.isEmpty {
-                            footnote(model.t("\(pending.plan.closedPositions.count) sold-out stock(s) not in Weave were left out."))
+                            let closed = pending.plan.closedPositions.count
+                            footnote(counted(closed, "sold-out stock") + (closed == 1 ? " not in Weave was left out." : " not in Weave were left out."))
                         }
                     } else if !mismatches.isEmpty {
                         CapsLabel(text: model.t("Needs review"))
@@ -108,7 +109,7 @@ struct ImportReviewView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 10.5, weight: .semibold))
                     .padding(.top, 1)
-                Text(model.t("Weave holds up to \(AppModel.assetSoftLimit) assets, so \(overLimit) stock(s) won't be added. Free up assets and the next sync brings them in."))
+                Text("Weave holds up to \(AppModel.assetSoftLimit) assets, so \(counted(overLimit, "stock")) won't be added. Free up assets and the next sync brings them in.")
                     .fixedSize(horizontal: false, vertical: true)
             }
             .font(.system(size: 10.5))
@@ -150,7 +151,7 @@ struct ImportReviewView: View {
                 lines.append(GroupLine(label: model.t("Orders"), detail: model.t("\(orders.count) from history")))
             }
             if merged > 0 {
-                lines.append(GroupLine(label: model.t("Merged"), detail: model.t("\(merged) trade(s) you entered by hand")))
+                lines.append(GroupLine(label: model.t("Merged"), detail: counted(merged, "trade") + " you entered by hand"))
             }
             lines += plan.unresolved.filter { $0.instrument == instrument }.map {
                 GroupLine(label: model.t("Check"), detail: model.mismatchShortText($0), isWarning: true)
@@ -325,7 +326,7 @@ struct ImportReviewView: View {
             let coins = Set(plan.trades.filter { !$0.isManualSide }.map(\.instrument)).count
             return "Import " + counted(coins, "coin")
         }
-        let added = model.t("Add \(plan.trades.count) trade(s)")
+        let added = "Add " + counted(plan.trades.count, "trade")
         guard !plan.duplicates.isEmpty else { return added }
         return added + " · " + model.t("merge \(plan.duplicates.count)")
     }

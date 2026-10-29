@@ -355,7 +355,7 @@ extension AppModel {
     func disconnectMessage(_ source: LinkedSource) -> String {
         let trades = importedTradeCount(sourceID: source.id)
         let assets = assetsOnlyIn(sourceID: source.id).count
-        let message = t("The keys, \(trades) imported trade(s), and \(assets) asset(s) held only in this account will be deleted.")
+        let message = "The keys, \(counted(trades, "imported trade")), and \(counted(assets, "asset")) held only in this account will be deleted."
         guard document.trades.contains(where: { $0.sourceID == nil && $0.transferSourceID == source.id }) else {
             return message
         }

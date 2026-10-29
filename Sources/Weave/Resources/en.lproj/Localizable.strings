@@ -121,7 +121,6 @@
 "Linked account holdings change only when the account syncs" = "Linked account holdings change only when the account syncs";
 "If a linked account still holds it, the next sync brings it back." = "If a linked account still holds it, the next sync brings it back.";
 "Toss Securities" = "Toss Securities";
-"The keys, %lld imported trade(s), and %lld asset(s) held only in this account will be deleted." = "The keys, %lld imported trade(s), and %lld asset(s) held only in this account will be deleted.";
 "The client ID or secret is wrong. Copy them again from Toss Securities WTS." = "The client ID or secret is wrong. Copy them again from Toss Securities WTS.";
 "This network's IP isn't on Toss Securities' allowed list. Add it in WTS › Settings › Open API › Allowed IPs." = "This network's IP isn't on Toss Securities' allowed list. Add it in WTS › Settings › Open API › Allowed IPs.";
 "Too many requests. Try again in a moment." = "Too many requests. Try again in a moment.";
@@ -188,8 +187,6 @@
 "Moves over from your manual holdings at their average cost, %@." = "Moves over from your manual holdings at their average cost, %@.";
 "Goes back to your manual holdings at %@. Enter the sell there if you sold it." = "Goes back to your manual holdings at %@. Enter the sell there if you sold it.";
 "Import balances" = "Import balances";
-"Weave holds up to %lld assets, so %lld stock(s) won't be added. Free up assets and the next sync brings them in." = "Weave holds up to %lld assets, so %lld stock(s) won't be added. Free up assets and the next sync brings them in.";
-"%lld trade(s) weren't imported because Weave is at its asset limit." = "%lld trade(s) weren't imported because Weave is at its asset limit.";
 "%lld holding(s)" = "%lld holding(s)";
 "Syncing…" = "Syncing…";
 "● Failed" = "● Failed";
@@ -206,7 +203,6 @@
 "How to get keys" = "How to get keys";
 "Needs review" = "Needs review";
 "Nothing to review." = "Nothing to review.";
-"%lld sold-out stock(s) not in Weave were left out." = "%lld sold-out stock(s) not in Weave were left out.";
 "New trades" = "New trades";
 "Duplicates" = "Duplicates";
 "New assets" = "New assets";
@@ -214,7 +210,6 @@
 "Entered manually on %@. The imported record replaces it." = "Entered manually on %@. The imported record replaces it.";
 "Later" = "Later";
 "Done" = "Done";
-"Add %lld trade(s)" = "Add %lld trade(s)";
 "merge %lld" = "merge %lld";
 "Total P&L %@" = "Total P&L %@";
 "Record shortcut" = "Record shortcut";

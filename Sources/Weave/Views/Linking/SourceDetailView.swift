@@ -236,13 +236,17 @@ struct SourceDetailView: View {
                         }
                     }
                 } else {
-                    infoRow(model.t("Type")) {
-                        Text(model.sourceKindName(source.kind))
-                            .font(.system(size: 12))
-                            .foregroundStyle(theme.text2)
+                    // 이름을 바꿨을 때만 종류를 따로 보인다 — 아니면 위 이름과 같은 말이 두 번 나온다.
+                    let kindName = model.sourceKindName(source.kind)
+                    if source.name != kindName {
+                        infoRow(model.t("Type")) {
+                            Text(kindName)
+                                .font(.system(size: 12))
+                                .foregroundStyle(theme.text2)
+                        }
                     }
                     if !source.label.isEmpty {
-                        HairDivider()
+                        if source.name != kindName { HairDivider() }
                         infoRow(model.t("Account")) {
                             Text(source.label)
                                 .font(.system(size: 11.5, design: .monospaced))

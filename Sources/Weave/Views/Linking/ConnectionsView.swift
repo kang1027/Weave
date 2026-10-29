@@ -262,7 +262,7 @@ private struct SourceRow: View {
             }
         }
         if let skipped = model.linkSkippedTrades[source.id] {
-            Text(model.t("\(skipped) trade(s) weren't imported because Weave is at its asset limit."))
+            Text(counted(skipped, "trade") + (skipped == 1 ? " wasn't" : " weren't") + " imported because Weave is at its asset limit.")
                 .font(.system(size: 10.5))
                 .foregroundStyle(theme.orange)
                 .fixedSize(horizontal: false, vertical: true)
