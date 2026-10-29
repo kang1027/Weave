@@ -92,19 +92,6 @@ struct SettingsView: View {
                                 )
                             )
                         }
-                        SettingsRow(title: model.t("Language")) {
-                            SelectPill(
-                                options: [
-                                    (LanguagePreference.system, model.t("System")),
-                                    (LanguagePreference.korean, "한국어"),
-                                    (LanguagePreference.english, "English")
-                                ],
-                                selection: Binding(
-                                    get: { model.settings.language },
-                                    set: { model.settings.language = $0 }
-                                )
-                            )
-                        }
                         SettingsRow(
                             title: model.t("Day ring full at"),
                             subtitle: model.t("Fills at this daily move; over it wraps a new lap")

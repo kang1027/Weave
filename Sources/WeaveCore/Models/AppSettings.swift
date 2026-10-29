@@ -6,12 +6,6 @@ public enum ThemePreference: String, Codable, Sendable, CaseIterable {
     case light
 }
 
-public enum LanguagePreference: String, Codable, Sendable, CaseIterable {
-    case system
-    case korean
-    case english
-}
-
 public enum MenuBarFormat: String, Codable, Sendable, CaseIterable {
     /// 2줄 — 이름(위) / 가격 등락%(아래)
     case full
@@ -46,7 +40,6 @@ public struct Hotkey: Codable, Equatable, Hashable, Sendable {
 
 public struct AppSettings: Codable, Equatable, Sendable {
     public var theme: ThemePreference
-    public var language: LanguagePreference
     /// 총액·통합 차트 등 합산 계산에만 쓰는 기준 통화 — KRW/USD/JPY.
     public var baseCurrency: String
     public var displayCurrencyMode: DisplayCurrencyMode
@@ -79,7 +72,6 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
     public init(
         theme: ThemePreference = .system,
-        language: LanguagePreference = .system,
         baseCurrency: String = AppSettings.defaultBaseCurrency(),
         displayCurrencyMode: DisplayCurrencyMode = .source,
         quoteRefreshSeconds: Int = 300,
@@ -95,7 +87,6 @@ public struct AppSettings: Codable, Equatable, Sendable {
         hiddenHomeChartAssetIDs: [UUID] = []
     ) {
         self.theme = theme
-        self.language = language
         self.baseCurrency = baseCurrency
         self.displayCurrencyMode = displayCurrencyMode
         self.quoteRefreshSeconds = quoteRefreshSeconds
@@ -112,7 +103,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case theme, language, baseCurrency, displayCurrencyMode
+        case theme, baseCurrency, displayCurrencyMode
         case quoteRefreshSeconds, rotationSeconds, menuBarFormat
         case privacyMode, launchAtLogin, autoUpdateCheck, hotkey, switchAssetHotkey
         case dayRingFullPercent, returnRingFullPercent
@@ -125,7 +116,6 @@ public struct AppSettings: Codable, Equatable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = AppSettings()
         theme = Self.lenientEnum(c, .theme, d.theme)
-        language = Self.lenientEnum(c, .language, d.language)
         baseCurrency = (try? c.decodeIfPresent(String.self, forKey: .baseCurrency)) ?? nil ?? d.baseCurrency
         displayCurrencyMode = Self.lenientEnum(c, .displayCurrencyMode, d.displayCurrencyMode)
         quoteRefreshSeconds = (try? c.decodeIfPresent(Int.self, forKey: .quoteRefreshSeconds)) ?? nil ?? d.quoteRefreshSeconds

@@ -279,11 +279,11 @@ final class AppModel: ObservableObject {
     // MARK: - 다국어
 
     func t(_ key: String.LocalizationValue) -> String {
-        String(localized: key, bundle: L10n.bundle(for: settings.language))
+        String(localized: key, bundle: L10n.bundle)
     }
 
     var locale: Locale {
-        L10n.locale(for: settings.language)
+        L10n.locale
     }
 
     // MARK: - 테마

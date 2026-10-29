@@ -184,7 +184,6 @@ Entered via ✎ in the Home footer. Consists of a top search bar + a held-asset 
   - Menu bar rotation interval (select: 5s / 10s / 30s / off)
 - **Appearance**
   - Theme (select: System / Slate / Light, default System)
-  - Language (select: System / 한국어 / English, default System)
 - **Data**
   - Price refresh interval (select: 1/5/10/15 min)
   - Base currency (select: KRW/USD/JPY; new installs default to KRW for Korean systems, JPY for Japanese systems, USD otherwise)
@@ -196,10 +195,10 @@ Entered via ✎ in the Home footer. Consists of a top search bar + a held-asset 
   - Auto update check (toggle) · check now (button) · release notes link
 - At the very bottom: a **Quit Weave** button (+ ⌘Q) — as a menu bar app there's no Dock quit path.
 - Footer: version + countdown to next refresh.
-- **Localization**: 2 languages, Korean/English, based on `{ko,en}.lproj/Localizable.strings` (keys = English
-  source text; xcstrings is used because the SwiftPM CLI build can't compile it, so lproj was adopted). The default is the system
-  locale, with a per-app override in settings. Number/currency/date formats follow locale rules
-  (`FormatStyle`).
+- **Language**: English only. Strings go through `en.lproj/Localizable.strings` (keys = English source text; lproj
+  instead of xcstrings because the SwiftPM CLI build can't compile xcstrings). Dates and numbers use the `en_US`
+  locale so they match the English UI on any system language. Base currency still defaults from the system
+  language.
 
 ## 10. App Updates & Version Management
 

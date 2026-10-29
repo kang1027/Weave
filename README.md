@@ -39,7 +39,7 @@
 - **Manual assets.** Track anything without a ticker — real estate, cash, whatever you want counted.
 - **Privacy mode.** Mask amounts while keeping percentages, in both the popover and the menu bar.
 - **Yours, locally.** No account, no telemetry — your data never leaves the Mac. The `.weave` backup is self-contained, custom logos included.
-- **Native & polished.** Slate / Light themes, English / 한국어, signed & notarized, and it updates itself via Sparkle.
+- **Native & polished.** Slate / Light themes, signed & notarized, and it updates itself via Sparkle.
 
 ## Install
 
