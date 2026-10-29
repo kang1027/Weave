@@ -1,7 +1,7 @@
 import SwiftUI
 import WeaveCore
 
-/// 상세 "보관 위치" — 같은 자산이 연결한 계좌·지갑과 직접 입력에 얼마씩 있는지.
+/// 상세 "보관 위치" — 같은 자산이 연결한 계좌·지갑과 직접 입력에 얼마씩, 몇 %씩 있는지.
 struct HoldingLocationsCard: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
@@ -21,14 +21,14 @@ struct HoldingLocationsCard: View {
                     if index > 0 {
                         Rectangle().fill(theme.hair).frame(height: 1)
                     }
-                    row(location)
+                    row(location, share: total > 0 ? location.quantity / total : 0)
                 }
             }
         }
         .padding(.horizontal, 14)
     }
 
-    private func row(_ location: HoldingLocation) -> some View {
+    private func row(_ location: HoldingLocation, share: Decimal) -> some View {
         let source = location.sourceID.flatMap(model.document.source(id:))
         return HStack(spacing: 10) {
             SourceLogo(kind: source?.kind, size: 26)
@@ -37,7 +37,7 @@ struct HoldingLocationsCard: View {
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(theme.text)
                     .lineLimit(1)
-                Text([quantityText(location.quantity), source?.label].compactMap { $0 }.joined(separator: " · "))
+                Text("\(quantityText(location.quantity)) · \(shareText(share))")
                     .font(.system(size: 10.5))
                     .monospacedDigit()
                     .foregroundStyle(theme.text2)
@@ -71,8 +71,13 @@ struct HoldingLocationsCard: View {
     }
 
     private func quantityText(_ quantity: Decimal) -> String {
-        let qty = asset.formattedQuantity(quantity)
+        let qty = asset.shortQuantity(quantity)
         return asset.hasNumericSymbol ? model.t("\(qty) shares") : "\(qty) \(asset.symbol)"
+    }
+
+    private func shareText(_ share: Decimal) -> String {
+        guard share > 0 else { return "0%" }
+        return share < 0.01 ? "<1%" : "\(Int(share.doubleValue * 100 + 0.5))%"
     }
 
     private func valueText(_ quantity: Decimal) -> String {
