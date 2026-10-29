@@ -42,7 +42,8 @@ Requests to these services skip the on-disk URL cache.
 - **mempool.space** — for a linked Bitcoin wallet, the addresses you entered, to read their confirmed balance.
 - **Public chain RPCs** (`ethereum-rpc.publicnode.com`, `arb1.arbitrum.io`, `mainnet.base.org`,
   `mainnet.optimism.io`, `polygon-bor-rpc.publicnode.com`) — for a linked EVM wallet, the address, to read the
-  balances of a fixed list of known tokens on the chains you picked.
+  balances of a fixed list of known tokens on the chains you picked. If you hold an Aave yield or staking
+  token, the Ethereum RPC is also asked for that token's exchange rate when prices refresh (no address is sent).
 - **Binance** — current prices of the coins found in a wallet.
 
 Wallet balances are public on-chain data, but these services can see which addresses are looked up from your

@@ -448,13 +448,15 @@ extension AppModel {
         let provider: ProviderKind
         let providerSymbol: String
         switch instrument.market {
+        case _ where instrument.provider != nil:
+            (provider, providerSymbol) = (instrument.provider!, instrument.providerSymbol ?? instrument.symbol)
         case .koreaStock: (provider, providerSymbol) = (.naver, instrument.symbol)
         case .crypto: (provider, providerSymbol) = (.binance, "\(instrument.symbol)USDT")
         default: (provider, providerSymbol) = (.yahoo, instrument.symbol)
         }
         return Asset(
             name: instrument.name,
-            symbol: instrument.symbol,
+            symbol: instrument.displaySymbol,
             provider: provider,
             providerSymbol: providerSymbol,
             market: instrument.market,

@@ -6,12 +6,27 @@ public struct ImportInstrument: Hashable, Sendable {
     public var symbol: String
     public var name: String
     public var currency: String
+    /// 바이낸스·네이버·야후가 아닌 시세 출처가 필요한 종목(이자·스테이킹 토큰) — 자산을 만들 때 쓴다.
+    public var provider: ProviderKind?
+    public var providerSymbol: String?
+    /// 화면에 보일 심볼 — 대소문자를 살린다("stkwaEthUSDC.v1"). 같은지는 대문자 심볼로 본다.
+    public var displaySymbol: String
 
-    public init(market: Market, symbol: String, name: String, currency: String) {
+    public init(
+        market: Market,
+        symbol: String,
+        name: String,
+        currency: String,
+        provider: ProviderKind? = nil,
+        providerSymbol: String? = nil
+    ) {
         self.market = market
         self.symbol = symbol.uppercased()
         self.name = name
         self.currency = currency.uppercased()
+        self.provider = provider
+        self.providerSymbol = providerSymbol
+        self.displaySymbol = symbol
     }
 
     /// 이름·통화 표기가 소스마다 달라도 같은 종목으로 본다.

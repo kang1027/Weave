@@ -9,6 +9,11 @@ public struct AssetLogoSource: Equatable, Sendable {
     public let candidates: [URL]
 
     public init?(asset: Asset) {
+        // 이자·스테이킹 토큰은 원금 코인 아이콘을 쓴다.
+        if asset.provider == .onchain, let underlying = EVMToken.yieldBearing(providerSymbol: asset.providerSymbol)?.underlying {
+            self.init(market: .crypto, symbol: underlying)
+            return
+        }
         self.init(market: asset.market, symbol: asset.symbol)
     }
 

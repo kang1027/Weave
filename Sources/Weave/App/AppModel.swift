@@ -183,10 +183,12 @@ final class AppModel: ObservableObject {
                     .appendingPathComponent("Weave/portfolio.json")
             )
         let fxService = FXService(yahoo: yahoo, cacheDirectory: cacheDir)
+        // 지갑의 이자·스테이킹 토큰 시세 — 검색엔 안 나오고 시세·차트만 낸다.
+        let onchain = OnchainVaultProvider(http: URLSessionHTTPClient(session: URLSession(configuration: .ephemeral)), underlying: binance)
         let model = AppModel(
             store: store,
-            quoteService: QuoteService(providers: providers),
-            candleService: CandleService(providers: providers, cacheDirectory: cacheDir),
+            quoteService: QuoteService(providers: providers + [onchain]),
+            candleService: CandleService(providers: providers + [onchain], cacheDirectory: cacheDir),
             fxService: fxService,
             searchService: SearchService(providers: providers),
             kimchiPremiumService: KimchiPremiumService(

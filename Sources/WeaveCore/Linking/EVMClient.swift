@@ -21,9 +21,6 @@ public struct EVMClient: Sendable {
             + tokens.map { (target: $0.contract, data: Self.balanceOf(owner), symbol: $0.symbol, decimals: $0.decimals) }
 
         var amounts: [String: Decimal] = [:]
-        // 금고 토큰 지분 — 원금으로 바꾼 뒤 더한다. 지분 워드를 그대로 다음 convertToAssets 인자로 넘긴다.
-        var shares: [(token: EVMToken, word: Data)] = []
-        let vaults = Dictionary(tokens.map { ($0.contract, $0) }, uniquingKeysWith: { first, _ in first })
         for start in stride(from: 0, to: calls.count, by: Self.batchSize) {
             let batch = Array(calls[start..<min(start + Self.batchSize, calls.count)])
             let results = try await aggregate(batch.map { ($0.target, $0.data) }, chain: chain)
@@ -33,26 +30,26 @@ public struct EVMClient: Sendable {
                     throw WalletError.partialFailure(chain: chain.name)
                 }
                 guard raw > 0 else { continue }
-                if let vault = vaults[call.target], !vault.vaultPath.isEmpty {
-                    shares.append((vault, result.data))
-                    continue
-                }
                 amounts[call.symbol, default: 0] += raw / Self.power(of: call.decimals)
             }
         }
-        for (token, word) in shares {
-            var current = word
-            for vault in token.vaultPath {
-                let results = try await aggregate([(vault, Self.convertToAssets(current))], chain: chain)
-                guard let result = results.first, result.success, result.data.count == 32 else {
-                    throw WalletError.partialFailure(chain: chain.name)
-                }
-                current = result.data
-            }
-            guard let raw = Self.uint(current) else { throw WalletError.invalidResponse }
-            amounts[token.symbol, default: 0] += raw / Self.power(of: token.decimals)
-        }
         return amounts
+    }
+
+    /// 이자·스테이킹 토큰 1개가 원금 몇 개인지 — 금고마다 convertToAssets를 차례로 부른다.
+    public func underlyingPerToken(_ token: EVMToken) async throws -> Decimal {
+        guard let underlyingDecimals = token.underlyingDecimals else { throw WalletError.invalidResponse }
+        guard !token.vaultPath.isEmpty else { return 1 }
+        var current = Self.word(decimal: Self.power(of: token.decimals))
+        for vault in token.vaultPath {
+            let results = try await aggregate([(vault, Self.convertToAssets(current))], chain: token.chain)
+            guard let result = results.first, result.success, result.data.count == 32 else {
+                throw WalletError.partialFailure(chain: token.chain.name)
+            }
+            current = result.data
+        }
+        guard let raw = Self.uint(current), raw > 0 else { throw WalletError.invalidResponse }
+        return raw / Self.power(of: underlyingDecimals)
     }
 
     private func aggregate(_ calls: [(target: String, data: Data)], chain: EVMChain) async throws -> [(success: Bool, data: Data)] {
@@ -163,6 +160,23 @@ public struct EVMClient: Sendable {
         var value = Decimal(1)
         for _ in 0..<decimals { value *= 10 }
         return value
+    }
+
+    /// 10의 거듭제곱 같은 정수 Decimal → uint256 워드.
+    static func word(decimal value: Decimal) -> Data {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        var remaining = value
+        var index = 31
+        while remaining > 0, index >= 0 {
+            var divided = remaining / 256
+            var quotient = Decimal()
+            NSDecimalRound(&quotient, &divided, 0, .down)
+            let digit = remaining - quotient * 256
+            bytes[index] = UInt8(truncating: digit as NSDecimalNumber)
+            remaining = quotient
+            index -= 1
+        }
+        return Data(bytes)
     }
 
     private static func word(_ value: UInt64) -> Data {

@@ -61,9 +61,21 @@ public enum WalletConnector {
             }
         }
 
-        let symbols = amounts.filter { $0.value > 0 }.keys.sorted()
-        let quotes = try await prices.prices(baseAssets: symbols)
+        // 이자·스테이킹 토큰은 원금 코인 시세 × 원금 교환비로 값을 매긴다.
+        let held = amounts.filter { $0.value > 0 }.keys.sorted()
+        let yieldTokens = held.compactMap(yieldToken)
+        let bases = Set(held.filter { yieldToken($0) == nil } + yieldTokens.compactMap(\.underlying))
+        var quotes = try await prices.prices(baseAssets: bases.sorted())
+        let client = EVMClient(http: http)
+        for token in yieldTokens {
+            guard let underlying = token.underlying, let base = quotes[underlying] else { continue }
+            quotes[token.symbol] = base * (try await client.underlyingPerToken(token))
+        }
         return snapshot(sourceID: sourceID, amounts: amounts, quotes: quotes, now: now)
+    }
+
+    static func yieldToken(_ symbol: String) -> EVMToken? {
+        EVMToken.yieldBearing.first { $0.symbol == symbol }
     }
 
     static func snapshot(
@@ -77,9 +89,13 @@ public enum WalletConnector {
         var dust: Set<ImportInstrument> = []
         for symbol in amounts.keys.sorted() {
             guard let quantity = amounts[symbol], quantity > 0 else { continue }
-            let instrument = ImportInstrument(
-                market: .crypto, symbol: symbol, name: CryptoNames.name(for: symbol), currency: "USD"
-            )
+            // 이자·스테이킹 토큰은 그 토큰 자체를 자산으로 — 시세는 체인 교환비로 따로 매긴다.
+            let instrument = yieldToken(symbol).map { token in
+                ImportInstrument(
+                    market: .crypto, symbol: token.symbol, name: token.name ?? token.symbol, currency: "USD",
+                    provider: .onchain, providerSymbol: token.providerSymbol
+                )
+            } ?? ImportInstrument(market: .crypto, symbol: symbol, name: CryptoNames.name(for: symbol), currency: "USD")
             // 잔고는 있는데 시세가 없다(상장 폐지·거래 중단) — 0으로 보면 지갑에서 다 빠진 걸로 기록되니 이번엔 건너뛴다.
             // 수량은 연결 상세에 보여 주려고 남긴다.
             guard let price = quotes[symbol] else {

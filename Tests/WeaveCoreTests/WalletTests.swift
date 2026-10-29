@@ -96,19 +96,64 @@ private actor FakeRPC: HTTPSending {
         }
     }
 
-    @Test func vaultTokensCountAsTheirUnderlyingCoin() async throws {
-        let rpc = FakeRPC(balance: 3_000_000)
-        // 지분 → 중간 금고 → 원금. 가짜 RPC는 어떤 호출이든 3,000,000을 돌려준다.
-        let staked = EVMToken(chain: .ethereum, contract: "0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6", symbol: "USDC", decimals: 6,
-                              vaultPath: ["0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6", "0xd4fa2d31b7968e448877f69a96de69f5de8cd23e"])
+    @Test func yieldTokensKeepTheirOwnSymbolAndAreValuedThroughTheVault() async throws {
+        let staked = try #require(EVMToken.yieldBearing(providerSymbol: "ethereum:0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6"))
+        #expect(staked.symbol == "stkwaEthUSDC.v1")
+        #expect(staked.underlying == "USDC")
         let plain = EVMToken(chain: .ethereum, contract: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", symbol: "USDC", decimals: 6)
+
+        // 잔고는 토큰 단위 그대로 — 스테이킹분을 USDC에 섞지 않는다.
+        let rpc = FakeRPC(balance: 3_000_000)
         let balances = try await EVMClient(http: rpc).balances(owner: owner, chain: .ethereum, tokens: [plain, staked])
-        // 잔고 한 번 + 금고 두 단계 = 세 번 부른다. 스테이킹분도 USDC로 더한다.
+        #expect(balances["USDC"] == 3)
+        #expect(balances["stkwaEthUSDC.v1"] == 3)
+        #expect(await rpc.calls == 1)
+
+        // 1개가 원금 몇 개인지는 금고 두 단계를 차례로 부른다(가짜 RPC는 늘 3,000,000을 준다).
+        let perToken = try await EVMClient(http: rpc).underlyingPerToken(staked)
+        #expect(perToken == 3)
         #expect(await rpc.calls == 3)
-        #expect(balances["USDC"] == 6)
-        #expect(EVMClient.convertToAssets(Data(repeating: 1, count: 32)).prefix(4).hex == "07a2d13a")
-        // 손으로 관리하는 이자 토큰도 지갑 조회 목록에 들어간다.
-        #expect(EVMToken.all.contains { $0.contract == "0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6" })
+        #expect(EVMClient.word(decimal: 1_000_000).hex.hasSuffix("0f4240"))
+
+        // 스냅샷 — 토큰 자체가 종목이고, 시세 출처가 실려 자산을 만들 때 onchain으로 만든다.
+        let snapshot = WalletConnector.snapshot(
+            sourceID: UUID(), amounts: ["stkwaEthUSDC.v1": Decimal(string: "3096.668")!],
+            quotes: ["stkwaEthUSDC.v1": Decimal(string: "1.1915")!], now: date("2026-03-01")
+        )
+        let holding = try #require(snapshot.holdings.first)
+        #expect(holding.instrument.displaySymbol == "stkwaEthUSDC.v1")
+        #expect(holding.instrument.name == "Aave Umbrella USDC")
+        #expect(holding.instrument.provider == .onchain)
+        #expect(holding.instrument.providerSymbol == "ethereum:0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6")
+        #expect(holding.marketPrice == Decimal(string: "1.1915"))
+        #expect(EVMToken.all.contains { $0.contract == staked.contract })
+    }
+
+    @Test func onchainQuotesScaleTheUnderlyingByTheVaultRate() async throws {
+        struct FixedUnderlying: MarketDataProvider {
+            let kind: ProviderKind = .binance
+            func search(query: String) async throws -> [SearchResult] { [] }
+            func quote(providerSymbol: String) async throws -> Quote {
+                #expect(providerSymbol == "USDCUSDT")
+                return Quote(price: 1, changePercent: Decimal(string: "0.01")!, currency: "USD")
+            }
+            func candles(providerSymbol: String, interval: CandleInterval) async throws -> [Candle] {
+                [Candle(date: Date(timeIntervalSince1970: 0), open: 1, high: 2, low: 1, close: 2)]
+            }
+        }
+        let rpc = FakeRPC(balance: 1_191_538)
+        let provider = OnchainVaultProvider(http: rpc, underlying: FixedUnderlying())
+        let symbol = "ethereum:0xd4fa2d31b7968e448877f69a96de69f5de8cd23e"
+        let quote = try await provider.quote(providerSymbol: symbol)
+        #expect(quote.price == Decimal(string: "1.191538"))
+        #expect(quote.currency == "USD")
+        let candles = try await provider.candles(providerSymbol: symbol, interval: .day)
+        #expect(candles.first?.close == Decimal(string: "2.383076"))
+        // 교환비는 잠깐 기억한다 — 두 번째 시세에서 체인을 다시 부르지 않는다.
+        #expect(await rpc.calls == 1)
+        await #expect(throws: ProviderError.unsupportedSymbol("ethereum:0xdead")) {
+            try await provider.quote(providerSymbol: "ethereum:0xdead")
+        }
     }
 
     @Test func smallWalletChangesWaitUntilTheyAddUp() {
