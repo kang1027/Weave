@@ -17,6 +17,9 @@ enum Route: Hashable {
     case settings
     case tradeForm(assetID: UUID, editing: Trade?, prefill: TradePrefill?)
     case manualAssetForm
+    case connections
+    case addToss
+    case importReview(UUID)
 }
 
 @MainActor
@@ -84,12 +87,24 @@ final class AppModel: ObservableObject {
     var detailChartAssetID: UUID?
     var detailLoadToken = 0
 
+    // 계좌 연결 — 상태는 화면 표시용이라 문서에 저장하지 않는다.
+    @Published var linkStatus: [UUID: LinkStatus] = [:]
+    /// 첫 동기화 결과 — 사용자가 검토하고 적용한다.
+    @Published var pendingImports: [UUID: PendingImport] = [:]
+    /// 자동으로 채우지 못해 사용자가 봐야 하는 차이.
+    @Published var linkMismatches: [UUID: [HoldingMismatch]] = [:]
+    var tossClients: [UUID: TossClient] = [:]
+    var lastLinkSyncAttempt: [UUID: Date] = [:]
+
     let store: any PortfolioStore
     let quoteService: QuoteService
     let candleService: CandleService
     let fxService: FXService
     let searchService: SearchService
     let updater: UpdaterHandle
+    let credentialStore: any CredentialStoring
+    /// 증권사 API 요청 — 오류 본문까지 봐야 해서 시세용 HTTPClient와 따로 둔다.
+    let linkHTTP: any HTTPSending
 
     private let logger = Logger(subsystem: "app.weave", category: "AppModel")
     private var refreshTask: Task<Void, Never>?
@@ -107,7 +122,9 @@ final class AppModel: ObservableObject {
         candleService: CandleService,
         fxService: FXService,
         searchService: SearchService,
-        updater: UpdaterHandle = UpdaterHandle()
+        updater: UpdaterHandle = UpdaterHandle(),
+        credentialStore: any CredentialStoring = KeychainCredentialStore(),
+        linkHTTP: any HTTPSending = URLSessionHTTPClient()
     ) {
         self.store = store
         self.quoteService = quoteService
@@ -115,6 +132,8 @@ final class AppModel: ObservableObject {
         self.fxService = fxService
         self.searchService = searchService
         self.updater = updater
+        self.credentialStore = credentialStore
+        self.linkHTTP = linkHTTP
         do {
             self.document = try store.load()
         } catch {
@@ -316,6 +335,7 @@ final class AppModel: ObservableObject {
             while let self, !Task.isCancelled {
                 await self.refreshQuotes()
                 self.lastRefreshAt = Date()
+                Task { await self.syncLinkedSources() }
                 let interval = max(60, min(900, self.settings.quoteRefreshSeconds))
                 self.nextRefreshAt = Date().addingTimeInterval(TimeInterval(interval))
                 try? await Task.sleep(for: .seconds(interval))
