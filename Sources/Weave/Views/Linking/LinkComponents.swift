@@ -4,7 +4,7 @@ import WeaveCore
 
 // 연결 화면들이 같이 쓰는 부품 — 로고, 버튼, 섹션 라벨, 태그, 상태 점, 로고 묶음, IP 상자.
 
-/// 연결 종류 로고 — 토스는 흰 원 위 로고, 비트코인은 주황 원, EVM은 지갑 아이콘에 ETH 배지.
+/// 연결 종류 로고 — 토스는 흰 원 위 로고, 지갑은 체인 색 원에 흰 지갑(EVM 남보라, 비트코인 주황).
 struct SourceLogo: View {
     @Environment(\.theme) private var theme
     let kind: LinkedSourceKind?
@@ -22,76 +22,53 @@ struct SourceLogo: View {
                 .frame(width: size * 0.62, height: size * 0.62)
                 .frame(width: size, height: size)
                 .background(Circle().fill(.white))
-        } else if kind == .bitcoinWallet {
-            CoinIcon(symbol: "btc", size: size)
-        } else if kind == .evmWallet {
-            symbolCircle("wallet.pass")
-                .overlay(alignment: .bottomTrailing) {
-                    CoinIcon(symbol: "eth", size: size * 0.44)
-                        .background(Circle().fill(theme.panel).padding(-1.5))
-                        .offset(x: 2, y: 2)
-                }
+        } else if let kind, kind.isWallet {
+            WalletMark(kind: kind, size: size)
         } else {
-            symbolCircle(kind == nil ? "pencil" : "building.columns")
+            Image(systemName: kind == nil ? "pencil" : "building.columns")
+                .font(.system(size: size * 0.42, weight: .medium))
+                .foregroundStyle(theme.text2)
+                .frame(width: size, height: size)
+                .background(Circle().fill(theme.iconBg))
         }
-    }
-
-    private func symbolCircle(_ name: String) -> some View {
-        Image(systemName: name)
-            .font(.system(size: size * 0.42, weight: .medium))
-            .foregroundStyle(theme.text2)
-            .frame(width: size, height: size)
-            .background(Circle().fill(theme.iconBg))
     }
 }
 
-/// 자산 로고에 겹쳐 붙이는 작은 출처 배지 — 토스는 로고, 지갑은 지갑 아이콘.
-/// 지갑에 코인 아이콘을 쓰면 비트코인 로고 위에 또 비트코인이 붙어 헷갈린다.
+/// 지갑 표시 — 체인 색 그라데이션 원에 흰 지갑.
+struct WalletMark: View {
+    let kind: LinkedSourceKind
+    let size: CGFloat
+
+    var body: some View {
+        Image(systemName: Self.symbol)
+            .font(.system(size: size * 0.42, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(Circle().fill(LinearGradient(
+                colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing
+            )))
+    }
+
+    /// 지갑 모양 심볼은 macOS 15부터 — 14에선 예전 지갑 심볼로.
+    private static let symbol = NSImage(systemSymbolName: "wallet.bifold.fill", accessibilityDescription: nil) != nil
+        ? "wallet.bifold.fill" : "wallet.pass.fill"
+
+    private var colors: [Color] {
+        kind == .bitcoinWallet
+            ? [Color(hex: 0xF7931A), Color(hex: 0xD96A06)]
+            : [Color(hex: 0x627EEA), Color(hex: 0x454AC9)]
+    }
+}
+
+/// 자산 로고에 겹쳐 붙이는 작은 출처 배지 — 연결 목록과 같은 로고를 작게.
 struct SourceBadge: View {
     @Environment(\.theme) private var theme
     let kind: LinkedSourceKind
     var size: CGFloat = 14
 
     var body: some View {
-        Group {
-            if kind == .toss {
-                SourceLogo(kind: .toss, size: size)
-            } else {
-                Image(systemName: kind.isWallet ? "wallet.pass.fill" : "building.columns.fill")
-                    .font(.system(size: size * 0.5, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: size, height: size)
-                    .background(Circle().fill(theme.link))
-            }
-        }
-        .background(Circle().fill(theme.bg).padding(-1.5))
-    }
-}
-
-/// 코인 아이콘(원격 아이콘셋) — 아직 없으면 회색 원.
-struct CoinIcon: View {
-    @Environment(\.theme) private var theme
-    let symbol: String
-    let size: CGFloat
-    @State private var loaded = false
-
-    private var source: AssetLogoSource? { AssetLogoSource(market: .crypto, symbol: symbol) }
-
-    var body: some View {
-        let _ = loaded
-        Group {
-            if let source, let image = RemoteLogoCache.shared.cachedImage(for: source) {
-                Image(nsImage: image).resizable().scaledToFit()
-            } else {
-                Circle().fill(theme.iconBg)
-            }
-        }
-        .frame(width: size, height: size)
-        .clipShape(Circle())
-        .task(id: symbol) {
-            guard let source, RemoteLogoCache.shared.cachedImage(for: source) == nil else { return }
-            if await RemoteLogoCache.shared.image(for: source) != nil { loaded = true }
-        }
+        SourceLogo(kind: kind, size: size)
+            .background(Circle().fill(theme.bg).padding(-1.5))
     }
 }
 
