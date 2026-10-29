@@ -9,6 +9,7 @@ struct ImportReviewView: View {
     let sourceID: UUID
 
     private var source: LinkedSource? { model.document.source(id: sourceID) }
+    private var isWallet: Bool { source?.kind == .bitcoinWallet || source?.kind == .evmWallet }
     private var plan: ImportPlan? { model.pendingImports[sourceID]?.plan }
     private var mismatches: [HoldingMismatch] { plan?.unresolved ?? model.linkMismatches[sourceID] ?? [] }
 
@@ -39,6 +40,7 @@ struct ImportReviewView: View {
                             .padding(.top, 10)
                         }
                         newAssets(plan)
+                        transfers(plan)
                         openingBalances(plan)
                         adjustments(plan)
                         duplicates(plan)
@@ -84,8 +86,13 @@ struct ImportReviewView: View {
 
     private func tiles(_ plan: ImportPlan) -> some View {
         HStack(spacing: 6) {
-            tile(plan.newTradeCount, model.t("New trades"))
-            tile(plan.duplicates.count, model.t("Duplicates"))
+            if isWallet {
+                tile(plan.missingAssets.count, model.t("New assets"))
+                tile(plan.transfers.count, model.t("From manual"))
+            } else {
+                tile(plan.newTradeCount, model.t("New trades"))
+                tile(plan.duplicates.count, model.t("Duplicates"))
+            }
             tile(plan.unresolved.count, model.t("Needs review"), highlight: !plan.unresolved.isEmpty)
         }
         .padding(.horizontal, 14)
@@ -142,7 +149,35 @@ struct ImportReviewView: View {
                             .font(.system(size: 12, weight: .semibold))
                             .monospacedDigit()
                             .foregroundStyle(theme.text)
-                        Text(model.t("Holdings older than the order history start at \(MoneyFormatter.price(trade.price, currency: trade.instrument.currency)), matched to the account's average cost."))
+                        let price = MoneyFormatter.price(trade.price, currency: trade.instrument.currency)
+                        Text(isWallet
+                            ? model.t("Coins not in your manual holdings start at today's price, \(price).")
+                            : model.t("Holdings older than the order history start at \(price), matched to the account's average cost."))
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(theme.text2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+    }
+
+    /// 지갑 — 직접 입력분과 평단 그대로 주고받는 이동.
+    @ViewBuilder
+    private func transfers(_ plan: ImportPlan) -> some View {
+        if !plan.transfers.isEmpty {
+            sectionLabel(model.t("From manual"))
+            card {
+                rows(plan.transfers) { trade in
+                    let price = MoneyFormatter.price(trade.price, currency: trade.instrument.currency)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(trade.instrument.name) \(trade.side == .buy ? "+" : "−")\(MoneyFormatter.quantity(trade.quantity))")
+                            .font(.system(size: 12, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(theme.text)
+                        Text(trade.side == .buy
+                            ? model.t("Moves over from your manual holdings at their average cost, \(price).")
+                            : model.t("Goes back to your manual holdings at \(price). Enter the sell there if you sold it."))
                             .font(.system(size: 10.5))
                             .foregroundStyle(theme.text2)
                             .fixedSize(horizontal: false, vertical: true)
@@ -229,6 +264,7 @@ struct ImportReviewView: View {
     }
 
     private func applyTitle(_ plan: ImportPlan) -> String {
+        if isWallet { return model.t("Import balances") }
         let added = model.t("Add \(plan.trades.count) trade(s)")
         guard !plan.duplicates.isEmpty else { return added }
         return added + " · " + model.t("merge \(plan.duplicates.count)")

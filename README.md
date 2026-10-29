@@ -81,7 +81,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development and pull request
 
 ## Data & privacy
 
-Your portfolio is stored only on this Mac (`Application Support/Weave`) and is never sent anywhere. Weave reads public quotes and candles from Binance, Naver, and Yahoo Finance — no accounts, no telemetry. If you link a broker account (Toss Securities), its API keys stay in the macOS Keychain and go only to that broker. Details in [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md).
+Your portfolio is stored only on this Mac (`Application Support/Weave`) and is never sent anywhere. Weave reads public quotes and candles from Binance, Naver, and Yahoo Finance — no accounts, no telemetry. If you link a broker account (Toss Securities) or a crypto wallet, its API keys or addresses stay in the macOS Keychain and go only to the service that reads them. Details in [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md).
 
 Market data comes from unofficial public endpoints and may be delayed or inaccurate. Weave is a personal tracking tool, not investment advice.
 

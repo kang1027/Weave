@@ -23,10 +23,13 @@ enum LinkFailure: Error, Equatable {
     case rateLimited
     case noAccount
     case alreadyLinked
-    /// 다른 Mac에서 가져온 백업처럼 문서엔 연결이 있는데 이 Mac 키체인에 키가 없다.
+    /// 다른 Mac에서 가져온 백업처럼 문서엔 연결이 있는데 이 Mac 키체인에 키·주소가 없다.
     case missingCredentials
     case keychain
     case network
+    case invalidAddress
+    /// 체인 RPC가 일부 잔고를 못 줬다 — 0으로 보지 않고 이번 동기화를 건너뛴다.
+    case walletUnavailable(String)
     case server(String)
 
     init(_ error: Error) {
@@ -38,6 +41,9 @@ enum LinkFailure: Error, Equatable {
         case TossError.noAccount: self = .noAccount
         case TossError.server(let status, let code): self = .server(code.isEmpty ? "HTTP \(status)" : code)
         case TossError.invalidResponse: self = .server("invalid-response")
+        case WalletError.partialFailure(let chain): self = .walletUnavailable(chain)
+        case WalletError.invalidResponse: self = .server("invalid-response")
+        case HTTPError.badStatus(let status): self = .server("HTTP \(status)")
         case is CredentialStoreError, is DecodingError: self = .keychain
         case is URLError: self = .network
         default: self = .server(String(describing: error))
@@ -95,7 +101,59 @@ extension AppModel {
         }
     }
 
-    /// 연결 해제 — 키, 가져온 거래, 이 연결에서만 거래가 있던 자산을 지운다.
+    /// 지갑 주소를 확인하고 잔고를 받아 본 뒤 연결한다. 받지 못하면 아무것도 저장하지 않는다.
+    func connectWallet(
+        kind: WalletConfig.Kind,
+        name: String,
+        addresses: [String],
+        chains: [EVMChain]
+    ) async -> Result<UUID, LinkFailure> {
+        var seen = Set<String>()
+        let cleaned = addresses
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
+        let valid = kind == .bitcoin ? WalletConfig.isBitcoinAddress : WalletConfig.isEVMAddress
+        guard !cleaned.isEmpty, cleaned.allSatisfy(valid), kind == .bitcoin || !chains.isEmpty else {
+            return .failure(.invalidAddress)
+        }
+        guard !isWalletLinked(cleaned) else { return .failure(.alreadyLinked) }
+        guard let prices = cryptoPrices else { return .failure(.server("no-prices")) }
+
+        let config = WalletConfig(kind: kind, addresses: cleaned, chains: kind == .evm ? chains : [])
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let source = LinkedSource(
+            kind: kind == .bitcoin ? .bitcoinWallet : .evmWallet,
+            name: trimmedName.isEmpty ? t(kind == .bitcoin ? "Bitcoin wallet" : "EVM wallet") : trimmedName,
+            label: config.label
+        )
+        do {
+            let snapshot = try await WalletConnector.fetch(config: config, sourceID: source.id, http: linkHTTP, prices: prices)
+            // 받는 사이 같은 주소가 먼저 연결됐을 수 있다.
+            guard !isWalletLinked(cleaned) else { return .failure(.alreadyLinked) }
+            try credentialStore.save(config, for: source.id)
+            document.sources.append(source)
+            persist()
+            lastLinkSyncAttempt[source.id] = Date()
+            receive(snapshot, for: source.id, firstSync: true)
+            linkStatus[source.id] = .synced(Date())
+            return .success(source.id)
+        } catch {
+            return .failure(LinkFailure(error))
+        }
+    }
+
+    private func isWalletLinked(_ addresses: [String]) -> Bool {
+        let wanted = Set(addresses.map { $0.lowercased() })
+        return document.sources.contains { source in
+            guard source.kind == .bitcoinWallet || source.kind == .evmWallet,
+                  let config = try? credentialStore.walletConfig(for: source.id)
+            else { return false }
+            return config.addresses.contains { wanted.contains($0.lowercased()) }
+        }
+    }
+
+    /// 연결 해제 — 키·주소, 가져온 거래, 이 연결에서만 거래가 있던 자산을 지운다.
+    /// 지갑으로 옮겼던 직접 입력분은 이동 기록이 지워지면서 직접 입력분으로 돌아온다.
     func disconnectSource(id: UUID) {
         let removedAssets = assetsOnlyIn(sourceID: id)
         credentialStore.delete(for: id)
@@ -105,7 +163,7 @@ extension AppModel {
         linkMismatches[id] = nil
         linkSkippedTrades[id] = nil
         lastLinkSyncAttempt[id] = nil
-        document.trades.removeAll { $0.sourceID == id }
+        document.trades.removeAll { $0.sourceID == id || $0.transferSourceID == id }
         for assetID in removedAssets {
             LogoStore.delete(fileName: asset(id: assetID)?.customLogoFileName)
             quotes[assetID] = nil
@@ -119,11 +177,12 @@ extension AppModel {
         updateMenuBarTitle()
     }
 
-    /// 거래가 전부 이 연결에서 온 자산.
+    /// 거래가 전부 이 연결에서 온 자산(지갑 이동의 직접 입력 쪽 포함).
     func assetsOnlyIn(sourceID: UUID) -> Set<UUID> {
-        let bySource = Set(document.trades.filter { $0.sourceID == sourceID }.map(\.assetID))
+        let belongs: (Trade) -> Bool = { $0.sourceID == sourceID || $0.transferSourceID == sourceID }
+        let bySource = Set(document.trades.filter(belongs).map(\.assetID))
         return bySource.filter { assetID in
-            document.trades.allSatisfy { $0.assetID != assetID || $0.sourceID == sourceID }
+            document.trades.allSatisfy { $0.assetID != assetID || belongs($0) }
         }
     }
 
@@ -142,7 +201,11 @@ extension AppModel {
     func disconnectMessage(_ source: LinkedSource) -> String {
         let trades = importedTradeCount(sourceID: source.id)
         let assets = assetsOnlyIn(sourceID: source.id).count
-        return t("The keys, \(trades) imported trade(s), and \(assets) asset(s) held only in this account will be deleted.")
+        let message = t("The keys, \(trades) imported trade(s), and \(assets) asset(s) held only in this account will be deleted.")
+        guard document.trades.contains(where: { $0.sourceID == nil && $0.transferSourceID == source.id }) else {
+            return message
+        }
+        return message + "\n" + t("Coins moved from your manual holdings go back to them.")
     }
 
     /// 지울 데이터에 딸린 키를 키체인에서 지운다 — 전체 삭제·백업 복원 때.
@@ -182,17 +245,22 @@ extension AppModel {
             let snapshot = try await fetchSnapshot(source)
             // 받는 사이에 연결을 해제했거나 데이터를 지우고 복원했으면 버린다.
             guard generation == linkGeneration, let current = document.source(id: id) else { return }
-            let plan = ImportPlanner.plan(snapshot: snapshot, document: document)
-            linkMismatches[id] = plan.unresolved
-            if current.lastSyncedAt == nil, !plan.trades.isEmpty || !plan.duplicates.isEmpty {
-                pendingImports[id] = PendingImport(snapshot: snapshot, plan: plan)
-            } else {
-                applyImport(plan, syncedAt: snapshot.takenAt)
-            }
+            receive(snapshot, for: id, firstSync: current.lastSyncedAt == nil)
             linkStatus[id] = .synced(Date())
         } catch {
             guard generation == linkGeneration, document.source(id: id) != nil else { return }
             linkStatus[id] = .failed(LinkFailure(error))
+        }
+    }
+
+    /// 받은 스냅샷을 계획한다. 처음 가져올 때는 검토 화면에 올리고, 그 뒤로는 바로 반영한다.
+    private func receive(_ snapshot: SourceSnapshot, for id: UUID, firstSync: Bool) {
+        let plan = ImportPlanner.plan(snapshot: snapshot, document: document)
+        linkMismatches[id] = plan.unresolved
+        if firstSync, !plan.trades.isEmpty || !plan.duplicates.isEmpty {
+            pendingImports[id] = PendingImport(snapshot: snapshot, plan: plan)
+        } else {
+            applyImport(plan, syncedAt: snapshot.takenAt)
         }
     }
 
@@ -208,7 +276,13 @@ extension AppModel {
                 client: client, sourceID: source.id,
                 accountSeq: accountSeq, since: source.lastSyncedAt
             )
-        case .koreaInvestment, .bitcoinWallet, .evmWallet:
+        case .bitcoinWallet, .evmWallet:
+            guard let config = try credentialStore.walletConfig(for: source.id) else {
+                throw LinkFailure.missingCredentials
+            }
+            guard let prices = cryptoPrices else { throw LinkFailure.server("no-prices") }
+            return try await WalletConnector.fetch(config: config, sourceID: source.id, http: linkHTTP, prices: prices)
+        case .koreaInvestment:
             throw LinkFailure.server("unsupported")
         }
     }
@@ -262,12 +336,18 @@ extension AppModel {
     }
 
     private func makeAsset(for instrument: ImportInstrument) -> Asset {
-        let provider: ProviderKind = instrument.market == .koreaStock ? .naver : .yahoo
+        let provider: ProviderKind
+        let providerSymbol: String
+        switch instrument.market {
+        case .koreaStock: (provider, providerSymbol) = (.naver, instrument.symbol)
+        case .crypto: (provider, providerSymbol) = (.binance, "\(instrument.symbol)USDT")
+        default: (provider, providerSymbol) = (.yahoo, instrument.symbol)
+        }
         return Asset(
             name: instrument.name,
             symbol: instrument.symbol,
             provider: provider,
-            providerSymbol: instrument.symbol,
+            providerSymbol: providerSymbol,
             market: instrument.market,
             currency: instrument.currency,
             colorIndex: nextColorIndex()
@@ -302,13 +382,17 @@ extension AppModel {
         case .alreadyLinked:
             return t("These keys are already linked.")
         case .missingCredentials:
-            return t("The keys aren't on this Mac. Disconnect and link again.")
+            return t("The link details aren't on this Mac. Disconnect and link again.")
         case .keychain:
-            return t("Couldn't save the keys to the keychain.")
+            return t("Couldn't read or save the keychain item.")
         case .network:
-            return t("Couldn't reach Toss Securities. Check your connection.")
+            return t("Couldn't connect. Check your internet connection.")
+        case .invalidAddress:
+            return t("Check the address. Pick at least one chain for an EVM wallet.")
+        case .walletUnavailable(let chain):
+            return t("\(chain) didn't return every balance, so this sync was skipped.")
         case .server(let code):
-            return t("Toss Securities returned an error (\(code)).")
+            return t("The service returned an error (\(code)).")
         }
     }
 

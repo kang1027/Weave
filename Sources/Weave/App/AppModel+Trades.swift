@@ -9,7 +9,7 @@ extension AppModel {
         case imported
     }
 
-    /// 직접 입력한 거래만. 연결한 계좌 보유분은 그 계좌가 원본이라 직접 입력 매도로 줄이지 않는다.
+    /// 직접 입력분 거래만(지갑과 주고받은 이동 포함). 연결한 계좌 보유분은 그 계좌가 원본이라 직접 입력 매도로 줄이지 않는다.
     func manualTrades(for assetID: UUID) -> [Trade] {
         document.trades(for: assetID).filter { !$0.isImported }
     }
@@ -90,7 +90,7 @@ extension AppModel {
         guard let index = document.trades.firstIndex(where: { $0.id == trade.id }) else {
             return .invalidInput
         }
-        guard !document.trades[index].isImported else { return .imported }
+        guard !document.trades[index].isLocked else { return .imported }
         document.trades[index] = trade
         persist()
         invalidateHomeChart()
@@ -98,7 +98,7 @@ extension AppModel {
     }
 
     func deleteTrade(id: UUID) {
-        document.trades.removeAll { $0.id == id && !$0.isImported }
+        document.trades.removeAll { $0.id == id && !$0.isLocked }
         persist()
         invalidateHomeChart()
     }

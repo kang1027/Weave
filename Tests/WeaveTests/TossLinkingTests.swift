@@ -16,10 +16,10 @@ private struct OfflineHTTP: HTTPClient {
 
 private final class MemoryCredentials: CredentialStoring, @unchecked Sendable {
     private let lock = NSLock()
-    private var items: [UUID: TossCredentials] = [:]
+    private var items: [UUID: Data] = [:]
 
-    func tossCredentials(for sourceID: UUID) throws -> TossCredentials? { lock.withLock { items[sourceID] } }
-    func save(_ credentials: TossCredentials, for sourceID: UUID) throws { lock.withLock { items[sourceID] = credentials } }
+    func data(for sourceID: UUID) throws -> Data? { lock.withLock { items[sourceID] } }
+    func save(_ data: Data, for sourceID: UUID) throws { lock.withLock { items[sourceID] = data } }
     func delete(for sourceID: UUID) { lock.withLock { items[sourceID] = nil } }
     var count: Int { lock.withLock { items.count } }
 }

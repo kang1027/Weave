@@ -48,6 +48,10 @@ struct RootView: View {
             AddTossView()
         case .importReview(let sourceID):
             ImportReviewView(sourceID: sourceID)
+        case .addSource:
+            AddSourceView()
+        case .addWallet(let kind):
+            AddWalletView(kind: kind)
         case nil:
             if model.document.assets.isEmpty {
                 OnboardingView()

@@ -134,7 +134,7 @@ struct SettingsView: View {
                     sectionLabel(model.t("Linked accounts"))
                     SettingsCard {
                         Button { model.push(.connections) } label: {
-                            SettingsRow(title: model.t("Brokers"), subtitle: linkedSummary) {
+                            SettingsRow(title: model.t("Accounts & wallets"), subtitle: linkedSummary) {
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 11, weight: .semibold))
                                     .foregroundStyle(theme.text2)
@@ -236,7 +236,7 @@ struct SettingsView: View {
 
     private var linkedSummary: String {
         let sources = model.document.sources
-        guard !sources.isEmpty else { return model.t("Import holdings and trades from Toss Securities") }
+        guard !sources.isEmpty else { return model.t("Import holdings from Toss Securities and crypto wallets") }
         return sources.map { [$0.name, $0.label].filter { !$0.isEmpty }.joined(separator: " ") }.joined(separator: ", ")
     }
 

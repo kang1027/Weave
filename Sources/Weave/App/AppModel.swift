@@ -20,6 +20,8 @@ enum Route: Hashable {
     case connections
     case addToss
     case importReview(UUID)
+    case addSource
+    case addWallet(WalletConfig.Kind)
 }
 
 @MainActor
@@ -127,6 +129,8 @@ final class AppModel: ObservableObject {
     var credentialStore: any CredentialStoring = KeychainCredentialStore()
     /// 증권사 API 요청 — 오류 본문까지 봐야 해서 시세용 HTTPClient와 따로 둔다.
     var linkHTTP: any HTTPSending = URLSessionHTTPClient()
+    /// 지갑 코인 시세(바이낸스). 없으면 지갑을 연결하지 않는다.
+    var cryptoPrices: (any CryptoPriceSource)?
 
     init(
         store: any PortfolioStore,
@@ -173,7 +177,7 @@ final class AppModel: ObservableObject {
                     .appendingPathComponent("Weave/portfolio.json")
             )
         let fxService = FXService(yahoo: yahoo, cacheDirectory: cacheDir)
-        return AppModel(
+        let model = AppModel(
             store: store,
             quoteService: QuoteService(providers: providers),
             candleService: CandleService(providers: providers, cacheDirectory: cacheDir),
@@ -188,6 +192,8 @@ final class AppModel: ObservableObject {
                 usdKRW: { try await fxService.rate(from: "USD", to: "KRW", maxAge: 300, staleLimit: 3600) }
             )
         )
+        model.cryptoPrices = binance
+        return model
     }
 
     // MARK: - 파생 상태

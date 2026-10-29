@@ -254,8 +254,9 @@ public enum ImportPlanner {
                 mismatches.append(HoldingMismatch(instrument: instrument, difference: gap, reason: reason, adjusted: adjusted))
             }
             func adjust(_ side: TradeSide, _ quantity: Decimal, at price: Decimal) {
-                // 계좌가 원본 — 같은 동기화를 두 번 적용해도 한 번만 들어가게 시각으로 ID를 만든다.
-                let stamp = Int(snapshot.takenAt.timeIntervalSince1970)
+                // 계좌가 원본 — 같은 동기화를 두 번 적용해도 한 번만 들어가게 받은 시각(ms)으로 ID를 만든다.
+                // 초 단위면 연달아 누른 두 동기화가 같은 ID가 돼서 뒤의 것이 빠진다.
+                let stamp = Int(snapshot.takenAt.timeIntervalSince1970 * 1000)
                 trades.append(PlannedTrade(
                     instrument: instrument, side: side, quantity: quantity, price: price,
                     date: snapshot.takenAt, externalID: "adjust:\(instrument.symbol):\(stamp)", isAdjustment: true
@@ -264,7 +265,7 @@ public enum ImportPlanner {
             // 지갑 — 매수 기록이 없다. 들어온 만큼은 직접 입력분에서 평단 그대로 옮겨 오고, 모자라면 그때 시세로 잡는다.
             // 나간 만큼은 직접 입력분으로 평단 그대로 돌려놓는다 — 거래소로 옮겨 팔면 그 매도를 직접 입력하면 된다.
             if snapshot.inheritsManualHoldings {
-                let stamp = Int(snapshot.takenAt.timeIntervalSince1970)
+                let stamp = Int(snapshot.takenAt.timeIntervalSince1970 * 1000)
                 // side는 지갑 쪽 방향. 직접 입력 쪽은 반대 방향으로 같은 수량·단가가 들어간다.
                 func move(_ side: TradeSide, _ quantity: Decimal, at price: Decimal) {
                     trades.append(PlannedTrade(

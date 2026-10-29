@@ -10,14 +10,14 @@ struct ConnectionsView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScreenHeader(title: model.t("Linked accounts"), onBack: { model.pop() }) {
-                IconButton(systemName: "plus") { model.push(.addToss) }
+                IconButton(systemName: "plus") { model.push(.addSource) }
             }
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     LinkNotice(
                         systemName: "lock.fill",
-                        text: model.t("Keys stay in this Mac's keychain. Weave only reads holdings and order history, never places orders.")
+                        text: model.t("Keys and addresses stay in this Mac's keychain. Weave only reads balances and order history, never places orders or moves coins.")
                     )
 
                     if model.document.sources.isEmpty {
@@ -54,13 +54,13 @@ struct ConnectionsView: View {
     private var emptyState: some View {
         PanelCard {
             VStack(spacing: 10) {
-                Text(model.t("Link a broker account to bring in holdings and trades automatically."))
+                Text(model.t("Link a broker account or a crypto wallet to bring in holdings automatically."))
                     .font(.system(size: 12))
                     .foregroundStyle(theme.text2)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
-                LinkPrimaryButton(title: model.t("Link Toss Securities")) {
-                    model.push(.addToss)
+                LinkPrimaryButton(title: model.t("Add a link")) {
+                    model.push(.addSource)
                 }
             }
         }
@@ -217,6 +217,12 @@ struct SourceLogo: View {
                 .frame(width: size * 0.62, height: size * 0.62)
                 .frame(width: size, height: size)
                 .background(Circle().fill(.white))
+        } else if kind == .bitcoinWallet {
+            Image(systemName: "bitcoinsign")
+                .font(.system(size: size * 0.46, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: size, height: size)
+                .background(Circle().fill(Color(hex: 0xF7931A)))
         } else {
             Image(systemName: symbol)
                 .font(.system(size: size * 0.42, weight: .medium))

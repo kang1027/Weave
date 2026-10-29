@@ -108,7 +108,7 @@ extension AppModel {
         // (창 시작보다 늦게 산 종목은 그 매수일부터 그려 날짜 기준을 통일.)
         let windowStart = series.first?.date ?? from
         let firstBuyByAsset: [UUID: Date] = Dictionary(
-            document.trades.filter { $0.side == .buy }.map { ($0.assetID, $0.date) },
+            document.trades.filter { $0.side == .buy && !$0.isTransfer }.map { ($0.assetID, $0.date) },
             uniquingKeysWith: min
         )
         let assetLines: [AssetLineSeries] = assets.compactMap { asset in
@@ -130,7 +130,7 @@ extension AppModel {
         // 매수 마커 — 표시 구간 안의 매수 체결. y = 그 시점과 가장 가까운 시계열 값.
         // (일봉/시간봉 공통 — 날짜 키 사전은 인트라데이에서 중복 키로 깨지므로 최근접 탐색.)
         let markers: [BuyMarker] = document.trades
-            .filter { $0.side == .buy && $0.date >= windowStart }
+            .filter { $0.side == .buy && !$0.isTransfer && !$0.isBalanceAdjustment && $0.date >= windowStart }
             .compactMap { trade -> BuyMarker? in
                 guard
                     let asset = assets.first(where: { $0.id == trade.assetID }),
