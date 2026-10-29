@@ -260,8 +260,8 @@ is left out because its API keys require an allowlisted static IP.
   USDT markets). Unknown contracts are never read, so spam tokens with look-alike symbols don't come in. WETH
   counts as ETH. A failed balance call stops the sync instead of reading as zero.
 - **Coins**: only coins with a Binance USDT market. New coins become Binance assets (`BTCUSDT`). A balance
-  under $1 doesn't bring in a new coin, but a coin the wallet already holds keeps being reconciled, so it
-  doesn't flip in and out around $1. A coin with a balance but no price (delisted, halted) is skipped for that
+  under $10 doesn't bring in a new coin, but a coin the wallet already holds keeps being reconciled, so it
+  doesn't flip in and out around $10. A coin with a balance but no price (delisted, halted) is skipped for that
   sync instead of reading as zero.
 - **No trade history**: a wallet only has balances, so changes are recorded as moves against the manual
   holdings, at average cost:

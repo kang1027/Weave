@@ -105,20 +105,20 @@ private actor FakeRPC: HTTPSending {
         #expect(!WalletConfig.isBitcoinAddress("tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx"))
         #expect(!WalletConfig.isBitcoinAddress("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNO"))
         #expect(WalletConfig(kind: .bitcoin, addresses: ["bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"]).label == "bc1qar…5mdq +1")
-        #expect(WalletConfig(kind: .evm, addresses: [owner], chains: [.ethereum, .arbitrum]).label == "0xd8dA…6045 · Ethereum, Arbitrum")
+        #expect(WalletConfig(kind: .evm, addresses: [owner], chains: [.ethereum, .arbitrum]).label == "0xd8dA…6045")
     }
 
     @Test func snapshotMarksDustAndCoinsWithoutAPrice() async throws {
         let snapshot = WalletConnector.snapshot(
             sourceID: UUID(),
-            amounts: ["BTC": Decimal(string: "0.5")!, "PEPE": 100, "ETH": Decimal(string: "0.0001")!, "ARB": 0],
+            amounts: ["BTC": Decimal(string: "0.5")!, "PEPE": 100, "ETH": Decimal(string: "0.004")!, "ARB": 0],
             quotes: ["BTC": 80_000, "ETH": 2_000],
             now: date("2026-03-01")
         )
         #expect(snapshot.holdings.map(\.instrument.symbol) == ["BTC", "ETH"])
         #expect(snapshot.holdings.first?.marketPrice == 80_000)
         #expect(snapshot.holdings.first?.averageCost == nil)
-        // ETH 0.0001개는 $0.2라 먼지, PEPE는 잔고가 있는데 시세가 없어 이번엔 대조하지 않는다.
+        // ETH 0.004개는 $8이라 먼지, PEPE는 잔고가 있는데 시세가 없어 이번엔 대조하지 않는다.
         #expect(snapshot.dust.map(\.symbol) == ["ETH"])
         #expect(snapshot.unsettled.map(\.symbol) == ["PEPE"])
         #expect(snapshot.inheritsManualHoldings)

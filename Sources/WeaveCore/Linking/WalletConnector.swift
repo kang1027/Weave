@@ -34,8 +34,8 @@ public struct BitcoinClient: Sendable {
 /// 지갑 → 가져오기 스냅샷. 지갑엔 매수 기록이 없으니 잔고만 보내고, 평단은 플래너가
 /// 직접 입력분에서 옮겨오거나 그때 시세로 잡는다.
 public enum WalletConnector {
-    /// 이보다 작은 잔고(USD)는 먼지로 보고 뺀다.
-    static let dustValue: Decimal = 1
+    /// 이보다 작은 잔고(USD)로는 새 코인을 들이지 않는다 — 에어드랍·잔돈 토큰이 자산 목록을 채우지 않게.
+    static let dustValue: Decimal = 10
 
     public static func fetch(
         config: WalletConfig,

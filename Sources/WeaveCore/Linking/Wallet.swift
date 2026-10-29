@@ -61,18 +61,11 @@ public struct WalletConfig: Codable, Equatable, Sendable {
         self.chains = chains
     }
 
-    /// 표시용 요약 — "bc1q…x8f0 +1", "0x7a3f…91c2 · Ethereum, Arbitrum".
+    /// 표시용 요약 — "bc1q…x8f0 +1", "0x7a3f…91c2". 연결 목록 한 줄에 종목·거래 수와 같이 들어가서 짧게 둔다.
     public var label: String {
         guard let first = addresses.first else { return "" }
         let short = Self.shortAddress(first)
-        switch kind {
-        case .bitcoin:
-            return addresses.count > 1 ? "\(short) +\(addresses.count - 1)" : short
-        case .evm:
-            return ([short] + [chains.map(\.name).joined(separator: ", ")])
-                .filter { !$0.isEmpty }
-                .joined(separator: " · ")
-        }
+        return addresses.count > 1 ? "\(short) +\(addresses.count - 1)" : short
     }
 
     public static func shortAddress(_ address: String) -> String {
