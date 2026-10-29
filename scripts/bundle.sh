@@ -7,7 +7,8 @@ cd "$(dirname "$0")/.."
 
 VERSION=$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' Sources/WeaveCore/WeaveInfo.swift)
 # Sparkle EdDSA 공개키 — 앱에 박히는 값이라 공개해도 안전(개인키만 키체인 보관).
-ED_KEY="${SPARKLE_ED_PUBLIC_KEY:-OYrjZVe89kag8gckegzrsPP/KEb63kRRphubPRzHpQQ=}"
+# 0.2.0부터 쓰는 키. 0.1.x는 잃어버린 이전 키(OYrjZVe8…)를 믿어서 0.2.0을 자동 설치하지 못한다.
+ED_KEY="${SPARKLE_ED_PUBLIC_KEY:-RizcdBrAfK9wXXiy1UmYI3Dhh+lnyB1iHE0wAApfDG0=}"
 
 echo "▸ swift build -c release (Weave ${VERSION})"
 swift build -c release
