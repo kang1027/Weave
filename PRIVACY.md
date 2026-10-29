@@ -16,6 +16,7 @@ There is **no account, no sign-in, no cloud sync, and no server owned by this pr
 
 Weave only makes requests to fetch **public market data** and asset logos:
 
+- **Upbit** — public KRW crypto prices for the kimchi premium card (only when your base currency is KRW). No Upbit account or API key is used.
 - **Binance** — crypto quotes and candles.
 - **Naver Finance** — Korean stock quotes and candles, plus Korea/US/Japan stock logos.
 - **Yahoo Finance** — US/Japan stock quotes, candles, and FX rates.
