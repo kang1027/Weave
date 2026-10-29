@@ -554,6 +554,39 @@ extension AppModel {
         )
     }
 
+    // MARK: - 스크린샷
+
+    /// 연결 화면 스크린샷 — WEAVE_SHOT_EVM에 공개 주소를 주면 그 지갑을 메모리 보관소로 연결해 둔다.
+    func pushShotLinkState(_ state: String, env: [String: String]) {
+        guard state.hasPrefix("link") else { return }
+        push(.settings)
+        push(.connections)
+        Task {
+            if let address = env["WEAVE_SHOT_EVM"] {
+                _ = await connectWallet(kind: .evm, name: "Main wallet", addresses: [address], chains: EVMChain.allCases)
+            }
+            let sourceID = document.sources.first(where: \.kind.isWallet)?.id ?? document.sources.first?.id
+            switch state {
+            case "link-add": push(.addSource)
+            case "link-toss": push(.addSource); push(.addToss)
+            case "link-wallet": push(.addSource); push(.addWallet(.evm))
+            case "link-review": if let sourceID { push(.importReview(sourceID)) }
+            case "link-detail":
+                if let sourceID {
+                    applyPendingImport(sourceID: sourceID)
+                    push(.sourceDetail(sourceID))
+                }
+            case "link-asset":
+                if let sourceID {
+                    applyPendingImport(sourceID: sourceID)
+                    if let asset = holdings(sourceID: sourceID).first?.asset { push(.detail(asset.id)) }
+                }
+            default:
+                if let sourceID { applyPendingImport(sourceID: sourceID) }
+            }
+        }
+    }
+
     // MARK: - 도움
 
     /// 허용 IP 등록을 돕는 공인 IP 확인 — 토스 연결 화면을 열 때와 IP가 막혔을 때만 부른다.
