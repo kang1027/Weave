@@ -1,14 +1,18 @@
 import SwiftUI
 import WeaveCore
 
-/// 자산 로고 — 크립토는 아이콘 CDN, 그 외/실패 시 자산색 이니셜 배지 폴백.
+/// 자산 로고 — 크립토는 아이콘 CDN, 주식은 네이버 증권 로고, 그 외/실패 시 자산색 이니셜 배지 폴백.
+/// 두 로고 소스가 모두 원형이라 커스텀 로고·이니셜 배지도 원형으로 맞춘다.
 struct AssetLogoView: View {
     @Environment(\.theme) private var theme
     let asset: Asset
     var size: CGFloat = 28
-    var isCircle = false
+    /// 원격 로고가 도착했다는 신호 — 이미지는 늘 현재 자산 키로 캐시에서 찾는다(다른 자산 로고가 남지 않게).
+    @State private var loadedKey: String?
 
     var body: some View {
+        // 로고 도착 시 이 뷰를 다시 그리도록 body에서 읽어 둔다.
+        let _ = loadedKey
         Group {
             if let fileName = asset.customLogoFileName,
                let custom = LogoStore.image(named: fileName) {
@@ -16,28 +20,30 @@ struct AssetLogoView: View {
                 Image(nsImage: custom)
                     .resizable()
                     .scaledToFill()
-            } else if let url = Self.logoURL(for: asset) {
-                AsyncImage(url: url) { phase in
-                    if let image = phase.image {
-                        image.resizable().scaledToFit()
-                            .padding(size * 0.08)
-                    } else {
-                        initialBadge
-                    }
-                }
+            } else if let remote = RemoteLogoCache.shared.cachedImage(for: asset) {
+                Image(nsImage: remote)
+                    .resizable()
+                    .scaledToFit()
             } else {
                 initialBadge
             }
         }
         .frame(width: size, height: size)
         .background(color.opacity(0.15))
-        .clipShape(shape)
+        .clipShape(Circle())
+        .task(id: logoTaskID) {
+            guard asset.customLogoFileName == nil,
+                  RemoteLogoCache.shared.cachedImage(for: asset) == nil else { return }
+            let key = logoTaskID
+            if await RemoteLogoCache.shared.image(for: asset) != nil, !Task.isCancelled {
+                loadedKey = key
+            }
+        }
     }
 
-    private var shape: AnyShape {
-        isCircle
-            ? AnyShape(Circle())
-            : AnyShape(RoundedRectangle(cornerRadius: size * 0.29))
+    /// 자산이 바뀌거나 커스텀 로고가 지워지면 원격 로고를 다시 찾는다.
+    private var logoTaskID: String {
+        "\(AssetLogoSource(asset: asset)?.key ?? "")|\(asset.customLogoFileName ?? "")"
     }
 
     private var color: Color {
@@ -49,14 +55,6 @@ struct AssetLogoView: View {
             .font(.system(size: size * 0.45, weight: .bold))
             .foregroundStyle(color)
             .frame(width: size, height: size)
-    }
-
-    static func logoURL(for asset: Asset) -> URL? {
-        guard asset.market == .crypto else { return nil }
-        let symbol = asset.symbol.lowercased()
-        return URL(
-            string: "https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/128/color/\(symbol).png"
-        )
     }
 }
 

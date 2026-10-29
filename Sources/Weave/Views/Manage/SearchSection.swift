@@ -73,6 +73,7 @@ struct SearchResultRow: View {
     @EnvironmentObject private var model: AppModel
     let result: SearchResult
     @State private var isAdding = false
+    @State private var remoteLogo: NSImage?
 
     var body: some View {
         Button {
@@ -114,26 +115,26 @@ struct SearchResultRow: View {
         .opacity(model.isAtAssetLimit ? 0.45 : 1)
     }
 
+    private var logoSource: AssetLogoSource? {
+        AssetLogoSource(market: result.market, symbol: result.symbol)
+    }
+
     private var logo: some View {
         Group {
-            if result.market == .crypto,
-               let url = URL(
-                   string: "https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/128/color/\(result.symbol.lowercased()).png"
-               ) {
-                AsyncImage(url: url) { phase in
-                    if let image = phase.image {
-                        image.resizable().scaledToFit().padding(2)
-                    } else {
-                        initialBadge
-                    }
-                }
+            if let image = remoteLogo ?? logoSource.flatMap(RemoteLogoCache.shared.cachedImage(for:)) {
+                Image(nsImage: image).resizable().scaledToFit()
             } else {
                 initialBadge
             }
         }
         .frame(width: 28, height: 28)
         .background(theme.iconBg)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(Circle())
+        .task(id: logoSource?.key) {
+            remoteLogo = nil
+            guard let source = logoSource else { return }
+            remoteLogo = await RemoteLogoCache.shared.image(for: source)
+        }
     }
 
     private var initialBadge: some View {
