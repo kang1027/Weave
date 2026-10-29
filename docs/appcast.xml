@@ -8,6 +8,22 @@
     <language>ko</language>
     <!-- appcast:items — publish.sh가 이 줄 바로 아래에 새 <item>을 삽입(최신이 위) -->
     <item>
+      <title>0.2.0</title>
+      <pubDate>Thu, 29 Oct 2026 22:39:41 +0900</pubDate>
+      <sparkle:version>0.2.0</sparkle:version>
+      <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:informationalUpdate>
+        <sparkle:belowVersion>0.2.0</sparkle:belowVersion>
+      </sparkle:informationalUpdate>
+      <link>https://github.com/kang1027/Weave/releases/tag/v0.2.0</link>
+      <enclosure
+        url="https://github.com/kang1027/Weave/releases/download/v0.2.0/Weave-0.2.0.zip"
+        sparkle:edSignature="eNKsv9EfB2J+Ftz4DtWOkqIZcQ3kcKG8Ngw/o/isqr+Kj19oJQ4g4JDrVx2ifc/yuYHVKvdkzs9Z7cM8GAKNAA=="
+        length="4100684"
+        type="application/octet-stream"/>
+    </item>
+    <item>
       <title>0.1.25</title>
       <pubDate>Wed, 15 Jul 2026 22:16:08 +0900</pubDate>
       <sparkle:version>0.1.25</sparkle:version>
