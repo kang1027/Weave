@@ -125,7 +125,7 @@ Each flow follows the "action → expected behavior" format, and reviews/QA vali
 - **F8.2 Appearance**: Theme (System/Slate/Light — switches immediately) · language (System/Korean/English
   — switches immediately, with number/date formats tied to the locale).
 - **F8.3 Data**: Refresh cycle (restarts the polling loop) · base currency (KRW/USD/JPY — total · rings · chart
-  recompute immediately) · asset display currency (source as-is / base-converted) · backup (JSON export) ·
+  recompute immediately) · kimchi premium card when base currency isn't KRW (on/off) · asset display currency (source as-is / base-converted) · backup (JSON export) ·
   restore (error on validation failure, on success replace everything + refresh) · clear candle cache · delete all data:
   show a backup warning, require a successful export, then require a second destructive confirmation before removing the portfolio,
   settings, custom logos, and quote/candle/FX caches.

@@ -157,6 +157,18 @@ struct SettingsView: View {
                                 )
                             )
                         }
+                        // KRW면 김프 카드는 항상 뜬다 — 다른 기준 통화일 때만 고른다.
+                        if model.settings.baseCurrency.uppercased() != "KRW" {
+                            SettingsRow(
+                                title: model.t("Kimchi premium"),
+                                subtitle: model.t("Show Upbit vs Binance gap on crypto detail")
+                            ) {
+                                MiniToggle(isOn: Binding(
+                                    get: { model.settings.showsKimchiPremiumOutsideKRW },
+                                    set: { model.settings.showsKimchiPremiumOutsideKRW = $0 }
+                                ))
+                            }
+                        }
                         SettingsRow(
                             title: model.t("Asset currency"),
                             subtitle: model.t("Source: BTC in $, 삼성전자 in ₩")
