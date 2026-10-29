@@ -9,8 +9,11 @@ Everything is kept on your Mac only:
 - `~/Library/Application Support/Weave/portfolio.json` — your assets, trades, and settings.
 - `~/Library/Application Support/Weave/logos/` — any custom asset icons you upload.
 - A local candle/quote cache to avoid re-fetching market data.
+- **macOS Keychain** — the API keys of a broker account you link (Toss Securities), stored for this Mac only.
+  They are never written to `portfolio.json` or to backups.
 
-There is **no account, no sign-in, no cloud sync, and no server owned by this project.** Nothing you enter is transmitted anywhere.
+There is **no account, no sign-in, no cloud sync, and no server owned by this project.** Nothing you enter is
+transmitted anywhere, except the keys of a broker account you choose to link, which go only to that broker.
 
 ## Network requests
 
@@ -20,7 +23,20 @@ Weave only makes requests to fetch **public market data**:
 - **Naver Finance** — Korean stock quotes and candles.
 - **Yahoo Finance** — US/Japan stock quotes, candles, and FX rates.
 
-These requests contain only the symbol/endpoint being queried. Weave sends **no account identifiers, no API keys, and no personal data**. There is **no analytics, telemetry, tracking, or crash reporting** of any kind.
+These requests contain only the symbol/endpoint being queried — **no account identifiers, no API keys, and no personal data**. There is **no analytics, telemetry, tracking, or crash reporting** of any kind.
+
+## Linked accounts (optional)
+
+Nothing below happens unless you link an account in **Settings › Linked accounts**.
+
+- **Toss Securities Open API** (`openapi.tossinvest.com`) — Weave sends the client ID and secret you entered to
+  Toss to get an access token, then reads your account list, holdings, and order history about every 5 minutes
+  while the app runs. It never calls order APIs. Toss only answers IPs you allowed in its WTS settings.
+- **ipify** (`api.ipify.org`) — only when you tap **Check this network's IP**, to show which IP to allow in Toss.
+  It returns your public IP; nothing else is sent.
+
+Disconnecting an account deletes its keys from the Keychain together with the trades imported from it.
+**Delete all my data** does the same for every linked account.
 
 ## Updates
 

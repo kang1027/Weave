@@ -218,11 +218,29 @@ Entered via ✎ in the Home footer. Consists of a top search bar + a held-asset 
   version 2 so v0.1.x builds can still open it. A v0.1.x build refuses a version 3 file instead of
   silently dropping the linked data.
 
-### Linked accounts (in progress — no source can be connected yet)
+### Linked accounts
 
-The import rules are implemented in `WeaveCore` (`ImportPlanner` · `ImportApplier`) and tested. Brokers
-(Korea Investment, Toss Securities) and wallets will plug in later. Upbit is left out because its API
-keys require an allowlisted static IP.
+Settings › Linked accounts. Toss Securities works today; Korea Investment and wallets come later. Upbit is
+left out because its API keys require an allowlisted static IP.
+
+- **Toss Securities**: the user pastes the Open API client ID and secret from WTS › Settings › Open API.
+  Weave checks them, picks the brokerage account, and stores the keys plus `accountSeq` in the macOS Keychain
+  (this Mac only). The document keeps only the masked account number (`••••8901`).
+- **Allowed IPs**: Toss only answers IPs registered in WTS. On another network a sync fails with a message
+  that says where to add the IP, and the last synced data stays. A **Check this network's IP** button asks
+  `api.ipify.org` only when tapped.
+- **What is read**: holdings (quantity · average cost) and orders. The first sync reads every closed order
+  since the account opened; later syncs read from 7 days before the last sync. An order is one row with its
+  total filled quantity and average fill price, so one order becomes one imported trade (`externalID` =
+  order ID). Partly filled then canceled orders keep their filled part. An instrument with an order still
+  filling is not reconciled until the order closes. Order APIs are never called.
+- **Access token**: Toss allows one valid token per client, so Weave reuses it until a minute before it
+  expires and reissues once on a 401.
+- **First sync** goes to a review screen (new trades · duplicates · needs review · new assets · opening
+  balances). Later syncs run with the quote refresh, at most every 5 minutes, and apply without review.
+- **New assets**: Korean stocks are created on Naver, US stocks on Yahoo (`BRK.B` → `BRK-B`). Positions that
+  were sold out and have no asset in Weave are left out.
+- **Disconnect** deletes the keys, the imported trades, and assets whose every trade came from that account.
 
 - **Already imported**: executions whose `externalID` is already in the document are skipped, as are repeats in the same sync.
 - **Same trade entered manually**: same asset · side · quantity, same day, price within 1% → suggested as a
