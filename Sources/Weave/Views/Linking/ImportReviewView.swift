@@ -37,7 +37,8 @@ struct ImportReviewView: View {
                         }
                         skippedSection(pending)
                         if !pending.plan.closedPositions.isEmpty {
-                            footnote(model.t("\(pending.plan.closedPositions.count) sold-out stock(s) not in Weave were left out."))
+                            let closed = pending.plan.closedPositions.count
+                            footnote(counted(closed, "sold-out stock") + (closed == 1 ? " not in Weave was left out." : " not in Weave were left out."))
                         }
                     } else if !mismatches.isEmpty {
                         CapsLabel(text: model.t("Needs review"))
@@ -68,7 +69,7 @@ struct ImportReviewView: View {
     // MARK: - 요약
 
     private func hero(_ groups: [ImportGroup]) -> some View {
-        // 증권사는 현재가를 주지 않는다 — 시세를 모르는 종목이 있으면 합계를 지어내지 않고 뺀다.
+        // 시세를 모르는 종목이 있으면 합계를 지어내지 않고 뺀다.
         let total: Decimal? = groups.allSatisfy { $0.value != nil }
             ? groups.reduce(Decimal(0)) { $0 + model.amountInBase($1.value ?? 0, currency: $1.asset.currency) }
             : nil
@@ -108,7 +109,7 @@ struct ImportReviewView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 10.5, weight: .semibold))
                     .padding(.top, 1)
-                Text(model.t("Weave holds up to \(AppModel.assetSoftLimit) assets, so \(overLimit) stock(s) won't be added. Free up assets and the next sync brings them in."))
+                Text("Weave holds up to \(AppModel.assetSoftLimit) assets, so \(counted(overLimit, "stock")) won't be added. Free up assets and the next sync brings them in.")
                     .fixedSize(horizontal: false, vertical: true)
             }
             .font(.system(size: 10.5))
@@ -139,7 +140,7 @@ struct ImportReviewView: View {
         return order.map { instrument in
             let asset = model.previewAsset(for: instrument)
             let holding = pending.snapshot.holdings.first { $0.instrument == instrument }
-            // 지갑은 받은 시세, 증권사는 이미 있는 자산의 시세로.
+            // 받은 현재가(지갑·토스), 없으면 이미 있는 자산의 시세로.
             let price = holding?.marketPrice ?? model.quotes[asset.id]?.price
             let value = holding.flatMap { holding in price.map { $0 * holding.quantity } }
             let trades = plan.trades.filter { $0.instrument == instrument && !$0.isManualSide }
@@ -150,7 +151,7 @@ struct ImportReviewView: View {
                 lines.append(GroupLine(label: model.t("Orders"), detail: model.t("\(orders.count) from history")))
             }
             if merged > 0 {
-                lines.append(GroupLine(label: model.t("Merged"), detail: model.t("\(merged) trade(s) you entered by hand")))
+                lines.append(GroupLine(label: model.t("Merged"), detail: counted(merged, "trade") + " you entered by hand"))
             }
             lines += plan.unresolved.filter { $0.instrument == instrument }.map {
                 GroupLine(label: model.t("Check"), detail: model.mismatchShortText($0), isWarning: true)
@@ -325,7 +326,7 @@ struct ImportReviewView: View {
             let coins = Set(plan.trades.filter { !$0.isManualSide }.map(\.instrument)).count
             return "Import " + counted(coins, "coin")
         }
-        let added = model.t("Add \(plan.trades.count) trade(s)")
+        let added = "Add " + counted(plan.trades.count, "trade")
         guard !plan.duplicates.isEmpty else { return added }
         return added + " · " + model.t("merge \(plan.duplicates.count)")
     }
