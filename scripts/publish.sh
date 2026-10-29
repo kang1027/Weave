@@ -13,8 +13,9 @@
 #   TAP_REPO        기본 kang1027/homebrew-weave
 #   NOTES           릴리즈 노트(미지정 시 자동 생성)
 #   DRY_RUN=1       서명·공증·푸시·릴리즈 없이 계획 출력 + appcast 주입만 검증
-#   INFORMATIONAL_BELOW  이 버전 미만 앱엔 설치 대신 "더 알아보기"(릴리즈 페이지)만 띄운다.
-#                   서명 키를 바꾼 릴리즈용 — 예전 키를 믿는 앱이 받으면 서명 오류가 나기 때문.
+#   INFORMATIONAL_BELOW  이 버전 미만 앱엔 설치 대신 "더 알아보기"(릴리즈 페이지)만 띄운다(기본 0.2.0).
+#                   0.1.x는 잃어버린 예전 키를 믿어서 새 키로 서명한 업데이트를 받으면 서명 오류가 난다.
+#                   빈 값(INFORMATIONAL_BELOW=)이면 넣지 않는다.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -71,8 +72,9 @@ fi
 
 # ── 5. appcast <item> 삽입 (마커 바로 아래 = 최신이 위) ────────
 PUBDATE=$(LC_TIME=en_US.UTF-8 date '+%a, %d %b %Y %H:%M:%S %z')
+INFORMATIONAL_BELOW="${INFORMATIONAL_BELOW-0.2.0}"
 INFORMATIONAL=""
-[ -n "${INFORMATIONAL_BELOW:-}" ] && INFORMATIONAL="
+[ -n "$INFORMATIONAL_BELOW" ] && INFORMATIONAL="
       <sparkle:informationalUpdate>
         <sparkle:belowVersion>$INFORMATIONAL_BELOW</sparkle:belowVersion>
       </sparkle:informationalUpdate>"
