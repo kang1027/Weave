@@ -206,6 +206,9 @@ final class AppModel: ObservableObject {
             )
         )
         model.cryptoPrices = binance
+        if overrideStore != nil {
+            model.credentialStore = EphemeralCredentialStore()
+        }
         return model
     }
 
@@ -348,6 +351,7 @@ final class AppModel: ObservableObject {
             if state == "detail", let id = visibleAssets.first?.id {
                 push(.detail(id))
             }
+            pushShotLinkState(state, env: shotEnv)
         }
         restartRefreshLoop()
         restartRotationLoop()

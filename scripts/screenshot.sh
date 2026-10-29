@@ -3,6 +3,8 @@
 # 실제 데이터와 격리된 시드 포트폴리오(scripts/seed-portfolio.json)를 임시 스토어에 복사해
 # 앱을 dev 실행하고, 팝오버가 열리면 그 창을 자체 렌더해 PNG로 저장한다.
 # 화면 녹화 권한 불필요(앱이 자기 뷰를 비트맵으로 캡처).
+# 연결 화면은 WEAVE_SHOT_STATE=link|link-add|link-toss|link-wallet|link-review|link-detail|link-asset로 찍는다.
+# WEAVE_SHOT_EVM=<공개 주소>를 주면 그 지갑을 연결해 둔다. WEAVE_STORE가 있으면 키체인 대신 메모리 보관소를 쓴다.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

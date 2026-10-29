@@ -48,6 +48,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSApp.activate(ignoringOtherApps: true)
                 HotkeyManager.toggleMenuBarWindow()
             }
+            // 메뉴바 아이콘이 노치 뒤로 밀려 팝오버가 안 열리면 같은 화면을 화면 밖 창에 띄운다.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+                if state != "menubar", !NSApp.windows.contains(where: { $0.isVisible && $0.className.contains("MenuBarExtra") }) {
+                    Self.openOffscreenPopover()
+                }
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5 + delay) {
                 if state == "menubar" {
                     Self.writeMenuBarMockup(to: shotPath)
@@ -58,9 +64,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @MainActor private static var offscreenWindow: NSWindow?
+
+    /// 팝오버와 같은 RootView를 화면 밖 창에 띄운다 — 스크린샷 전용.
+    @MainActor
+    static func openOffscreenPopover() {
+        guard let model = AppModel.shared else { return }
+        let window = NSWindow(
+            contentRect: NSRect(x: -10_000, y: -10_000, width: 360, height: 720),
+            styleMask: [.borderless], backing: .buffered, defer: false
+        )
+        window.contentView = NSHostingView(rootView: RootView().environmentObject(model).frame(width: 360, height: 720))
+        window.orderFrontRegardless()
+        offscreenWindow = window
+    }
+
     /// 팝오버 창을 캡처. 아직 안 열렸으면 다시 열고 재시도(최대 5회) — 첫 클릭이 씹히는 것 방어.
     @MainActor
     static func capturePopover(to path: String, attempt: Int) {
+        if let view = offscreenWindow?.contentView, write(view, to: path) {
+            NSApp.terminate(nil)
+            return
+        }
         if writeWindow(matching: "MenuBarExtra", to: path) {
             NSApp.terminate(nil)
             return
@@ -123,11 +148,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let window = NSApp.windows.first(where: {
                 $0.isVisible && $0.contentView != nil && $0.className.contains(cls)
             }),
-            let view = window.contentView,
-            let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)
+            let view = window.contentView
         else {
             return false
         }
+        return write(view, to: path)
+    }
+
+    @MainActor
+    static func write(_ view: NSView, to path: String) -> Bool {
+        guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return false }
         view.cacheDisplay(in: view.bounds, to: rep)
         guard let data = rep.representation(using: .png, properties: [:]) else { return false }
         do {

@@ -1,80 +1,63 @@
 import SwiftUI
 import WeaveCore
 
-/// 첫 가져오기 검토 — 무엇이 들어가고, 무엇이 합쳐지고, 무엇을 사람이 봐야 하는지.
+/// 첫 가져오기 검토 — 자산마다 한 줄로, 그 자산에 무엇이 일어나는지(이동·새로 시작·체결·합침·확인)를 짧게.
 /// 적용한 뒤에는 자동으로 채우지 못한 차이만 보여 준다.
 struct ImportReviewView: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
     let sourceID: UUID
+    @State private var showsSkipped = false
 
     private var source: LinkedSource? { model.document.source(id: sourceID) }
-    private var isWallet: Bool { source?.kind == .bitcoinWallet || source?.kind == .evmWallet }
-    private var plan: ImportPlan? { model.pendingImports[sourceID]?.plan }
-    private var mismatches: [HoldingMismatch] { plan?.unresolved ?? model.linkMismatches[sourceID] ?? [] }
+    private var isWallet: Bool { source?.kind.isWallet ?? false }
+    private var pending: PendingImport? { model.pendingImports[sourceID] }
+    private var mismatches: [HoldingMismatch] { pending?.plan.unresolved ?? model.linkMismatches[sourceID] ?? [] }
 
     var body: some View {
         VStack(spacing: 0) {
             ScreenHeader(title: model.t("Review import"), onBack: { model.pop() })
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    if let source {
-                        Text([source.name, source.label].filter { !$0.isEmpty }.joined(separator: " · "))
-                            .font(.system(size: 11))
-                            .foregroundStyle(theme.text2)
-                            .frame(maxWidth: .infinity)
-                            .padding(.bottom, 8)
-                    }
-
-                    if let plan {
-                        tiles(plan)
-                        let overLimit = model.assetsOverLimit(plan)
-                        if overLimit > 0 {
-                            LinkNotice(
-                                systemName: "exclamationmark.triangle.fill",
-                                text: model.t("Weave holds up to \(AppModel.assetSoftLimit) assets, so \(overLimit) stock(s) won't be added. Free up assets and the next sync brings them in."),
-                                tint: theme.orange
-                            )
-                            .padding(.horizontal, 14)
-                            .padding(.top, 10)
+                VStack(spacing: 0) {
+                    if let pending {
+                        let groups = groups(pending)
+                        hero(groups)
+                        overLimitNotice(pending.plan)
+                        if !groups.isEmpty {
+                            LinkCard {
+                                VStack(spacing: 0) {
+                                    ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
+                                        if index > 0 { HairDivider(inset: 50) }
+                                        GroupRow(group: group)
+                                    }
+                                }
+                            }
+                            .padding(.top, 12)
                         }
-                        newAssets(plan)
-                        transfers(plan)
-                        openingBalances(plan)
-                        adjustments(plan)
-                        duplicates(plan)
-                    }
-                    if !mismatches.isEmpty {
-                        sectionLabel(model.t("Needs review"))
-                        card {
-                            rows(mismatches) { mismatch in
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(mismatch.instrument.name)
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(theme.text)
-                                    Text(model.mismatchText(mismatch))
-                                        .font(.system(size: 10.5))
-                                        .foregroundStyle(theme.text2)
-                                        .fixedSize(horizontal: false, vertical: true)
+                        skippedSection(pending)
+                        if !pending.plan.closedPositions.isEmpty {
+                            footnote(model.t("\(pending.plan.closedPositions.count) sold-out stock(s) not in Weave were left out."))
+                        }
+                    } else if !mismatches.isEmpty {
+                        CapsLabel(text: model.t("Needs review"))
+                        LinkCard {
+                            VStack(spacing: 0) {
+                                ForEach(Array(mismatches.enumerated()), id: \.offset) { index, mismatch in
+                                    if index > 0 { HairDivider() }
+                                    mismatchRow(mismatch)
                                 }
                             }
                         }
-                    } else if plan == nil {
+                    } else {
                         Text(model.t("Nothing to review."))
                             .font(.system(size: 12))
                             .foregroundStyle(theme.text2)
                             .frame(maxWidth: .infinity)
                             .padding(.top, 20)
                     }
-                    if let plan, !plan.closedPositions.isEmpty {
-                        Text(model.t("\(plan.closedPositions.count) sold-out stock(s) not in Weave were left out."))
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(theme.text2)
-                            .padding(.horizontal, 20)
-                            .padding(.top, 10)
-                    }
                 }
+                .padding(.top, 6)
                 .padding(.bottom, 12)
             }
 
@@ -84,171 +67,246 @@ struct ImportReviewView: View {
 
     // MARK: - 요약
 
-    private func tiles(_ plan: ImportPlan) -> some View {
-        HStack(spacing: 6) {
-            if isWallet {
-                tile(plan.missingAssets.count, model.t("New assets"))
-                tile(plan.transfers.count, model.t("From manual"))
-            } else {
-                tile(plan.newTradeCount, model.t("New trades"))
-                tile(plan.duplicates.count, model.t("Duplicates"))
+    private func hero(_ groups: [ImportGroup]) -> some View {
+        // 증권사는 현재가를 주지 않는다 — 시세를 모르는 종목이 있으면 합계를 지어내지 않고 뺀다.
+        let total: Decimal? = groups.allSatisfy { $0.value != nil }
+            ? groups.reduce(Decimal(0)) { $0 + model.amountInBase($1.value ?? 0, currency: $1.asset.currency) }
+            : nil
+        let unresolved = groups.reduce(0) { $0 + $1.lines.filter(\.isWarning).count }
+        return VStack(spacing: 4) {
+            if let source {
+                Text([source.name, source.label].filter { !$0.isEmpty }.joined(separator: " · "))
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.text2)
+                    .lineLimit(1)
             }
-            tile(plan.unresolved.count, model.t("Needs review"), highlight: !plan.unresolved.isEmpty)
-        }
-        .padding(.horizontal, 14)
-    }
-
-    private func tile(_ count: Int, _ label: String, highlight: Bool = false) -> some View {
-        VStack(spacing: 1) {
-            Text("\(count)")
-                .font(.system(size: 15, weight: .bold))
-                .monospacedDigit()
-                .foregroundStyle(highlight ? theme.orange : theme.text)
-            Text(label)
-                .font(.system(size: 10))
-                .foregroundStyle(highlight ? theme.orange : theme.text2)
+            if let total {
+                Text(MoneyFormatter.price(total, currency: model.settings.baseCurrency))
+                    .font(.system(size: 24, weight: .bold))
+                    .monospacedDigit()
+                    .privacyBlur(model.settings.privacyMode)
+            }
+            HStack(spacing: 0) {
+                Text(counted(groups.count, isWallet ? "coin" : "holding") + " to import")
+                    .foregroundStyle(theme.text2)
+                Text(" · ").foregroundStyle(theme.text2)
+                Text(unresolved == 0 ? model.t("nothing to check") : model.t("\(unresolved) to check"))
+                    .foregroundStyle(unresolved == 0 ? theme.greenText : theme.orange)
+                    .fontWeight(unresolved == 0 ? .regular : .semibold)
+            }
+            .font(.system(size: 11.5))
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 7)
-        .background(
-            RoundedRectangle(cornerRadius: 9)
-                .fill(highlight ? theme.orange.opacity(0.14) : theme.panel)
-        )
-    }
-
-    // MARK: - 항목
-
-    @ViewBuilder
-    private func newAssets(_ plan: ImportPlan) -> some View {
-        if !plan.missingAssets.isEmpty {
-            sectionLabel(model.t("New assets"))
-            card {
-                rows(plan.missingAssets) { instrument in
-                    HStack {
-                        Text(instrument.name)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(theme.text)
-                        Spacer()
-                        Text(instrument.symbol)
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(theme.text2)
-                    }
-                }
-            }
-        }
+        .padding(.top, 4)
     }
 
     @ViewBuilder
-    private func openingBalances(_ plan: ImportPlan) -> some View {
-        if !plan.openingBalances.isEmpty {
-            sectionLabel(model.t("Opening balance"))
-            card {
-                rows(plan.openingBalances) { trade in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(trade.instrument.name) \(MoneyFormatter.quantity(trade.quantity))")
-                            .font(.system(size: 12, weight: .semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(theme.text)
-                        let price = MoneyFormatter.price(trade.price, currency: trade.instrument.currency)
-                        Text(isWallet
-                            ? model.t("Coins not in your manual holdings start at today's price, \(price).")
-                            : model.t("Holdings older than the order history start at \(price), matched to the account's average cost."))
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(theme.text2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
+    private func overLimitNotice(_ plan: ImportPlan) -> some View {
+        let overLimit = model.assetsOverLimit(plan)
+        if overLimit > 0 {
+            HStack(alignment: .top, spacing: 7) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .padding(.top, 1)
+                Text(model.t("Weave holds up to \(AppModel.assetSoftLimit) assets, so \(overLimit) stock(s) won't be added. Free up assets and the next sync brings them in."))
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .font(.system(size: 10.5))
+            .foregroundStyle(theme.orange)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 10).fill(theme.orange.opacity(0.12)))
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
         }
     }
 
-    /// 지갑 — 직접 입력분과 평단 그대로 주고받는 이동.
+    // MARK: - 자산별 묶음
+
+    /// 계획을 자산별로 묶는다 — 큰 것부터.
+    private func groups(_ pending: PendingImport) -> [ImportGroup] {
+        let plan = pending.plan
+        var order: [ImportInstrument] = []
+        func note(_ instrument: ImportInstrument) {
+            if !order.contains(instrument) { order.append(instrument) }
+        }
+        plan.trades.filter { !$0.isManualSide }.forEach { note($0.instrument) }
+        plan.unresolved.forEach { note($0.instrument) }
+
+        let missing = Set(plan.missingAssets)
+        let duplicateIDs = Set(plan.duplicates.map(\.externalID))
+        return order.map { instrument in
+            let asset = model.previewAsset(for: instrument)
+            let holding = pending.snapshot.holdings.first { $0.instrument == instrument }
+            // 지갑은 받은 시세, 증권사는 이미 있는 자산의 시세로.
+            let price = holding?.marketPrice ?? model.quotes[asset.id]?.price
+            let value = holding.flatMap { holding in price.map { $0 * holding.quantity } }
+            let trades = plan.trades.filter { $0.instrument == instrument && !$0.isManualSide }
+            let merged = trades.filter { $0.externalID.map(duplicateIDs.contains) ?? false }.count
+            var lines = trades.compactMap { line(for: $0, asset: asset) }
+            let orders = trades.filter { !$0.isOpeningBalance && !$0.isAdjustment && !$0.isTransfer }
+            if !orders.isEmpty {
+                lines.append(GroupLine(label: model.t("Orders"), detail: model.t("\(orders.count) from history")))
+            }
+            if merged > 0 {
+                lines.append(GroupLine(label: model.t("Merged"), detail: model.t("\(merged) trade(s) you entered by hand")))
+            }
+            lines += plan.unresolved.filter { $0.instrument == instrument }.map {
+                GroupLine(label: model.t("Check"), detail: model.mismatchShortText($0), isWarning: true)
+            }
+            return ImportGroup(
+                instrument: instrument, asset: asset, isNew: missing.contains(instrument),
+                quantity: holding?.quantity, value: value, lines: lines
+            )
+        }
+        .sorted { model.amountInBase($0.value ?? 0, currency: $0.asset.currency) > model.amountInBase($1.value ?? 0, currency: $1.asset.currency) }
+    }
+
+    /// 거래 하나가 그 자산에 하는 일 — 체결은 묶어서 따로 센다.
+    private func line(for trade: PlannedTrade, asset: Asset) -> GroupLine? {
+        let quantity = "\(asset.shortQuantity(trade.quantity)) \(asset.symbol)"
+        let price = MoneyFormatter.price(trade.price, currency: trade.instrument.currency)
+        if trade.isTransfer {
+            return trade.side == .buy
+                ? GroupLine(label: model.t("Moved"), detail: model.t("\(quantity) from manual · avg \(price)"))
+                : GroupLine(label: model.t("Back to manual"), detail: model.t("\(quantity) · avg \(price)"))
+        }
+        if trade.isAdjustment {
+            let sign = trade.side == .buy ? "+" : "−"
+            return GroupLine(label: model.t("Adjusted"), detail: "\(sign)\(quantity) · \(price)")
+        }
+        if trade.isOpeningBalance {
+            return isWallet
+                ? GroupLine(label: model.t("New"), detail: model.t("\(quantity) · today's price \(price)"))
+                : GroupLine(label: model.t("Opening"), detail: model.t("\(quantity) · avg \(price)"))
+        }
+        return nil
+    }
+
+    private func mismatchRow(_ mismatch: HoldingMismatch) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            AssetLogoView(asset: model.previewAsset(for: mismatch.instrument), size: 28)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(mismatch.instrument.name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(theme.text)
+                Text(model.mismatchText(mismatch))
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(theme.text2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+    }
+
+    // MARK: - 가져오지 않은 잔고
+
     @ViewBuilder
-    private func transfers(_ plan: ImportPlan) -> some View {
-        if !plan.transfers.isEmpty {
-            sectionLabel(model.t("From manual"))
-            card {
-                rows(plan.transfers) { trade in
-                    let price = MoneyFormatter.price(trade.price, currency: trade.instrument.currency)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(trade.instrument.name) \(trade.side == .buy ? "+" : "−")\(MoneyFormatter.quantity(trade.quantity))")
-                            .font(.system(size: 12, weight: .semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(theme.text)
-                        Text(trade.side == .buy
-                            ? model.t("Moves over from your manual holdings at their average cost, \(price).")
-                            : model.t("Goes back to your manual holdings at \(price). Enter the sell there if you sold it."))
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(theme.text2)
-                            .fixedSize(horizontal: false, vertical: true)
+    private func skippedSection(_ pending: PendingImport) -> some View {
+        let snapshot = pending.snapshot
+        let skipped = snapshot.holdings
+            .filter { snapshot.dust.contains($0.instrument) || snapshot.unsettled.contains($0.instrument) }
+            .sorted { $0.quantity * ($0.marketPrice ?? 0) > $1.quantity * ($1.marketPrice ?? 0) }
+        if isWallet, !skipped.isEmpty {
+            let total = skipped.reduce(Decimal(0)) { $0 + $1.quantity * ($1.marketPrice ?? 0) }
+            LinkCard {
+                VStack(spacing: 0) {
+                    Button {
+                        withAnimation(.easeOut(duration: 0.15)) { showsSkipped.toggle() }
+                    } label: {
+                        HStack(spacing: 8) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 0) {
+                                    Text(counted(skipped.count, "balance") + " skipped")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(theme.text)
+                                    Text(" · " + model.t("\(MoneyFormatter.price(total, currency: "USD")) total"))
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(theme.text2)
+                                        .privacyBlur(model.settings.privacyMode)
+                                }
+                                Text(model.t("Under $10 or no Binance price"))
+                                    .font(.system(size: 10.5))
+                                    .foregroundStyle(theme.text2)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(theme.text2)
+                                .rotationEffect(.degrees(showsSkipped ? 180 : 0))
+                        }
+                        .padding(12)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if showsSkipped {
+                        ForEach(Array(skipped.prefix(10).enumerated()), id: \.offset) { _, holding in
+                            HairDivider()
+                            HStack {
+                                Text(holding.instrument.displaySymbol)
+                                    .font(.system(size: 11.5, weight: .semibold))
+                                    .foregroundStyle(theme.text)
+                                Text(MoneyFormatter.quantity(holding.quantity))
+                                    .font(.system(size: 10.5))
+                                    .monospacedDigit()
+                                    .foregroundStyle(theme.text2)
+                                    .lineLimit(1)
+                                Spacer(minLength: 8)
+                                Text(snapshot.unsettled.contains(holding.instrument)
+                                    ? model.t("No price")
+                                    : MoneyFormatter.price(holding.quantity * (holding.marketPrice ?? 0), currency: "USD"))
+                                    .font(.system(size: 11))
+                                    .monospacedDigit()
+                                    .foregroundStyle(theme.text2)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                        }
+                        if skipped.count > 10 {
+                            HairDivider()
+                            Text(model.t("and \(skipped.count - 10) more"))
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(theme.text2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                        }
                     }
                 }
             }
+            .padding(.top, 10)
         }
     }
 
-    @ViewBuilder
-    private func adjustments(_ plan: ImportPlan) -> some View {
-        let adjusted = plan.mismatches.filter(\.adjusted)
-        if !adjusted.isEmpty {
-            sectionLabel(model.t("Balance adjustment"))
-            card {
-                rows(adjusted) { mismatch in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(mismatch.instrument.name) \(mismatch.difference > 0 ? "+" : "")\(MoneyFormatter.quantity(mismatch.difference))")
-                            .font(.system(size: 12, weight: .semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(theme.text)
-                        Text(model.mismatchText(mismatch))
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(theme.text2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func duplicates(_ plan: ImportPlan) -> some View {
-        let manual = plan.duplicates.compactMap { duplicate in
-            model.document.trades.first { $0.id == duplicate.manualTradeID }
-        }
-        if !manual.isEmpty {
-            sectionLabel(model.t("Duplicates"))
-            card {
-                rows(manual) { trade in
-                    let asset = model.asset(id: trade.assetID)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(asset?.name ?? "") · \(MoneyFormatter.quantity(trade.quantity)) @ \(MoneyFormatter.price(trade.price, currency: asset?.currency ?? "KRW"))")
-                            .font(.system(size: 12, weight: .semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(theme.text)
-                        Text(model.t("Entered manually on \(trade.date.formatted(.dateTime.month().day().locale(model.locale))). The imported record replaces it."))
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(theme.text2)
-                    }
-                }
-            }
-        }
+    private func footnote(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 10.5))
+            .foregroundStyle(theme.text2)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
     }
 
     // MARK: - 하단
 
     private var footer: some View {
         HStack(spacing: 8) {
-            if let plan {
+            if let pending {
                 Button { model.pop() } label: {
                     Text(model.t("Later"))
-                        .font(.system(size: 12.5, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(theme.text)
                         .frame(width: 88)
-                        .padding(.vertical, 8)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(theme.seg))
-                        .contentShape(RoundedRectangle(cornerRadius: 8))
+                        .padding(.vertical, 9)
+                        .background(RoundedRectangle(cornerRadius: 9).fill(theme.seg))
+                        .contentShape(RoundedRectangle(cornerRadius: 9))
                 }
                 .buttonStyle(.plain)
-                LinkPrimaryButton(title: applyTitle(plan)) {
+                LinkPrimaryButton(title: applyTitle(pending)) {
                     model.applyPendingImport(sourceID: sourceID)
                     model.pop()
                 }
@@ -256,53 +314,90 @@ struct ImportReviewView: View {
                 LinkPrimaryButton(title: model.t("Done")) { model.pop() }
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .overlay(alignment: .top) {
-            Rectangle().fill(theme.hair).frame(height: 1)
-        }
+        .overlay(alignment: .top) { HairDivider() }
     }
 
-    private func applyTitle(_ plan: ImportPlan) -> String {
-        if isWallet { return model.t("Import balances") }
+    private func applyTitle(_ pending: PendingImport) -> String {
+        let plan = pending.plan
+        if isWallet {
+            let coins = Set(plan.trades.filter { !$0.isManualSide }.map(\.instrument)).count
+            return "Import " + counted(coins, "coin")
+        }
         let added = model.t("Add \(plan.trades.count) trade(s)")
         guard !plan.duplicates.isEmpty else { return added }
         return added + " · " + model.t("merge \(plan.duplicates.count)")
     }
+}
 
-    // MARK: - 레이아웃
+// MARK: - 행
 
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 10, weight: .semibold))
-            .kerning(0.8)
-            .textCase(.uppercase)
-            .foregroundStyle(theme.caps)
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
-            .padding(.bottom, 6)
-    }
+private struct GroupLine {
+    let label: String
+    let detail: String
+    var isWarning = false
+}
 
-    private func card(@ViewBuilder _ content: () -> some View) -> some View {
-        PanelCard(padding: EdgeInsets(top: 2, leading: 12, bottom: 2, trailing: 12)) {
-            content()
-        }
-        .padding(.horizontal, 14)
-    }
+private struct ImportGroup: Identifiable {
+    let instrument: ImportInstrument
+    let asset: Asset
+    let isNew: Bool
+    /// 계좌·지갑의 실제 보유. 다 판 종목이면 nil.
+    let quantity: Decimal?
+    /// 원래 통화 기준 평가액.
+    let value: Decimal?
+    let lines: [GroupLine]
 
-    private func rows<Item>(
-        _ items: [Item],
-        @ViewBuilder row: @escaping (Item) -> some View
-    ) -> some View {
-        VStack(spacing: 0) {
-            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                if index > 0 {
-                    Rectangle().fill(theme.hair).frame(height: 1)
+    var id: ImportInstrument { instrument }
+}
+
+private struct GroupRow: View {
+    @Environment(\.theme) private var theme
+    @EnvironmentObject private var model: AppModel
+    let group: ImportGroup
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            AssetLogoView(asset: group.asset, size: 28)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(group.asset.name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(theme.text)
+                        .lineLimit(1)
+                    if group.isNew {
+                        LinkTag(text: model.t("New asset"), style: .blue)
+                    }
                 }
-                row(item)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 8)
+                ForEach(Array(group.lines.enumerated()), id: \.offset) { _, line in
+                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                        Text(line.label)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(line.isWarning ? theme.orange : theme.text)
+                        Text(line.detail)
+                            .foregroundStyle(theme.text2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(.system(size: 10.5))
+                    .monospacedDigit()
+                }
             }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(group.value.map { MoneyFormatter.price($0, currency: group.asset.currency) } ?? "—")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(theme.text)
+                if let quantity = group.quantity {
+                    Text("\(group.asset.shortQuantity(quantity)) \(group.asset.symbol)")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(theme.text2)
+                        .lineLimit(1)
+                }
+            }
+            .monospacedDigit()
+            .privacyBlur(model.settings.privacyMode)
         }
+        .padding(12)
     }
 }

@@ -28,6 +28,16 @@ extension CredentialStoring {
     }
 }
 
+/// 앱이 켜져 있는 동안만 쥐는 보관소 — 시드 문서(WEAVE_STORE)로 띄운 데모·스크린샷이 실제 키체인을 건드리지 않게.
+final class EphemeralCredentialStore: CredentialStoring, @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [UUID: Data] = [:]
+
+    func data(for sourceID: UUID) throws -> Data? { lock.withLock { items[sourceID] } }
+    func save(_ data: Data, for sourceID: UUID) throws { lock.withLock { items[sourceID] = data } }
+    func delete(for sourceID: UUID) { lock.withLock { items[sourceID] = nil } }
+}
+
 enum CredentialStoreError: Error {
     case keychain(OSStatus)
 }

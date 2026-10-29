@@ -77,7 +77,7 @@ struct AssetDetailView: View {
 
                             // 지금 연결한 계좌·지갑에 남아 있는 몫이 있을 때만 — 직접 입력만이면 한 곳뿐이다.
                             if HoldingLocations.breakdown(trades: trades).contains(where: { $0.sourceID != nil }) {
-                                CapsHeader(text: model.t("Holdings by location"))
+                                CapsHeader(text: model.t("Where it's held"))
                                 HoldingLocationsCard(asset: asset, trades: model.document.trades(for: assetID))
                             }
 
@@ -421,9 +421,13 @@ struct AssetDetailView: View {
         let traded = trades.filter { !$0.isTransfer }
         let buys = traded.filter { $0.side == .buy }.count
         let sells = traded.count - buys
+        let moves = trades.count - traded.count
         var parts: [String] = [model.t("\(buys) buys")]
         if sells > 0 {
             parts.append(model.t("\(sells) sells"))
+        }
+        if moves > 0 {
+            parts.append(model.t(moves == 1 ? "1 move" : "\(moves) moves"))
         }
         return parts.joined(separator: " · ")
     }
@@ -460,20 +464,12 @@ private struct TradeRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            chip
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 3) {
-                    Text("\(quantityLabel) @")
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(theme.text)
-                        .lineLimit(1)
-                    Text(MoneyFormatter.price(trade.price, currency: asset.currency))
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(theme.text)
-                        .lineLimit(1)
-                        .privacyBlur(model.settings.privacyMode)
-                }
+            icon
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(theme.text)
+                    .lineLimit(1)
                 HStack(spacing: 4) {
                     if trade.isLocked {
                         Image(systemName: "lock.fill")
@@ -482,33 +478,28 @@ private struct TradeRow: View {
                             .help(model.t("Imported trades can't be changed here"))
                     }
                     Text(subText)
-                        .font(.system(size: 10))
+                        .font(.system(size: 10.5))
+                        .monospacedDigit()
                         .foregroundStyle(theme.text2)
                         .lineLimit(1)
-                    // 그 거래의 총액(수량 × 단가). 이동은 사고판 게 아니라 어디서 어디로만 보인다.
-                    if !trade.isTransfer {
-                        Text(verbatim: "·")
-                            .font(.system(size: 10))
-                            .foregroundStyle(theme.text2)
-                        Text(MoneyFormatter.price(trade.amount, currency: asset.currency))
-                            .font(.system(size: 10, weight: .medium))
-                            .monospacedDigit()
-                            .foregroundStyle(theme.text2)
-                            .lineLimit(1)
-                            .privacyBlur(model.settings.privacyMode)
-                    }
+                        .privacyBlur(model.settings.privacyMode)
                 }
             }
             Spacer(minLength: 6)
-            VStack(alignment: .trailing, spacing: 1) {
+            VStack(alignment: .trailing, spacing: 2) {
                 Text(rightValue)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 12.5, weight: .semibold))
                     .monospacedDigit()
-                    .foregroundStyle(rightIsUp ? theme.greenText : theme.redText)
-                    .privacyBlur(model.settings.privacyMode && trade.side == .sell)
-                Text(rightLabel)
-                    .font(.system(size: 10))
-                    .foregroundStyle(theme.text2)
+                    .foregroundStyle(trade.isTransfer ? theme.badgeGrayText : theme.text)
+                    .lineLimit(1)
+                    .privacyBlur(model.settings.privacyMode)
+                if let change = changeText {
+                    Text(change)
+                        .font(.system(size: 10.5, weight: trade.isOpeningBalance ? .regular : .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(trade.isOpeningBalance ? theme.text2 : (changeIsUp ? theme.greenText : theme.redText))
+                        .privacyBlur(model.settings.privacyMode && trade.side == .sell)
+                }
             }
         }
         .padding(.horizontal, 16)
@@ -548,25 +539,19 @@ private struct TradeRow: View {
             ?? model.t("Linked account")
     }
 
-    private var chip: some View {
-        let isBuy = trade.side == .buy
-        if trade.isTransfer {
-            return Text(model.t("MOVE"))
-                .font(.system(size: 9.5, weight: .bold))
-                .foregroundStyle(theme.text2)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2.5)
-                .background(RoundedRectangle(cornerRadius: 5).fill(theme.badgeGray))
-        }
-        return Text(isBuy ? model.t("BUY") : model.t("SELL"))
-            .font(.system(size: 9.5, weight: .bold))
-            .foregroundStyle(isBuy ? theme.greenText : theme.redText)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2.5)
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill((isBuy ? theme.green : theme.red).opacity(0.15))
-            )
+    /// 사고판 기록과 이동·기초 잔고가 한눈에 갈리게 — 모양과 색이 다른 동그라미.
+    private var icon: some View {
+        let (symbol, tint): (String, Color?) = {
+            if trade.isTransfer { return ("arrow.left.arrow.right", nil) }
+            if trade.isOpeningBalance { return ("flag.fill", theme.greenText) }
+            if trade.isBalanceAdjustment { return ("plusminus", nil) }
+            return trade.side == .buy ? ("arrow.down", theme.greenText) : ("arrow.up", theme.redText)
+        }()
+        return Image(systemName: symbol)
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(tint ?? theme.badgeGrayText)
+            .frame(width: 28, height: 28)
+            .background(Circle().fill(tint.map { $0.opacity(0.14) } ?? theme.badgeGray))
     }
 
     private var quantityLabel: String {
@@ -576,51 +561,76 @@ private struct TradeRow: View {
             : "\(qty) \(asset.symbol)"
     }
 
-    private var subText: String {
-        let date = trade.date.formatted(
-            .dateTime.year(.twoDigits).month(.defaultDigits).day().locale(model.locale)
-        )
-        if trade.isOpeningBalance { return "\(date) · \(model.t("Opening balance")) · \(sourceName)" }
-        if trade.isBalanceAdjustment { return "\(date) · \(model.t("Balance adjustment")) · \(sourceName)" }
-        if trade.isTransfer {
-            // 지갑 쪽 한 줄만 보인다 — 어디서 어디로 옮겼는지.
-            let manual = model.t("Entered manually")
-            return trade.side == .buy
-                ? "\(date) · \(manual) → \(sourceName)"
-                : "\(date) · \(sourceName) → \(manual)"
-        }
-        if trade.isImported { return "\(date) · \(sourceName)" }
-        return trade.note.isEmpty ? date : "\(date) · \(trade.note)"
+    /// 오른쪽 자리용 — 소수 자리를 줄인다.
+    private var shortQuantityLabel: String {
+        let qty = asset.shortQuantity(trade.quantity)
+        return asset.hasNumericSymbol ? model.t("\(qty) shares") : "\(qty) \(asset.symbol)"
     }
 
-    private var rightIsUp: Bool {
+    private var title: String {
+        if trade.isTransfer {
+            // 지갑 쪽 한 줄만 보인다 — 어디서 어디로 옮겼는지.
+            let manual = model.t("Manual")
+            return trade.side == .buy ? "\(manual) → \(sourceName)" : "\(sourceName) → \(manual)"
+        }
+        if trade.isOpeningBalance { return model.t("Opening balance · \(sourceName)") }
+        if trade.isBalanceAdjustment { return model.t("Adjustment · \(sourceName)") }
+        return trade.side == .buy ? model.t("Buy \(quantityLabel)") : model.t("Sell \(quantityLabel)")
+    }
+
+    private var subText: String {
+        let price = MoneyFormatter.price(trade.price, currency: asset.currency)
+        var parts = [dateText]
+        if trade.isTransfer {
+            parts.append(model.t("at avg cost \(price)"))
+        } else if trade.isOpeningBalance {
+            parts.append(model.t("price at link \(price)"))
+        } else {
+            parts.append(price)
+            if trade.isImported, !trade.isBalanceAdjustment {
+                parts.append(sourceName)
+            } else if !trade.note.isEmpty {
+                parts.append(trade.note)
+            }
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// 올해면 "Oct 29", 아니면 "Sep 15, 2024".
+    private var dateText: String {
+        let sameYear = Calendar.current.isDate(trade.date, equalTo: Date(), toGranularity: .year)
+        let style = Date.FormatStyle.dateTime.month(.abbreviated).day().locale(model.locale)
+        return trade.date.formatted(sameYear ? style : style.year())
+    }
+
+    /// 오른쪽 위 — 사고판 기록은 금액, 이동·기초 잔고·잔고 맞춤은 수량.
+    private var rightValue: String {
+        if trade.isTransfer || trade.isOpeningBalance { return shortQuantityLabel }
+        if trade.isBalanceAdjustment { return (trade.side == .buy ? "+" : "−") + shortQuantityLabel }
+        return MoneyFormatter.price(trade.amount, currency: asset.currency)
+    }
+
+    /// 오른쪽 아래 — 매수·기초 잔고는 지금 대비 등락, 매도는 실현 손익. 이동은 없음.
+    private var changeText: String? {
+        if trade.isTransfer || trade.isBalanceAdjustment { return nil }
+        switch trade.side {
+        case .buy:
+            guard let quote = model.quotes[asset.id], trade.price > 0 else { return nil }
+            let percent = ((quote.price - trade.price) / trade.price * 100).rounded(scale: 1)
+            return MoneyFormatter.percent(percent, fractionDigits: 1)
+        case .sell:
+            guard let pnl = model.realizedPnL(of: trade) else { return nil }
+            return MoneyFormatter.signedPrice(pnl.rounded(scale: 2), currency: asset.currency)
+        }
+    }
+
+    private var changeIsUp: Bool {
         switch trade.side {
         case .buy:
             guard let quote = model.quotes[asset.id] else { return true }
             return quote.price >= trade.price
         case .sell:
             return (model.realizedPnL(of: trade) ?? 0) >= 0
-        }
-    }
-
-    private var rightValue: String {
-        if trade.isTransfer { return "" }
-        switch trade.side {
-        case .buy:
-            guard let quote = model.quotes[asset.id], trade.price > 0 else { return "—" }
-            let percent = ((quote.price - trade.price) / trade.price * 100).rounded(scale: 2)
-            return MoneyFormatter.percent(percent)
-        case .sell:
-            guard let pnl = model.realizedPnL(of: trade) else { return "—" }
-            return MoneyFormatter.signedPrice(pnl.rounded(scale: 2), currency: asset.currency)
-        }
-    }
-
-    private var rightLabel: String {
-        if trade.isTransfer { return model.t("At average cost") }
-        switch trade.side {
-        case .buy: return model.t("vs now")
-        case .sell: return model.t("Realized")
         }
     }
 }
