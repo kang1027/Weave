@@ -68,7 +68,7 @@ struct ImportReviewView: View {
     // MARK: - 요약
 
     private func hero(_ groups: [ImportGroup]) -> some View {
-        // 증권사는 현재가를 주지 않는다 — 시세를 모르는 종목이 있으면 합계를 지어내지 않고 뺀다.
+        // 시세를 모르는 종목이 있으면 합계를 지어내지 않고 뺀다.
         let total: Decimal? = groups.allSatisfy { $0.value != nil }
             ? groups.reduce(Decimal(0)) { $0 + model.amountInBase($1.value ?? 0, currency: $1.asset.currency) }
             : nil
@@ -139,7 +139,7 @@ struct ImportReviewView: View {
         return order.map { instrument in
             let asset = model.previewAsset(for: instrument)
             let holding = pending.snapshot.holdings.first { $0.instrument == instrument }
-            // 지갑은 받은 시세, 증권사는 이미 있는 자산의 시세로.
+            // 받은 현재가(지갑·토스), 없으면 이미 있는 자산의 시세로.
             let price = holding?.marketPrice ?? model.quotes[asset.id]?.price
             let value = holding.flatMap { holding in price.map { $0 * holding.quantity } }
             let trades = plan.trades.filter { $0.instrument == instrument && !$0.isManualSide }

@@ -124,6 +124,7 @@ private func order(
         let holdings = try await client(http).holdings(accountSeq: 7)
         #expect(holdings.map(\.quantity) == [100, Decimal(string: "0.123456")!])
         #expect(holdings.last?.averagePurchasePrice == Decimal(string: "155.3"))
+        #expect(holdings.map(\.lastPrice) == [72_000, Decimal(string: "178.5")])
         #expect(await http.requests.last?.value(forHTTPHeaderField: "X-Tossinvest-Account") == "7")
     }
 
@@ -162,7 +163,7 @@ private func order(
         let snapshot = TossConnector.snapshot(
             sourceID: sourceID,
             holdings: [
-                TossHolding(symbol: "005930", name: "삼성전자", marketCountry: "KR", currency: "KRW", quantity: 6, averagePurchasePrice: 70_000),
+                TossHolding(symbol: "005930", name: "삼성전자", marketCountry: "KR", currency: "KRW", quantity: 6, lastPrice: 72_000, averagePurchasePrice: 70_000),
                 TossHolding(symbol: "BRK.B", name: "Berkshire Hathaway", marketCountry: "US", currency: "USD", quantity: 1, averagePurchasePrice: 410),
                 TossHolding(symbol: "AAPL", name: "Apple Inc.", marketCountry: "US", currency: "USD", quantity: 3, averagePurchasePrice: 150)
             ],
@@ -181,6 +182,8 @@ private func order(
         #expect(snapshot.executions.first?.instrument.name == "삼성전자")
         #expect(snapshot.executions.first?.date == filledAt)
         #expect(snapshot.holdings.map(\.instrument.symbol) == ["005930", "BRK-B", "AAPL"])
+        // 현재가는 검토 화면 평가액용으로만 넘어간다.
+        #expect(snapshot.holdings.map(\.marketPrice) == [72_000, nil, nil])
         #expect(snapshot.unsettled.map(\.symbol) == ["AAPL"])
         #expect(snapshot.historyStart == filledAt)
         #expect(TossConnector.maskedAccount("123-45-678901") == "••••8901")

@@ -37,6 +37,8 @@ public struct TossHolding: Equatable, Sendable {
     public var marketCountry: String
     public var currency: String
     public var quantity: Decimal
+    /// 현재가(거래 통화 기준). 검토 화면 평가액에만 쓴다.
+    public var lastPrice: Decimal?
     public var averagePurchasePrice: Decimal?
 }
 
@@ -107,6 +109,7 @@ public actor TossClient {
                 var marketCountry: String
                 var currency: String
                 var quantity: String
+                var lastPrice: String?
                 var averagePurchasePrice: String?
             }
             var items: [Item]
@@ -118,6 +121,7 @@ public actor TossClient {
                 symbol: item.symbol, name: item.name,
                 marketCountry: item.marketCountry, currency: item.currency,
                 quantity: quantity,
+                lastPrice: item.lastPrice.flatMap(Decimal.clean),
                 averagePurchasePrice: item.averagePurchasePrice.flatMap(Decimal.clean)
             )
         }

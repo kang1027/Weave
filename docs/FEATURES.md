@@ -235,7 +235,7 @@ is left out because its API keys require an allowlisted static IP.
   copy button in step 2, so it can be allowed before connecting. On another network a sync pauses, the row
   shows the IP to add, and the last synced data stays. The IP comes from `api.ipify.org`, asked only on the
   setup screen and when a sync fails for this reason.
-- **What is read**: holdings (quantity · average cost) and orders. The first sync reads every closed order
+- **What is read**: holdings (quantity · average cost · current price, which only feeds the review screen's values) and orders. The first sync reads every closed order
   since the account opened; later syncs read from 7 days before the last sync. An order is one row with its
   total filled quantity and average fill price, so one order becomes one imported trade (`externalID` =
   order ID). Partly filled then canceled or replaced orders keep their filled part; `CANCEL_REJECTED` and

@@ -72,7 +72,7 @@ public enum TossConnector {
             guard let instrument = instrument(holding.symbol, holding.currency) else { return nil }
             return ImportedHolding(
                 instrument: instrument, quantity: holding.quantity,
-                averageCost: holding.averagePurchasePrice
+                averageCost: holding.averagePurchasePrice, marketPrice: holding.lastPrice
             )
         }
         // 일부만 체결된 뒤 취소·정정된 주문도 체결분은 남는다. 취소·정정 거부는 원주문과 별도로 생기는 레코드라 뺀다.
