@@ -144,6 +144,8 @@ extension AppModel {
             await fxService.clearCache()
             LogoStore.clearAll()
             deleteStoredData()
+            // 메모리에 남은 로고·없음 기록이 디스크에 되살아나지 않게 비운다.
+            await RemoteLogoCache.shared.reset()
 
             document = .empty
             quotes = [:]
