@@ -16,10 +16,19 @@ private struct OfflineHTTP: HTTPClient {
 private final class MemoryCredentials: CredentialStoring, @unchecked Sendable {
     private let lock = NSLock()
     private var items: [UUID: Data] = [:]
-    func data(for sourceID: UUID) throws -> Data? { lock.withLock { items[sourceID] } }
+    private(set) var reads = 0
+    func data(for sourceID: UUID) throws -> Data? {
+        // 키체인처럼 메인 스레드에서 불리면 안 된다 — 허용 창이 뜨면 거기서 앱 전체가 멈춘다.
+        precondition(!Thread.isMainThread, "keychain read on the main thread")
+        return lock.withLock { reads += 1; return items[sourceID] }
+    }
     func save(_ data: Data, for sourceID: UUID) throws { lock.withLock { items[sourceID] = data } }
     func delete(for sourceID: UUID) { lock.withLock { items[sourceID] = nil } }
     var count: Int { lock.withLock { items.count } }
+    /// 테스트가 확인용으로 읽는다(메인 스레드 검사 없이).
+    func peek(_ sourceID: UUID) -> WalletConfig? {
+        lock.withLock { items[sourceID] }.flatMap { try? JSONDecoder().decode(WalletConfig.self, from: $0) }
+    }
 }
 
 /// mempool.space 흉내 — 주소별 사토시 잔고.
@@ -73,7 +82,7 @@ private func makeModel(_ document: PortfolioDocument, mempool: FakeMempool, cred
         #expect(await model.connectWallet(kind: .bitcoin, name: "", addresses: ["not-an-address"], chains: []) == .failure(.invalidAddress))
 
         let sourceID = try await model.connectWallet(kind: .bitcoin, name: "콜드 월렛", addresses: [address, " \(address) "], chains: []).get()
-        #expect(try credentials.walletConfig(for: sourceID)?.addresses == [address])
+        #expect(credentials.peek(sourceID)?.addresses == [address])
         #expect(model.document.source(id: sourceID)?.label == "bc1qar…5mdq")
         let pending = try #require(model.pendingImports[sourceID])
         #expect(pending.plan.transfers.map(\.quantity) == [Decimal(string: "0.8")!])
@@ -169,6 +178,23 @@ private func makeModel(_ document: PortfolioDocument, mempool: FakeMempool, cred
         await model.syncSource(id: second)
         #expect(total() == 1)
         #expect(model.document.trades.filter { $0.isBalanceAdjustment }.isEmpty)
+    }
+
+    @MainActor
+    @Test func keychainIsReadOffTheMainThreadOncePerLaunch() async throws {
+        // 앱을 다시 켠 상황 — 문서엔 연결이 있고 주소는 키체인에만 있다.
+        let wallet = LinkedSource(kind: .bitcoinWallet, name: "콜드 월렛", label: "bc1qar…5mdq", lastSyncedAt: Date(timeIntervalSince1970: 1_780_000_000))
+        let credentials = MemoryCredentials()
+        try credentials.save(WalletConfig(kind: .bitcoin, addresses: [address]), for: wallet.id)
+        let mempool = FakeMempool()
+        mempool.set(address, 50_000_000)
+        let model = makeModel(PortfolioDocument(sources: [wallet]), mempool: mempool, credentials: credentials)
+
+        await model.syncSource(id: wallet.id)
+        await model.syncSource(id: wallet.id)
+        #expect(credentials.reads == 1)
+        #expect(model.walletConfigs[wallet.id]?.addresses == [address])
+        if case .synced = model.linkStatus[wallet.id] {} else { Issue.record("expected synced, got \(String(describing: model.linkStatus[wallet.id]))") }
     }
 
     @MainActor

@@ -69,18 +69,20 @@ extension AppModel {
             return .failure(.invalidCredentials)
         }
         // 같은 계좌를 두 번 연결하면 같은 체결이 두 번 들어간다.
-        guard !isTossLinked(clientID: credentials.clientID) else { return .failure(.alreadyLinked) }
+        guard await !isTossLinked(clientID: credentials.clientID) else { return .failure(.alreadyLinked) }
 
         let client = TossClient(credentials: credentials, http: linkHTTP)
         do {
             guard let account = try await client.accounts().first else { return .failure(.noAccount) }
             let label = TossConnector.maskedAccount(account.accountNo)
             // 기다리는 사이 같은 키나 계좌가 먼저 연결됐을 수 있다.
-            guard !isTossLinked(clientID: credentials.clientID, label: label) else { return .failure(.alreadyLinked) }
+            guard await !isTossLinked(clientID: credentials.clientID, label: label) else { return .failure(.alreadyLinked) }
             let source = LinkedSource(kind: .toss, name: t("Toss Securities"), label: label)
-            var stored = credentials
-            stored.accountSeq = account.accountSeq
-            try credentialStore.save(stored, for: source.id)
+            let stored = TossCredentials(
+                clientID: credentials.clientID, clientSecret: credentials.clientSecret, accountSeq: account.accountSeq
+            )
+            try await saveCredentials { try $0.save(stored, for: source.id) }
+            tossCredentialCache[source.id] = stored
             document.sources.append(source)
             persist()
             // 토큰은 클라이언트당 하나 — 방금 받은 토큰을 동기화에서 그대로 쓴다.
@@ -92,13 +94,12 @@ extension AppModel {
         }
     }
 
-    private func isTossLinked(clientID: String, label: String? = nil) -> Bool {
-        document.sources.contains { source in
-            guard source.kind == .toss else { return false }
+    private func isTossLinked(clientID: String, label: String? = nil) async -> Bool {
+        for source in document.sources where source.kind == .toss {
             if let label, source.label == label { return true }
-            let stored = try? credentialStore.tossCredentials(for: source.id)
-            return stored?.clientID == clientID
+            if (try? await tossCredentials(for: source.id))?.clientID == clientID { return true }
         }
+        return false
     }
 
     /// 지갑 주소를 확인하고 잔고를 받아 본 뒤 연결한다. 받지 못하면 아무것도 저장하지 않는다.
@@ -116,7 +117,7 @@ extension AppModel {
         guard !cleaned.isEmpty, cleaned.allSatisfy(valid), kind == .bitcoin || !chains.isEmpty else {
             return .failure(.invalidAddress)
         }
-        guard !isWalletLinked(cleaned) else { return .failure(.alreadyLinked) }
+        guard await !isWalletLinked(cleaned) else { return .failure(.alreadyLinked) }
         guard let prices = cryptoPrices else { return .failure(.server("no-prices")) }
 
         let generation = linkGeneration
@@ -134,8 +135,8 @@ extension AppModel {
             await syncWallets()
             // 받는 사이 데이터를 지웠거나 같은 주소가 먼저 연결됐을 수 있다.
             guard generation == linkGeneration else { return .failure(.server("cancelled")) }
-            guard !isWalletLinked(cleaned) else { return .failure(.alreadyLinked) }
-            try credentialStore.save(config, for: source.id)
+            guard await !isWalletLinked(cleaned) else { return .failure(.alreadyLinked) }
+            try await saveCredentials { try $0.save(config, for: source.id) }
             walletConfigs[source.id] = config
             document.sources.append(source)
             persist()
@@ -148,21 +149,54 @@ extension AppModel {
         }
     }
 
-    private func isWalletLinked(_ addresses: [String]) -> Bool {
+    private func isWalletLinked(_ addresses: [String]) async -> Bool {
         let wanted = Set(addresses.map { $0.lowercased() })
-        return document.sources.contains { source in
-            guard source.kind == .bitcoinWallet || source.kind == .evmWallet,
-                  let config = try? credentialStore.walletConfig(for: source.id)
-            else { return false }
-            return config.addresses.contains { wanted.contains($0.lowercased()) }
+        for source in document.sources where source.kind.isWallet {
+            guard let config = try? await walletConfig(for: source.id) else { continue }
+            if config.addresses.contains(where: { wanted.contains($0.lowercased()) }) { return true }
         }
+        return false
+    }
+
+    // MARK: - 키체인
+
+    // 키체인은 허용 창이 뜨면 답할 때까지 부른 스레드를 멈춘다. 개발 빌드는 빌드마다 서명이 바뀌어 창이 다시 뜨고,
+    // 메인 스레드에서 부르면 앱 전체가 멈춘다 — 그래서 늘 밖에서 부르고, 한 번 읽은 값은 앱이 켜져 있는 동안 기억한다.
+
+    func tossCredentials(for id: UUID) async throws -> TossCredentials? {
+        if let cached = tossCredentialCache[id] { return cached }
+        let store = credentialStore
+        let value = try await Task.detached { try store.tossCredentials(for: id) }.value
+        if let value { tossCredentialCache[id] = value }
+        return value
+    }
+
+    func walletConfig(for id: UUID) async throws -> WalletConfig? {
+        if let cached = walletConfigs[id] { return cached }
+        let store = credentialStore
+        let value = try await Task.detached { try store.walletConfig(for: id) }.value
+        if let value { walletConfigs[id] = value }
+        return value
+    }
+
+    private func saveCredentials(_ write: @escaping @Sendable (any CredentialStoring) throws -> Void) async throws {
+        let store = credentialStore
+        try await Task.detached { try write(store) }.value
+    }
+
+    /// 지우기도 허용 창이 뜰 수 있어 밖에서 한다 — 기다릴 필요는 없다.
+    private func deleteCredentials(_ ids: [UUID]) {
+        guard !ids.isEmpty else { return }
+        let store = credentialStore
+        Task.detached { ids.forEach(store.delete(for:)) }
     }
 
     /// 연결 해제 — 키·주소, 가져온 거래, 이 연결에서만 거래가 있던 자산을 지운다.
     /// 지갑으로 옮겼던 직접 입력분은 이동 기록이 지워지면서 직접 입력분으로 돌아온다.
     func disconnectSource(id: UUID) {
         let removedAssets = assetsOnlyIn(sourceID: id)
-        credentialStore.delete(for: id)
+        deleteCredentials([id])
+        tossCredentialCache[id] = nil
         tossClients[id] = nil
         linkStatus[id] = nil
         pendingImports[id] = nil
@@ -273,9 +307,8 @@ extension AppModel {
 
     /// 지울 데이터에 딸린 키를 키체인에서 지운다 — 전체 삭제·백업 복원 때.
     func forgetCredentials(keeping kept: Set<UUID> = []) {
-        for source in document.sources where !kept.contains(source.id) {
-            credentialStore.delete(for: source.id)
-        }
+        deleteCredentials(document.sources.map(\.id).filter { !kept.contains($0) })
+        tossCredentialCache = [:]
         tossClients = [:]
         linkStatus = [:]
         pendingImports = [:]
@@ -375,7 +408,7 @@ extension AppModel {
     private func fetchSnapshot(_ source: LinkedSource) async throws -> SourceSnapshot {
         switch source.kind {
         case .toss:
-            guard let credentials = try credentialStore.tossCredentials(for: source.id),
+            guard let credentials = try await tossCredentials(for: source.id),
                   let accountSeq = credentials.accountSeq
             else { throw LinkFailure.missingCredentials }
             let client = tossClients[source.id] ?? TossClient(credentials: credentials, http: linkHTTP)
@@ -385,10 +418,9 @@ extension AppModel {
                 accountSeq: accountSeq, since: source.lastSyncedAt
             )
         case .bitcoinWallet, .evmWallet:
-            guard let config = try credentialStore.walletConfig(for: source.id) else {
+            guard let config = try await walletConfig(for: source.id) else {
                 throw LinkFailure.missingCredentials
             }
-            walletConfigs[source.id] = config
             guard let prices = cryptoPrices else { throw LinkFailure.server("no-prices") }
             return try await WalletConnector.fetch(config: config, sourceID: source.id, http: linkHTTP, prices: prices)
         case .koreaInvestment:

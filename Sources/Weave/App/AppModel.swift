@@ -137,6 +137,8 @@ final class AppModel: ObservableObject {
     @Published var lastSnapshots: [UUID: SourceSnapshot] = [:]
     /// 키체인에서 읽은 지갑 설정 — 화면이 그릴 때마다 키체인을 읽지 않게.
     @Published var walletConfigs: [UUID: WalletConfig] = [:]
+    /// 키체인에서 읽은 증권사 키 — 동기화마다 키체인을 다시 열지 않게 앱이 켜져 있는 동안 기억한다.
+    var tossCredentialCache: [UUID: TossCredentials] = [:]
 
     init(
         store: any PortfolioStore,
