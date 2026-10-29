@@ -21,8 +21,11 @@ public enum ImportApplier {
         now: Date = Date()
     ) -> ImportResult {
         var result = ImportResult()
+        // 지갑 이동의 직접 입력 쪽은 sourceID가 없어서 이동 표시로도 찾는다.
         let alreadyImported = Set(
-            document.trades.filter { $0.sourceID == plan.sourceID }.compactMap(\.externalID)
+            document.trades
+                .filter { $0.sourceID == plan.sourceID || $0.transferSourceID == plan.sourceID }
+                .compactMap(\.externalID)
         )
         var addedExternalIDs = Set<String>()
 
@@ -54,7 +57,7 @@ public enum ImportApplier {
             let merged = Set(
                 plan.duplicates.filter { addedExternalIDs.contains($0.externalID) }.map(\.manualTradeID)
             )
-            document.trades.removeAll { merged.contains($0.id) && !$0.isImported }
+            document.trades.removeAll { merged.contains($0.id) && !$0.isLocked }
             result.merged = merged.count
         }
 

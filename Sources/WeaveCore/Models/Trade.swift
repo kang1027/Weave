@@ -22,12 +22,17 @@ public struct Trade: Identifiable, Codable, Equatable, Hashable, Sendable {
     public var openingBalance: Bool?
     /// 잔고 맞춤 — 이력에 없는 입출고만큼 계좌 보유에 맞춘 거래.
     public var balanceAdjustment: Bool?
+    /// 직접 입력분과 지갑 사이 이동이면 그 지갑 연결 ID. 직접 입력 쪽(sourceID nil)과 지갑 쪽에 같이 붙는다.
+    public var transferSourceID: UUID?
 
     public var amount: Decimal { quantity * price }
     /// 가져온 거래는 소스가 원본이라 앱에서 고치거나 지우지 않는다.
     public var isImported: Bool { sourceID != nil }
     public var isOpeningBalance: Bool { openingBalance == true }
     public var isBalanceAdjustment: Bool { balanceAdjustment == true }
+    public var isTransfer: Bool { transferSourceID != nil }
+    /// 앱에서 고치거나 지울 수 없는 거래 — 가져온 거래와 지갑 이동의 직접 입력 쪽.
+    public var isLocked: Bool { isImported || isTransfer }
 
     public init(
         id: UUID = UUID(),
@@ -40,7 +45,8 @@ public struct Trade: Identifiable, Codable, Equatable, Hashable, Sendable {
         sourceID: UUID? = nil,
         externalID: String? = nil,
         openingBalance: Bool? = nil,
-        balanceAdjustment: Bool? = nil
+        balanceAdjustment: Bool? = nil,
+        transferSourceID: UUID? = nil
     ) {
         self.id = id
         self.assetID = assetID
@@ -53,5 +59,6 @@ public struct Trade: Identifiable, Codable, Equatable, Hashable, Sendable {
         self.externalID = externalID
         self.openingBalance = openingBalance
         self.balanceAdjustment = balanceAdjustment
+        self.transferSourceID = transferSourceID
     }
 }

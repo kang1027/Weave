@@ -34,11 +34,14 @@ public struct ImportedHolding: Equatable, Sendable {
     public var instrument: ImportInstrument
     public var quantity: Decimal
     public var averageCost: Decimal?
+    /// 평단이 없는 지갑용 현재가 — 직접 입력분에서 못 채운 만큼의 원가.
+    public var marketPrice: Decimal?
 
-    public init(instrument: ImportInstrument, quantity: Decimal, averageCost: Decimal?) {
+    public init(instrument: ImportInstrument, quantity: Decimal, averageCost: Decimal?, marketPrice: Decimal? = nil) {
         self.instrument = instrument
         self.quantity = quantity
         self.averageCost = averageCost
+        self.marketPrice = marketPrice
     }
 }
 
@@ -79,6 +82,8 @@ public struct SourceSnapshot: Sendable {
     public var unsettled: Set<ImportInstrument>
     /// 보유를 받은 시각 — 잔고 맞춤 거래의 날짜.
     public var takenAt: Date
+    /// 지갑 — 체결 기록 없이 잔고만 있다. 늘고 준 만큼을 직접 입력분과 평단 그대로 주고받는다.
+    public var inheritsManualHoldings: Bool
 
     public init(
         sourceID: UUID,
@@ -86,7 +91,8 @@ public struct SourceSnapshot: Sendable {
         executions: [ImportedExecution],
         historyStart: Date,
         unsettled: Set<ImportInstrument> = [],
-        takenAt: Date = Date()
+        takenAt: Date = Date(),
+        inheritsManualHoldings: Bool = false
     ) {
         self.sourceID = sourceID
         self.holdings = holdings
@@ -94,6 +100,7 @@ public struct SourceSnapshot: Sendable {
         self.historyStart = historyStart
         self.unsettled = unsettled
         self.takenAt = takenAt
+        self.inheritsManualHoldings = inheritsManualHoldings
     }
 }
 
@@ -108,6 +115,10 @@ public struct PlannedTrade: Equatable, Sendable {
     public var externalID: String?
     /// 잔고 맞춤 — 계좌 보유와 이력의 차이를 메우는 거래.
     public var isAdjustment = false
+    /// 직접 입력분과 지갑 사이 이동 — 지갑 쪽과 직접 입력 쪽 두 건이 짝으로 들어간다.
+    public var isTransfer = false
+    /// 이동의 직접 입력 쪽(문서엔 sourceID 없이 들어간다).
+    public var isManualSide = false
 
     public var isOpeningBalance: Bool { externalID == nil }
 }
@@ -152,7 +163,9 @@ public struct ImportPlan: Equatable, Sendable {
     /// 아직 자산이 없는 종목 — 적용 전에 자산을 만들어야 한다.
     public var missingAssets: [ImportInstrument]
 
-    public var newTradeCount: Int { trades.filter { !$0.isOpeningBalance && !$0.isAdjustment }.count }
+    public var newTradeCount: Int { trades.filter { !$0.isOpeningBalance && !$0.isAdjustment && !$0.isTransfer }.count }
+    /// 직접 입력분과 지갑 사이 이동(지갑 쪽).
+    public var transfers: [PlannedTrade] { trades.filter { $0.isTransfer && !$0.isManualSide } }
     public var openingBalances: [PlannedTrade] { trades.filter(\.isOpeningBalance) }
     public var adjustments: [PlannedTrade] { trades.filter(\.isAdjustment) }
     /// 자동으로 맞추지 못해 사람이 봐야 하는 차이.
@@ -195,7 +208,7 @@ public enum ImportPlanner {
             guard let asset = assetFor(execution.instrument) else { continue }
             let match = document.trades.first { trade in
                 trade.assetID == asset.id
-                    && !trade.isImported
+                    && !trade.isLocked
                     && !claimedManual.contains(trade.id)
                     && trade.side == execution.side
                     && trade.quantity == execution.quantity
@@ -248,6 +261,51 @@ public enum ImportPlanner {
                     date: snapshot.takenAt, externalID: "adjust:\(instrument.symbol):\(stamp)", isAdjustment: true
                 ))
             }
+            // 지갑 — 매수 기록이 없다. 들어온 만큼은 직접 입력분에서 평단 그대로 옮겨 오고, 모자라면 그때 시세로 잡는다.
+            // 나간 만큼은 직접 입력분으로 평단 그대로 돌려놓는다 — 거래소로 옮겨 팔면 그 매도를 직접 입력하면 된다.
+            if snapshot.inheritsManualHoldings {
+                let stamp = Int(snapshot.takenAt.timeIntervalSince1970)
+                // side는 지갑 쪽 방향. 직접 입력 쪽은 반대 방향으로 같은 수량·단가가 들어간다.
+                func move(_ side: TradeSide, _ quantity: Decimal, at price: Decimal) {
+                    trades.append(PlannedTrade(
+                        instrument: instrument, side: side, quantity: quantity, price: price, date: snapshot.takenAt,
+                        externalID: "move:\(instrument.symbol):\(stamp)", isTransfer: true
+                    ))
+                    trades.append(PlannedTrade(
+                        instrument: instrument, side: side == .buy ? .sell : .buy, quantity: quantity, price: price,
+                        date: snapshot.takenAt, externalID: "move-manual:\(instrument.symbol):\(stamp)",
+                        isTransfer: true, isManualSide: true
+                    ))
+                }
+                if gap < 0 {
+                    move(.sell, -gap, at: PositionCalculator.snapshot(trades: history).averageCost)
+                } else if gap > 0 {
+                    let manual = assetFor(instrument).map { asset in
+                        document.trades.filter { $0.assetID == asset.id && $0.sourceID == nil }
+                    } ?? []
+                    let manualPosition = PositionCalculator.snapshot(trades: manual)
+                    let moved = min(gap, max(0, manualPosition.quantity))
+                    if moved > 0 {
+                        move(.buy, moved, at: manualPosition.averageCost)
+                    }
+                    let rest = gap - moved
+                    if rest > 0 {
+                        guard let price = holding?.marketPrice, price > 0 else {
+                            flag(.missingAverageCost)
+                            continue
+                        }
+                        if existing.isEmpty {
+                            trades.append(PlannedTrade(
+                                instrument: instrument, side: .buy, quantity: rest, price: price,
+                                date: snapshot.takenAt.addingTimeInterval(-1), externalID: nil
+                            ))
+                        } else {
+                            adjust(.buy, rest, at: price)
+                        }
+                    }
+                }
+                continue
+            }
             if gap < 0 {
                 // 이력에 없는 출고·시간외 매도 — 줄어든 만큼 평단으로 팔아 실현손익 없이 계좌 보유에 맞춘다.
                 // 중간에 이미 마이너스가 되는 이력은 끝에서 맞춰도 틀리니 사람이 본다.
@@ -271,7 +329,7 @@ public enum ImportPlanner {
                 continue
             }
             if let asset = assetFor(instrument), document.trades.contains(where: {
-                $0.assetID == asset.id && !$0.isImported && !claimedManual.contains($0.id)
+                $0.assetID == asset.id && !$0.isLocked && !claimedManual.contains($0.id)
             }) {
                 flag(.manualTradesMayOverlap)
                 continue
@@ -344,12 +402,14 @@ public enum ImportPlanner {
 }
 
 extension PlannedTrade {
+    /// 문서에 넣을 거래. 이동의 직접 입력 쪽은 sourceID 없이 직접 입력분에 들어가고 이동 표시만 남는다.
     func asTrade(assetID: UUID, sourceID: UUID? = nil) -> Trade {
         Trade(
             assetID: assetID, side: side, quantity: quantity, price: price, date: date,
-            sourceID: sourceID, externalID: externalID,
+            sourceID: isManualSide ? nil : sourceID, externalID: externalID,
             openingBalance: isOpeningBalance ? true : nil,
-            balanceAdjustment: isAdjustment ? true : nil
+            balanceAdjustment: isAdjustment ? true : nil,
+            transferSourceID: isTransfer ? sourceID : nil
         )
     }
 }
