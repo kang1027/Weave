@@ -1,29 +1,32 @@
+import AppKit
 import SwiftUI
 import WeaveCore
 
-/// 연결 하나 — 무엇을 어디서 읽는지, 가져온 보유, 가져오지 않은 잔고.
+/// 연결 하나 — 위에 합계와 상태, 보유는 비중과 함께, 주소·체인은 아래 정보로, 동기화·해제는 맨 아래.
 struct SourceDetailView: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
     let sourceID: UUID
     @State private var disconnectTarget: LinkedSource?
+    @State private var showsSkipped = false
 
     private var source: LinkedSource? { model.document.source(id: sourceID) }
 
     var body: some View {
         VStack(spacing: 0) {
-            ScreenHeader(title: source?.name ?? "", onBack: { model.pop() })
+            ScreenHeader(title: "", onBack: { model.pop() })
 
             if let source {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        infoCard(source)
+                    VStack(spacing: 0) {
+                        hero(source)
                         holdingsSection(source)
                         skippedSection(source)
+                        detailsSection(source)
+                        actionsCard(source)
                     }
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 14)
                 }
-                footer(source)
             } else {
                 Spacer()
             }
@@ -42,52 +45,47 @@ struct SourceDetailView: View {
         )
     }
 
-    // MARK: - 정보
+    // MARK: - 위
 
-    private func infoCard(_ source: LinkedSource) -> some View {
-        let config = model.walletConfigs[source.id]
-        return PanelCard(padding: EdgeInsets(top: 2, leading: 14, bottom: 2, trailing: 14)) {
-            VStack(spacing: 0) {
-                infoRow(model.t("Type"), model.sourceKindName(source.kind))
-                if let config {
-                    divider
-                    infoRow(model.t(config.addresses.count > 1 ? "Addresses" : "Address"),
-                            config.addresses.map(WalletConfig.shortAddress).joined(separator: "\n"),
-                            monospaced: true)
-                    if config.kind == .evm {
-                        divider
-                        infoRow(model.t("Chains"), config.chains.map(\.name).joined(separator: ", "))
-                    }
-                } else if !source.label.isEmpty {
-                    divider
-                    infoRow(model.t(source.kind.isWallet ? "Address" : "Account"), source.label, monospaced: true)
-                }
-                divider
-                infoRow(model.t("Last sync"), lastSyncText(source))
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.top, 6)
-    }
-
-    private func infoRow(_ title: String, _ value: String, monospaced: Bool = false) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title)
-                .font(.system(size: 12, weight: .semibold))
+    private func hero(_ source: LinkedSource) -> some View {
+        VStack(spacing: 4) {
+            SourceLogo(kind: source.kind, size: 44)
+            Text(source.name)
+                .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(theme.text)
-            Spacer(minLength: 12)
-            Text(value)
-                .font(monospaced ? .system(size: 11.5, design: .monospaced) : .system(size: 12))
-                .foregroundStyle(theme.text2)
-                .multilineTextAlignment(.trailing)
-                .fixedSize(horizontal: false, vertical: true)
-                .textSelection(.enabled)
+                .lineLimit(1)
+                .padding(.top, 4)
+            Text(MoneyFormatter.price(model.sourceValue(sourceID: source.id), currency: model.settings.baseCurrency))
+                .font(.system(size: 26, weight: .bold))
+                .monospacedDigit()
+                .foregroundStyle(theme.text)
+                .privacyBlur(model.settings.privacyMode)
+            HStack(spacing: 6) {
+                switch model.linkStatus[source.id] {
+                case .syncing:
+                    ProgressView().controlSize(.mini)
+                    Text(model.t("Syncing…"))
+                case .failed(let failure):
+                    StatusDot(color: theme.red)
+                    Text(model.t("Paused"))
+                        .foregroundStyle(theme.redText)
+                        .help(model.linkFailureText(failure))
+                default:
+                    if let synced = source.lastSyncedAt {
+                        StatusDot(color: theme.green)
+                        TimelineView(.periodic(from: .now, by: 30)) { context in
+                            Text(model.t("Synced \(relativeSyncText(synced, now: context.date, model: model).lowercased()) · every \(model.linkSyncMinutes) min"))
+                        }
+                    }
+                }
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(theme.text2)
+            .padding(.top, 2)
         }
-        .padding(.vertical, 8)
-    }
-
-    private var divider: some View {
-        Rectangle().fill(theme.hair).frame(height: 1)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 4)
     }
 
     // MARK: - 보유
@@ -95,51 +93,25 @@ struct SourceDetailView: View {
     @ViewBuilder
     private func holdingsSection(_ source: LinkedSource) -> some View {
         let holdings = model.holdings(sourceID: source.id)
-        sectionLabel(model.t("Holdings"))
-        PanelCard(padding: EdgeInsets(top: 2, leading: 12, bottom: 2, trailing: 12)) {
+        let total = model.sourceValue(sourceID: source.id)
+        CapsLabel(text: model.t("Holdings"))
+        LinkCard {
             if holdings.isEmpty {
                 Text(emptyText(source))
                     .font(.system(size: 11))
                     .foregroundStyle(theme.text2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 10)
+                    .padding(12)
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(holdings.enumerated()), id: \.element.asset.id) { index, item in
-                        if index > 0 { divider }
-                        Button {
-                            model.push(.detail(item.asset.id))
-                        } label: {
-                            HStack(spacing: 10) {
-                                AssetLogoView(asset: item.asset, size: 24)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(item.asset.name)
-                                        .font(.system(size: 12.5, weight: .semibold))
-                                        .foregroundStyle(theme.text)
-                                        .lineLimit(1)
-                                    Text("\(item.asset.formattedQuantity(item.quantity)) \(item.asset.symbol)")
-                                        .font(.system(size: 10.5))
-                                        .monospacedDigit()
-                                        .foregroundStyle(theme.text2)
-                                        .privacyBlur(model.settings.privacyMode)
-                                }
-                                Spacer(minLength: 8)
-                                Text(valueText(item.asset, item.quantity))
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .monospacedDigit()
-                                    .foregroundStyle(theme.text)
-                                    .privacyBlur(model.settings.privacyMode)
-                            }
-                            .padding(.vertical, 8)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
+                        if index > 0 { HairDivider(inset: 48) }
+                        let share = total > 0 ? model.valueInBase(item.asset, item.quantity) / total : 0
+                        HoldingShareRow(asset: item.asset, quantity: item.quantity, share: share)
                     }
                 }
             }
         }
-        .padding(.horizontal, 14)
     }
 
     private func emptyText(_ source: LinkedSource) -> String {
@@ -147,27 +119,46 @@ struct SourceDetailView: View {
         return model.t("No coins worth $10 or more with a Binance price were found on these chains.")
     }
 
-    private func valueText(_ asset: Asset, _ quantity: Decimal) -> String {
-        guard let quote = model.quotes[asset.id] else { return "—" }
-        return MoneyFormatter.price(quote.price * quantity, currency: quote.currency)
-    }
-
     // MARK: - 가져오지 않은 잔고
 
     @ViewBuilder
     private func skippedSection(_ source: LinkedSource) -> some View {
         let all = model.skippedBalances(sourceID: source.id)
-        // 소액 토큰이 수십 개일 수 있다 — 큰 것 10개만 보이고 나머지는 개수만.
-        let skipped = Array(all.prefix(10))
-        if source.kind.isWallet, !skipped.isEmpty {
-            sectionLabel(model.t("Not imported"))
-            PanelCard(padding: EdgeInsets(top: 2, leading: 12, bottom: 2, trailing: 12)) {
-                VStack(spacing: 0) {
-                    ForEach(Array(skipped.enumerated()), id: \.offset) { index, item in
-                        if index > 0 { divider }
+        if source.kind.isWallet, !all.isEmpty {
+            let total = all.reduce(Decimal(0)) { $0 + $1.holding.quantity * ($1.holding.marketPrice ?? 0) }
+            VStack(spacing: 0) {
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) { showsSkipped.toggle() }
+                } label: {
+                    HStack(spacing: 8) {
+                        HStack(spacing: 0) {
+                            Text(counted(all.count, "balance") + " skipped")
+                                .fontWeight(.semibold)
+                                .foregroundStyle(theme.badgeGrayText)
+                            Text(" · \(MoneyFormatter.price(total, currency: "USD"))")
+                                .foregroundStyle(theme.text2)
+                                .privacyBlur(model.settings.privacyMode)
+                        }
+                        .font(.system(size: 11.5))
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(theme.text2)
+                            .rotationEffect(.degrees(showsSkipped ? 90 : 0))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if showsSkipped {
+                    // 소액 토큰이 수십 개일 수 있다 — 큰 것 10개만 보이고 나머지는 개수만.
+                    ForEach(Array(all.prefix(10).enumerated()), id: \.offset) { _, item in
+                        HairDivider()
                         HStack {
-                            Text(item.holding.instrument.symbol)
-                                .font(.system(size: 12, weight: .semibold))
+                            Text(item.holding.instrument.displaySymbol)
+                                .font(.system(size: 11.5, weight: .semibold))
                                 .foregroundStyle(theme.text)
                             Text(MoneyFormatter.quantity(item.holding.quantity))
                                 .font(.system(size: 10.5))
@@ -182,60 +173,205 @@ struct SourceDetailView: View {
                                 .monospacedDigit()
                                 .foregroundStyle(theme.text2)
                         }
+                        .padding(.horizontal, 12)
                         .padding(.vertical, 7)
+                    }
+                    HairDivider()
+                    Text(all.count > 10
+                        ? model.t("and \(all.count - 10) more. Coins under $10 or without a Binance price aren't added.")
+                        : model.t("Coins under $10 or without a Binance price aren't added."))
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(theme.text2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                }
+            }
+            .background(RoundedRectangle(cornerRadius: 10).fill(theme.seg))
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+        }
+    }
+
+    // MARK: - 정보
+
+    @ViewBuilder
+    private func detailsSection(_ source: LinkedSource) -> some View {
+        let config = model.walletConfigs[source.id]
+        CapsLabel(text: model.t("Details"))
+        LinkCard(padding: EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12)) {
+            VStack(spacing: 0) {
+                if let config {
+                    ForEach(Array(config.addresses.enumerated()), id: \.offset) { index, address in
+                        if index > 0 { HairDivider() }
+                        infoRow(index == 0 ? model.t(config.addresses.count > 1 ? "Addresses" : "Address") : "") {
+                            HStack(spacing: 8) {
+                                Text(WalletConfig.shortAddress(address))
+                                    .font(.system(size: 11.5, design: .monospaced))
+                                    .foregroundStyle(theme.text2)
+                                    .help(address)
+                                Button {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(address, forType: .string)
+                                } label: {
+                                    Image(systemName: "doc.on.doc")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(theme.link)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(model.t("Copy address"))
+                            }
+                        }
+                    }
+                    if config.kind == .evm {
+                        HairDivider()
+                        infoRow(model.t("Chains")) {
+                            FlowLayout(spacing: 4, rowSpacing: 4, alignment: .trailing) {
+                                ForEach(config.chains, id: \.self) { chain in
+                                    LinkTag(text: chain.name)
+                                }
+                            }
+                            .frame(maxWidth: 190, alignment: .trailing)
+                        }
+                    }
+                } else {
+                    infoRow(model.t("Type")) {
+                        Text(model.sourceKindName(source.kind))
+                            .font(.system(size: 12))
+                            .foregroundStyle(theme.text2)
+                    }
+                    if !source.label.isEmpty {
+                        HairDivider()
+                        infoRow(model.t("Account")) {
+                            Text(source.label)
+                                .font(.system(size: 11.5, design: .monospaced))
+                                .foregroundStyle(theme.text2)
+                        }
+                    }
+                }
+                if let synced = source.lastSyncedAt {
+                    HairDivider()
+                    infoRow(model.t("Last sync")) {
+                        Text(synced.formatted(.dateTime.month().day().hour().minute().locale(model.locale)))
+                            .font(.system(size: 12))
+                            .foregroundStyle(theme.text2)
                     }
                 }
             }
-            .padding(.horizontal, 14)
-            if all.count > skipped.count {
-                Text(model.t("and \(all.count - skipped.count) more"))
+        }
+    }
+
+    private func infoRow(_ title: String, @ViewBuilder value: () -> some View) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(theme.text)
+            Spacer(minLength: 0)
+            value()
+        }
+        .padding(.vertical, 9)
+    }
+
+    // MARK: - 아래
+
+    private func actionsCard(_ source: LinkedSource) -> some View {
+        LinkCard {
+            VStack(spacing: 0) {
+                actionRow(model.t("Sync now"), color: theme.link, disabled: model.linkStatus[source.id] == .syncing) {
+                    Task { await model.syncSource(id: source.id) }
+                }
+                HairDivider().padding(.horizontal, 12)
+                actionRow(model.t("Disconnect…"), color: theme.redText) {
+                    disconnectTarget = source
+                }
+            }
+        }
+        .padding(.top, 14)
+    }
+
+    private func actionRow(_ title: String, color: Color, disabled: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(color)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 11)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.45 : 1)
+    }
+}
+
+/// 보유 한 줄 — 이름·평가액, 그 아래 수량과 비중 막대.
+private struct HoldingShareRow: View {
+    @Environment(\.theme) private var theme
+    @EnvironmentObject private var model: AppModel
+    let asset: Asset
+    let quantity: Decimal
+    let share: Decimal
+
+    var body: some View {
+        Button {
+            model.push(.detail(asset.id))
+        } label: {
+            HStack(spacing: 10) {
+                AssetLogoView(asset: asset, size: 26)
+                VStack(spacing: 3) {
+                    HStack {
+                        Text(asset.name)
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(theme.text)
+                            .lineLimit(1)
+                        Spacer(minLength: 8)
+                        Text(valueText)
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(theme.text)
+                            .privacyBlur(model.settings.privacyMode)
+                    }
+                    HStack(spacing: 8) {
+                        Text("\(asset.shortQuantity(quantity)) \(asset.symbol)")
+                            .lineLimit(1)
+                            .privacyBlur(model.settings.privacyMode)
+                        Spacer(minLength: 0)
+                        Capsule()
+                            .fill(theme.seg)
+                            .frame(width: 56, height: 4)
+                            .overlay(alignment: .leading) {
+                                Capsule()
+                                    .fill(theme.link)
+                                    .frame(width: max(2, 56 * fraction), height: 4)
+                            }
+                        Text(shareText)
+                            .frame(width: 28, alignment: .trailing)
+                    }
                     .font(.system(size: 10.5))
+                    .monospacedDigit()
                     .foregroundStyle(theme.text2)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 6)
+                }
             }
-            Text(model.t("Coins under $10 or without a Binance price aren't added. Tokens outside Weave's list aren't read."))
-                .font(.system(size: 10.5))
-                .foregroundStyle(theme.text2)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 20)
-                .padding(.top, 6)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
-    // MARK: - 하단
-
-    private func footer(_ source: LinkedSource) -> some View {
-        HStack(spacing: 8) {
-            LinkSecondaryButton(title: model.t("Sync now"), disabled: model.linkStatus[source.id] == .syncing) {
-                Task { await model.syncSource(id: source.id) }
-            }
-            Spacer()
-            LinkSecondaryButton(title: model.t("Disconnect…"), isDestructive: true) {
-                disconnectTarget = source
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .overlay(alignment: .top) {
-            Rectangle().fill(theme.hair).frame(height: 1)
-        }
+    private var fraction: CGFloat {
+        CGFloat(min(1, max(0, share)).doubleValue)
     }
 
-    private func lastSyncText(_ source: LinkedSource) -> String {
-        if model.linkStatus[source.id] == .syncing { return model.t("Syncing…") }
-        guard let date = source.lastSyncedAt else { return "—" }
-        return date.formatted(.dateTime.month().day().hour().minute().locale(model.locale))
+    private var shareText: String {
+        guard share > 0 else { return "—" }
+        return share < 0.01 ? "<1%" : "\(Int(share.doubleValue * 100 + 0.5))%"
     }
 
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 10, weight: .semibold))
-            .kerning(0.8)
-            .textCase(.uppercase)
-            .foregroundStyle(theme.caps)
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
-            .padding(.bottom, 6)
+    private var valueText: String {
+        guard let quote = model.quotes[asset.id] else { return "—" }
+        return MoneyFormatter.price(quote.price * quantity, currency: quote.currency)
     }
 }

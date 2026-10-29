@@ -12,4 +12,11 @@ extension Asset {
     func formattedQuantity(_ quantity: Decimal) -> String {
         MoneyFormatter.quantity(quantity, maxFractionDigits: market.tradesWholeShares ? 0 : 8)
     }
+
+    /// 좁은 자리용 수량 — 클수록 소수 자리를 줄인다. "11.0107", "1,144.04", "0.001146"
+    func shortQuantity(_ quantity: Decimal) -> String {
+        guard !market.tradesWholeShares else { return formattedQuantity(quantity) }
+        let magnitude = abs(quantity)
+        return MoneyFormatter.quantity(quantity, maxFractionDigits: magnitude >= 1000 ? 2 : magnitude >= 1 ? 4 : 6)
+    }
 }

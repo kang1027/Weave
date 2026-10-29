@@ -229,9 +229,10 @@ is left out because its API keys require an allowlisted static IP.
 - **Toss Securities**: the user pastes the Open API client ID and secret from WTS › Settings › Open API.
   Weave checks them, picks the brokerage account, and stores the keys plus `accountSeq` in the macOS Keychain
   (this Mac only). The document keeps only the masked account number (`••••8901`).
-- **Allowed IPs**: Toss only answers IPs registered in WTS. On another network a sync fails with a message
-  that says where to add the IP, and the last synced data stays. A **Check this network's IP** button asks
-  `api.ipify.org` only when tapped.
+- **Allowed IPs**: Toss only answers IPs registered in WTS. The setup screen shows this network's IP with a
+  copy button in step 2, so it can be allowed before connecting. On another network a sync pauses, the row
+  shows the IP to add, and the last synced data stays. The IP comes from `api.ipify.org`, asked only on the
+  setup screen and when a sync fails for this reason.
 - **What is read**: holdings (quantity · average cost) and orders. The first sync reads every closed order
   since the account opened; later syncs read from 7 days before the last sync. An order is one row with its
   total filled quantity and average fill price, so one order becomes one imported trade (`externalID` =
@@ -241,8 +242,13 @@ is left out because its API keys require an allowlisted static IP.
   Order APIs are never called.
 - **Access token**: Toss allows one valid token per client, so Weave reuses it until a minute before it
   expires and reissues once on a 401.
-- **First sync** goes to a review screen (new trades · duplicates · needs review · new assets · opening
-  balances). Later syncs run with the quote refresh, at most every 5 minutes, and apply without review.
+- **First sync** goes to a review screen: the total on top, then one row per asset with what happens to it
+  (New · Moved · Orders · Merged · Opening · Adjusted · Check) and a "New asset" tag, then the skipped balances
+  folded into one line. Later syncs run with the quote refresh, at most every 5 minutes, and apply without
+  review.
+- **Accounts & wallets**: the linked total with **Sync all** on top, then brokers and wallets. Each row shows
+  the value, a few holding logos, and its state (synced · syncing · review · paused). Anything to do, like a
+  review, an IP to allow, or the keychain prompt, sits inside that row instead of a banner.
 - **New assets**: Korean stocks are created on Naver, US stocks on Yahoo (`BRK.B` → `BRK-B`). Positions that
   were sold out and have no asset in Weave are left out. When the 30-asset limit blocks a new asset, its
   trades wait and `lastSyncedAt` does not move, so they come in once there is room.
@@ -267,8 +273,9 @@ is left out because its API keys require an allowlisted static IP.
   underlying's. A holder of a vault token sees interest as price growth. USDT and GHO have no Binance price, so
   those tokens only show under "Not imported". A wallet change worth under $5
   waits until it adds up, so accruing interest doesn't log a trade every sync.
-- **Connection detail**: tapping a link shows its type, addresses, chains, last sync, the holdings it brought
-  in, and the balances it left out (under $10 or no Binance price), largest first.
+- **Connection detail**: tapping a link shows its value and state on top, the holdings it brought in with each
+  one's share, the balances it left out (under $10 or no Binance price) folded into one line, then the address
+  (with copy), chains, and last sync. **Sync now** and **Disconnect…** sit at the bottom.
 - **Coins**: only coins with a Binance USDT market. New coins become Binance assets (`BTCUSDT`). A balance
   under $10 doesn't bring in a new coin, but a coin the wallet already holds keeps being reconciled, so it
   doesn't flip in and out around $10. A coin with a balance but no price (delisted, halted) is skipped for that

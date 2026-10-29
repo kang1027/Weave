@@ -37,8 +37,9 @@ Requests to these services skip the on-disk URL cache.
 - **Toss Securities Open API** (`openapi.tossinvest.com`) — Weave sends the client ID and secret you entered to
   Toss to get an access token, then reads your account list, holdings, and order history about every 5 minutes
   while the app runs. It never calls order APIs. Toss only answers IPs you allowed in its WTS settings.
-- **ipify** (`api.ipify.org`) — only when you tap **Check this network's IP**, to show which IP to allow in Toss.
-  It returns your public IP; nothing else is sent.
+- **ipify** (`api.ipify.org`) — when you open the Toss Securities setup screen, and when a Toss sync fails
+  because this network's IP isn't allowed, to show which IP to add in Toss. It returns your public IP; nothing
+  else is sent.
 - **mempool.space** — for a linked Bitcoin wallet, the addresses you entered, to read their confirmed balance.
 - **Public chain RPCs** (`ethereum-rpc.publicnode.com`, `arb1.arbitrum.io`, `mainnet.base.org`,
   `mainnet.optimism.io`, `polygon-bor-rpc.publicnode.com`) — for a linked EVM wallet, the address, to read the

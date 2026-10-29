@@ -284,11 +284,47 @@ extension AppModel {
             .sorted { valueInBase($0.0, $0.1) > valueInBase($1.0, $1.1) }
     }
 
+    /// 연결 하나의 평가액(기준 통화). 시세가 없는 자산은 빼고 더한다.
+    func sourceValue(sourceID: UUID) -> Decimal {
+        holdings(sourceID: sourceID).reduce(Decimal(0)) { $0 + valueInBase($1.asset, $1.quantity) }
+    }
+
+    /// 연결한 곳 전부의 평가액(기준 통화).
+    var linkedTotal: Decimal {
+        document.sources.reduce(Decimal(0)) { $0 + sourceValue(sourceID: $1.id) }
+    }
+
+    /// 연결 동기화 주기(분) — 시세 갱신과 함께 돌고, 5분보다 자주 받지는 않는다.
+    var linkSyncMinutes: Int {
+        max(5, max(60, min(900, settings.quoteRefreshSeconds)) / 60)
+    }
+
+    /// 가장 최근 동기화 — 연결 목록 맨 위 요약용.
+    var latestLinkSync: Date? {
+        document.sources.compactMap(\.lastSyncedAt).max()
+    }
+
+    /// 간격을 기다리지 않고 전부 다시 받는다. 검토를 기다리는 첫 가져오기는 건드리지 않는다.
+    func syncAllSources() async {
+        lastLinkSyncAttempt = [:]
+        await syncLinkedSources()
+    }
+
     /// 기준 통화로 환산한 평가액 — 정렬용. 시세가 없으면 0.
     func valueInBase(_ asset: Asset, _ quantity: Decimal) -> Decimal {
         guard let quote = quotes[asset.id] else { return 0 }
-        let fx = fxRates[asset.currency.uppercased()] ?? (asset.currency.uppercased() == settings.baseCurrency.uppercased() ? 1 : 0)
-        return quote.price * quantity * fx
+        return amountInBase(quote.price * quantity, currency: asset.currency)
+    }
+
+    /// 금액을 기준 통화로 — 환율이 아직 없으면 0.
+    func amountInBase(_ amount: Decimal, currency: String) -> Decimal {
+        let fx = fxRates[currency.uppercased()] ?? (currency.uppercased() == settings.baseCurrency.uppercased() ? 1 : 0)
+        return amount * fx
+    }
+
+    /// 검토 화면에 보일 자산 — 이미 있으면 그 자산, 아니면 가져오면 만들어질 모양.
+    func previewAsset(for instrument: ImportInstrument) -> Asset {
+        document.assets.first(where: instrument.matches) ?? makeAsset(for: instrument)
     }
 
     /// 지갑에서 읽었지만 자산으로 들이지 않은 잔고 — 소액이거나 바이낸스 시세가 없다.
@@ -520,7 +556,7 @@ extension AppModel {
 
     // MARK: - 도움
 
-    /// 허용 IP 등록을 돕는 공인 IP 확인 — 사용자가 버튼을 누를 때만 부른다.
+    /// 허용 IP 등록을 돕는 공인 IP 확인 — 토스 연결 화면을 열 때와 IP가 막혔을 때만 부른다.
     func currentPublicIP() async -> String? {
         guard let data = try? await URLSessionHTTPClient().get(URL(string: "https://api.ipify.org")!) else {
             return nil
@@ -557,6 +593,16 @@ extension AppModel {
             return t("\(chain) didn't return every balance, so this sync was skipped.")
         case .server(let code):
             return t("The service returned an error (\(code)).")
+        }
+    }
+
+    /// 목록 행에 붙는 한 줄 요약 — "may overlap trades entered by hand".
+    func mismatchShortText(_ mismatch: HoldingMismatch) -> String {
+        switch mismatch.reason {
+        case .historyExceedsHolding: return t("holds less than its history")
+        case .holdingExceedsHistory: return t("holds more than its history")
+        case .missingAverageCost: return t("no average cost")
+        case .manualTradesMayOverlap: return t("may overlap trades entered by hand")
         }
     }
 

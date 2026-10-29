@@ -1,7 +1,7 @@
 import SwiftUI
 import WeaveCore
 
-/// 연결 추가 — 증권사와 지갑 중 고른다.
+/// 연결 추가 — 무엇이 필요한지를 태그로 보여 주고 고르게 한다.
 struct AddSourceView: View {
     @Environment(\.theme) private var theme
     @EnvironmentObject private var model: AppModel
@@ -11,67 +11,93 @@ struct AddSourceView: View {
             ScreenHeader(title: model.t("Add a link"), onBack: { model.pop() })
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    sectionLabel(model.t("Brokers"))
-                    PanelCard(padding: EdgeInsets(top: 2, leading: 12, bottom: 2, trailing: 12)) {
-                        option(.toss, title: model.t("Toss Securities"), detail: model.t("Open API key · Korean and US stocks")) {
-                            model.push(.addToss)
-                        }
-                    }
-                    .padding(.horizontal, 14)
-
-                    sectionLabel(model.t("Wallets"))
-                    PanelCard(padding: EdgeInsets(top: 2, leading: 12, bottom: 2, trailing: 12)) {
+                VStack(spacing: 0) {
+                    CapsLabel(text: model.t("Brokers"))
+                    LinkCard {
                         VStack(spacing: 0) {
-                            option(.bitcoinWallet, title: model.t("Bitcoin wallet"), detail: model.t("Addresses only · no keys")) {
-                                model.push(.addWallet(.bitcoin))
-                            }
-                            Rectangle().fill(theme.hair).frame(height: 1)
-                            option(.evmWallet, title: model.t("EVM wallet"), detail: "Ethereum · Arbitrum · Base · Optimism · Polygon") {
-                                model.push(.addWallet(.evm))
-                            }
+                            option(.toss, title: model.t("Toss Securities"), tags: [
+                                (model.t("KR & US stocks"), .neutral),
+                                (model.t("API key"), .neutral),
+                                (model.t("Allowed IP required"), .orange)
+                            ]) { model.push(.addToss) }
+                            HairDivider(inset: 57)
+                            comingSoon(model.t("Korea Investment"))
                         }
                     }
-                    .padding(.horizontal, 14)
+
+                    CapsLabel(text: model.t("Crypto wallets"))
+                    LinkCard {
+                        VStack(spacing: 0) {
+                            option(.evmWallet, title: model.t("EVM wallet"), tags: [
+                                (model.t("Address only"), .green),
+                                (model.t("Ethereum + 4 chains"), .neutral),
+                                (model.t("Aave deposits"), .neutral)
+                            ]) { model.push(.addWallet(.evm)) }
+                            HairDivider(inset: 57)
+                            option(.bitcoinWallet, title: model.t("Bitcoin wallet"), tags: [
+                                (model.t("Address only"), .green),
+                                (model.t("Multiple addresses"), .neutral)
+                            ]) { model.push(.addWallet(.bitcoin)) }
+                        }
+                    }
+
+                    Text(model.t("Upbit isn't supported: its API keys need a fixed IP. Enter exchange coins by hand, or move them to a wallet and link the wallet."))
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(theme.text2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 14)
                 }
                 .padding(.bottom, 12)
             }
         }
     }
 
-    private func option(_ kind: LinkedSourceKind, title: String, detail: String, action: @escaping () -> Void) -> some View {
+    private func option(
+        _ kind: LinkedSourceKind,
+        title: String,
+        tags: [(String, LinkTag.Style)],
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
-            HStack(spacing: 10) {
-                SourceLogo(kind: kind, size: 28)
-                VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 11) {
+                SourceLogo(kind: kind, size: 34)
+                VStack(alignment: .leading, spacing: 6) {
                     Text(title)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 13.5, weight: .semibold))
                         .foregroundStyle(theme.text)
-                    Text(detail)
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(theme.text2)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
+                    FlowLayout(spacing: 4, rowSpacing: 4, alignment: .leading) {
+                        ForEach(tags, id: \.0) { tag in
+                            LinkTag(text: tag.0, style: tag.1)
+                        }
+                    }
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(theme.text2)
             }
-            .padding(.vertical, 10)
+            .padding(12)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 10, weight: .semibold))
-            .kerning(0.8)
-            .textCase(.uppercase)
-            .foregroundStyle(theme.caps)
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
-            .padding(.bottom, 6)
+    private func comingSoon(_ title: String) -> some View {
+        HStack(spacing: 11) {
+            SourceLogo(kind: .koreaInvestment, size: 34)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundStyle(theme.text)
+                Text(model.t("Coming soon"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.text2)
+            }
+            Spacer()
+        }
+        .padding(12)
+        .opacity(0.5)
     }
 }
