@@ -3,6 +3,16 @@ import Testing
 @testable import WeaveCore
 
 @Suite struct JSONPortfolioStoreTests {
+    @Test func settingsWithAnOldLanguageValueStillLoad() throws {
+        // 영어 전용 이전 버전이 남긴 language 값 — 무시하고 나머지는 그대로 읽는다.
+        let json = #"{"theme":"slate","language":"korean","baseCurrency":"KRW"}"#
+        let settings = try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8))
+        #expect(settings.theme == .slate)
+        #expect(settings.baseCurrency == "KRW")
+        let encoded = String(decoding: try JSONEncoder().encode(settings), as: UTF8.self)
+        #expect(!encoded.contains("language"))
+    }
+
     @Test func defaultBaseCurrencyFollowsSystemLanguage() {
         #expect(AppSettings.defaultBaseCurrency(for: Locale(identifier: "ko_KR")) == "KRW")
         #expect(AppSettings.defaultBaseCurrency(for: Locale(identifier: "ja_JP")) == "JPY")
