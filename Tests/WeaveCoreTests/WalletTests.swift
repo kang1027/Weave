@@ -115,7 +115,9 @@ private actor FakeRPC: HTTPSending {
             quotes: ["BTC": 80_000, "ETH": 2_000],
             now: date("2026-03-01")
         )
-        #expect(snapshot.holdings.map(\.instrument.symbol) == ["BTC", "ETH"])
+        // 시세 없는 PEPE도 수량은 남긴다(연결 상세에 보여 준다) — 대조는 unsettled로 건너뛴다.
+        #expect(snapshot.holdings.map(\.instrument.symbol) == ["BTC", "ETH", "PEPE"])
+        #expect(snapshot.holdings.last?.marketPrice == nil)
         #expect(snapshot.holdings.first?.marketPrice == 80_000)
         #expect(snapshot.holdings.first?.averageCost == nil)
         // ETH 0.004개는 $8이라 먼지, PEPE는 잔고가 있는데 시세가 없어 이번엔 대조하지 않는다.

@@ -115,7 +115,7 @@ private func makeModel(toss: FakeToss, credentials: MemoryCredentials) -> AppMod
         #expect(model.document.assets.first { $0.symbol == "AAPL" }?.provider == .yahoo)
         #expect(model.document.trades.count == 2)
         #expect(model.document.source(id: sourceID)?.lastSyncedAt != nil)
-        #expect(model.heldAssetCount(sourceID: sourceID) == 2)
+        #expect(model.holdings(sourceID: sourceID).count == 2)
 
         // 4) 다음 동기화는 검토 없이 새 체결만 넣는다.
         toss["/api/v1/holdings"] = holdings([("005930", "삼성전자", "KRW", "12", "70500"), ("AAPL", "Apple Inc.", "USD", "2", "150")])

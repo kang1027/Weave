@@ -136,6 +136,7 @@ extension AppModel {
             guard generation == linkGeneration else { return .failure(.server("cancelled")) }
             guard !isWalletLinked(cleaned) else { return .failure(.alreadyLinked) }
             try credentialStore.save(config, for: source.id)
+            walletConfigs[source.id] = config
             document.sources.append(source)
             persist()
             lastLinkSyncAttempt[source.id] = Date()
@@ -168,6 +169,8 @@ extension AppModel {
         linkMismatches[id] = nil
         linkSkippedTrades[id] = nil
         lastLinkSyncAttempt[id] = nil
+        lastSnapshots[id] = nil
+        walletConfigs[id] = nil
         // 지갑과 주고받은 직접 입력 쪽 기록은 지워서 직접 입력분을 되돌린다. 단, 돌아온 코인을 그 뒤에 직접 팔았다면
         // 지우는 순간 직접 입력분이 마이너스가 되니 그 자산의 기록은 일반 거래로 남긴다.
         let sourceName = document.source(id: id)?.name ?? ""
@@ -215,17 +218,48 @@ extension AppModel {
         }
     }
 
+    /// 이 연결에 지금 있는 자산과 수량 — 많이 가진(평가액 큰) 순.
+    func holdings(sourceID: UUID) -> [(asset: Asset, quantity: Decimal)] {
+        Dictionary(grouping: document.trades.filter { $0.sourceID == sourceID }, by: \.assetID)
+            .compactMap { assetID, trades -> (Asset, Decimal)? in
+                let quantity = PositionCalculator.snapshot(trades: trades).quantity
+                guard quantity > 0, let asset = asset(id: assetID) else { return nil }
+                return (asset, quantity)
+            }
+            .sorted { valueInBase($0.0, $0.1) > valueInBase($1.0, $1.1) }
+    }
+
+    /// 기준 통화로 환산한 평가액 — 정렬용. 시세가 없으면 0.
+    func valueInBase(_ asset: Asset, _ quantity: Decimal) -> Decimal {
+        guard let quote = quotes[asset.id] else { return 0 }
+        let fx = fxRates[asset.currency.uppercased()] ?? (asset.currency.uppercased() == settings.baseCurrency.uppercased() ? 1 : 0)
+        return quote.price * quantity * fx
+    }
+
+    /// 지갑에서 읽었지만 자산으로 들이지 않은 잔고 — 소액이거나 바이낸스 시세가 없다.
+    func skippedBalances(sourceID: UUID) -> [(holding: ImportedHolding, unpriced: Bool)] {
+        guard let snapshot = lastSnapshots[sourceID] else { return [] }
+        let held = Set(holdings(sourceID: sourceID).map { $0.asset.symbol.uppercased() })
+        return snapshot.holdings
+            .filter { !held.contains($0.instrument.symbol) }
+            .filter { snapshot.dust.contains($0.instrument) || snapshot.unsettled.contains($0.instrument) }
+            .map { ($0, snapshot.unsettled.contains($0.instrument)) }
+            .sorted { ($0.0.quantity * ($0.0.marketPrice ?? 0)) > ($1.0.quantity * ($1.0.marketPrice ?? 0)) }
+    }
+
+    func sourceKindName(_ kind: LinkedSourceKind) -> String {
+        switch kind {
+        case .toss: return t("Toss Securities")
+        case .koreaInvestment: return t("Korea Investment")
+        case .bitcoinWallet: return t("Bitcoin wallet")
+        case .evmWallet: return t("EVM wallet")
+        }
+    }
+
     func importedTradeCount(sourceID: UUID) -> Int {
         document.trades.filter { $0.sourceID == sourceID }.count
     }
 
-    /// 이 연결에 지금 남아 있는 종목 수.
-    func heldAssetCount(sourceID: UUID) -> Int {
-        Dictionary(grouping: document.trades.filter { $0.sourceID == sourceID }, by: \.assetID)
-            .values
-            .filter { PositionCalculator.snapshot(trades: $0).quantity > 0 }
-            .count
-    }
 
     func disconnectMessage(_ source: LinkedSource) -> String {
         let trades = importedTradeCount(sourceID: source.id)
@@ -248,6 +282,8 @@ extension AppModel {
         linkMismatches = [:]
         linkSkippedTrades = [:]
         lastLinkSyncAttempt = [:]
+        lastSnapshots = [:]
+        walletConfigs = [:]
         // 이미 받고 있던 동기화 결과가 바뀐 문서에 들어가지 않게 한다.
         linkGeneration += 1
     }
@@ -326,6 +362,7 @@ extension AppModel {
 
     /// 받은 스냅샷을 계획한다. 처음 가져올 때는 검토 화면에 올리고, 그 뒤로는 바로 반영한다.
     private func receive(_ snapshot: SourceSnapshot, for id: UUID, firstSync: Bool) {
+        lastSnapshots[id] = snapshot
         let plan = ImportPlanner.plan(snapshot: snapshot, document: document)
         linkMismatches[id] = plan.unresolved
         if firstSync, !plan.trades.isEmpty || !plan.duplicates.isEmpty {
@@ -351,6 +388,7 @@ extension AppModel {
             guard let config = try credentialStore.walletConfig(for: source.id) else {
                 throw LinkFailure.missingCredentials
             }
+            walletConfigs[source.id] = config
             guard let prices = cryptoPrices else { throw LinkFailure.server("no-prices") }
             return try await WalletConnector.fetch(config: config, sourceID: source.id, http: linkHTTP, prices: prices)
         case .koreaInvestment:

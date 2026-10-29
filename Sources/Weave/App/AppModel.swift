@@ -22,6 +22,7 @@ enum Route: Hashable {
     case importReview(UUID)
     case addSource
     case addWallet(WalletConfig.Kind)
+    case sourceDetail(UUID)
 }
 
 @MainActor
@@ -132,6 +133,10 @@ final class AppModel: ObservableObject {
     var linkHTTP: any HTTPSending = URLSessionHTTPClient(session: URLSession(configuration: .ephemeral))
     /// 지갑 코인 시세(바이낸스). 없으면 지갑을 연결하지 않는다.
     var cryptoPrices: (any CryptoPriceSource)?
+    /// 마지막으로 받은 스냅샷 — 연결 상세에서 가져오지 않은 잔고(소액·시세 없음)까지 보여 준다.
+    @Published var lastSnapshots: [UUID: SourceSnapshot] = [:]
+    /// 키체인에서 읽은 지갑 설정 — 화면이 그릴 때마다 키체인을 읽지 않게.
+    @Published var walletConfigs: [UUID: WalletConfig] = [:]
 
     init(
         store: any PortfolioStore,

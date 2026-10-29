@@ -79,8 +79,10 @@ public enum WalletConnector {
                 market: .crypto, symbol: symbol, name: CryptoNames.name(for: symbol), currency: "USD"
             )
             // 잔고는 있는데 시세가 없다(상장 폐지·거래 중단) — 0으로 보면 지갑에서 다 빠진 걸로 기록되니 이번엔 건너뛴다.
+            // 수량은 연결 상세에 보여 주려고 남긴다.
             guard let price = quotes[symbol] else {
                 unpriced.insert(instrument)
+                holdings.append(ImportedHolding(instrument: instrument, quantity: quantity, averageCost: nil))
                 continue
             }
             holdings.append(ImportedHolding(

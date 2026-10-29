@@ -16,6 +16,12 @@ OUT = ROOT / "Sources/WeaveCore/Linking/EVMTokenList.swift"
 CHAINS = {1: "ethereum", 42161: "arbitrum", 8453: "base", 10: "optimism", 137: "polygon"}
 # 래핑·브리지 표기를 바이낸스 심볼로 맞춘다 — 지갑의 WETH는 ETH 보유로 본다.
 ALIASES = {"WETH": "ETH", "USDC.E": "USDC", "USDBC": "USDC"}
+# Uniswap 목록에 이전 버전 컨트랙트가 남은 토큰 — 바이낸스에서 거래되는 새 컨트랙트로 바꾼다.
+# KNC: v1("Kyber Network Crystal") → v2("Kyber Network Crystal v2"), 이름은 각 체인에서 name()으로 확인.
+REPLACE = {
+    ("ethereum", "0xdd974d5c2e2928dea5f71b9825b8b646686bd200"): "0xdefa4e8a7bcba345f687a2f1456f5edd9ce97202",
+    ("polygon", "0x324b28d6565f784d596422b0f2e5ab6e9cfa1dc7"): "0x1c954e8fe737f99f68fa1ccda3e51ebdb291948c",
+}
 
 
 def fetch_json(url):
@@ -39,7 +45,8 @@ def main():
         symbol = ALIASES.get(token["symbol"].upper(), token["symbol"].upper())
         if chain is None or symbol not in listed:
             continue
-        rows.add((chain, token["address"].lower(), symbol, int(token["decimals"])))
+        address = token["address"].lower()
+        rows.add((chain, REPLACE.get((chain, address), address), symbol, int(token["decimals"])))
 
     order = list(CHAINS.values())
     lines = [

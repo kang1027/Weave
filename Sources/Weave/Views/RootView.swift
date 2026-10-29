@@ -52,6 +52,8 @@ struct RootView: View {
             AddSourceView()
         case .addWallet(let kind):
             AddWalletView(kind: kind)
+        case .sourceDetail(let sourceID):
+            SourceDetailView(sourceID: sourceID)
         case nil:
             if model.document.assets.isEmpty {
                 OnboardingView()
