@@ -67,15 +67,16 @@ private func holdings(_ items: [(String, String, String, String, String)]) -> (I
 private func makeModel(toss: FakeToss, credentials: MemoryCredentials) -> AppModel {
     let cacheDir = FileManager.default.temporaryDirectory.appendingPathComponent("weave-link-tests-\(UUID().uuidString)")
     let naver = NaverProvider(http: OfflineHTTP())
-    return AppModel(
+    let model = AppModel(
         store: MemoryStore(),
         quoteService: QuoteService(providers: [naver]),
         candleService: CandleService(providers: [naver], cacheDirectory: cacheDir),
         fxService: FXService(yahoo: YahooProvider(http: OfflineHTTP()), cacheDirectory: nil),
-        searchService: SearchService(providers: [naver]),
-        credentialStore: credentials,
-        linkHTTP: toss
+        searchService: SearchService(providers: [naver])
     )
+    model.credentialStore = credentials
+    model.linkHTTP = toss
+    return model
 }
 
 @Suite struct TossLinkingTests {
