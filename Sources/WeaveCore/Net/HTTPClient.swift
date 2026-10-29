@@ -38,3 +38,17 @@ public struct URLSessionHTTPClient: HTTPClient {
         return data
     }
 }
+
+/// 상태 코드와 본문을 그대로 돌려주는 요청 — 오류 본문의 코드로 원인을 가려야 하는 API용.
+public protocol HTTPSending: Sendable {
+    func send(_ request: URLRequest) async throws -> (data: Data, status: Int)
+}
+
+extension URLSessionHTTPClient: HTTPSending {
+    public func send(_ request: URLRequest) async throws -> (data: Data, status: Int) {
+        var request = request
+        request.timeoutInterval = 15
+        let (data, response) = try await session.data(for: request)
+        return (data, (response as? HTTPURLResponse)?.statusCode ?? -1)
+    }
+}

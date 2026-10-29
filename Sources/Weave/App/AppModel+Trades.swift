@@ -5,9 +5,21 @@ extension AppModel {
     enum TradeError: Error, Equatable {
         case exceedsHolding(available: Decimal)
         case invalidInput
+        /// 연결한 계좌에서 가져온 거래 — 원본이 소스라 앱에서 바꾸지 않는다.
+        case imported
     }
 
-    /// 거래 추가/수정 공통 검증 — 매도는 그 시점 보유 수량 초과 불가.
+    /// 직접 입력한 거래만. 연결한 계좌 보유분은 그 계좌가 원본이라 직접 입력 매도로 줄이지 않는다.
+    func manualTrades(for assetID: UUID) -> [Trade] {
+        document.trades(for: assetID).filter { !$0.isImported }
+    }
+
+    /// 연결한 계좌에서 가져온 거래가 있는 자산인지.
+    func hasLinkedHoldings(assetID: UUID) -> Bool {
+        document.trades.contains { $0.assetID == assetID && $0.isImported }
+    }
+
+    /// 거래 추가/수정 공통 검증 — 매도는 그 시점 직접 입력 보유 수량 초과 불가.
     /// 과거 날짜 삽입/수정으로 "이후 매도"가 무효화되는 것도 전체 재생으로 막는다.
     func validateTrade(
         assetID: UUID,
@@ -19,7 +31,7 @@ extension AppModel {
     ) -> TradeError? {
         guard quantity > 0, price >= 0 else { return .invalidInput }
 
-        let existing = document.trades(for: assetID).filter { $0.id != editingID }
+        let existing = manualTrades(for: assetID).filter { $0.id != editingID }
         if side == .sell {
             let available = PositionCalculator.availableQuantity(at: date, trades: existing)
             if quantity > available {
@@ -78,6 +90,7 @@ extension AppModel {
         guard let index = document.trades.firstIndex(where: { $0.id == trade.id }) else {
             return .invalidInput
         }
+        guard !document.trades[index].isImported else { return .imported }
         document.trades[index] = trade
         persist()
         invalidateHomeChart()
@@ -85,7 +98,7 @@ extension AppModel {
     }
 
     func deleteTrade(id: UUID) {
-        document.trades.removeAll { $0.id == id }
+        document.trades.removeAll { $0.id == id && !$0.isImported }
         persist()
         invalidateHomeChart()
     }

@@ -73,6 +73,12 @@ struct AssetDetailView: View {
                             .padding(.top, 10)
                             .id("detail-chart")
 
+                            // 지금 연결한 계좌·지갑에 남아 있는 몫이 있을 때만 — 직접 입력만이면 한 곳뿐이다.
+                            if HoldingLocations.breakdown(trades: trades).contains(where: { $0.sourceID != nil }) {
+                                CapsHeader(text: model.t("Holdings by location"))
+                                HoldingLocationsCard(asset: asset, trades: model.document.trades(for: assetID))
+                            }
+
                             CapsHeader(text: model.t("Trades"))
                             realizedSummary(position: position, currency: asset.currency)
                             tradesList(asset: asset, scrollProxy: scrollProxy)
@@ -456,6 +462,12 @@ private struct TradeRow: View {
                         .privacyBlur(model.settings.privacyMode)
                 }
                 HStack(spacing: 4) {
+                    if trade.isImported {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 7.5, weight: .semibold))
+                            .foregroundStyle(theme.text2)
+                            .help(model.t("Imported trades can't be changed here"))
+                    }
                     Text(subText)
                         .font(.system(size: 10))
                         .foregroundStyle(theme.text2)
@@ -493,6 +505,7 @@ private struct TradeRow: View {
         .gesture(
             TapGesture(count: 2)
                 .onEnded {
+                    guard !trade.isImported else { return }
                     model.push(.tradeForm(assetID: asset.id, editing: trade, prefill: nil))
                 }
                 .exclusively(
@@ -500,11 +513,21 @@ private struct TradeRow: View {
                 )
         )
         .contextMenu {
-            Button(model.t("Edit")) {
-                model.push(.tradeForm(assetID: asset.id, editing: trade, prefill: nil))
+            if trade.isImported {
+                // 원본은 연결한 계좌 — 고치면 다음 동기화와 어긋난다.
+                Text(model.t("Imported from \(sourceName)"))
+                Text(model.t("Imported trades can't be changed here"))
+            } else {
+                Button(model.t("Edit")) {
+                    model.push(.tradeForm(assetID: asset.id, editing: trade, prefill: nil))
+                }
+                Button(model.t("Delete"), role: .destructive, action: onDelete)
             }
-            Button(model.t("Delete"), role: .destructive, action: onDelete)
         }
+    }
+
+    private var sourceName: String {
+        trade.sourceID.flatMap(model.document.source(id:))?.name ?? model.t("Linked account")
     }
 
     private var chip: some View {
@@ -531,6 +554,9 @@ private struct TradeRow: View {
         let date = trade.date.formatted(
             .dateTime.year(.twoDigits).month(.defaultDigits).day().locale(model.locale)
         )
+        if trade.isOpeningBalance { return "\(date) · \(model.t("Opening balance")) · \(sourceName)" }
+        if trade.isBalanceAdjustment { return "\(date) · \(model.t("Balance adjustment")) · \(sourceName)" }
+        if trade.isImported { return "\(date) · \(sourceName)" }
         return trade.note.isEmpty ? date : "\(date) · \(trade.note)"
     }
 

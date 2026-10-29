@@ -140,6 +140,7 @@ extension AppModel {
             guard let self else { return }
 
             resetBackgroundWorkForDataWipe()
+            forgetCredentials()
             await candleService.clearCache()
             await fxService.clearCache()
             await kimchiPremiumService?.clearCache()
@@ -255,6 +256,8 @@ extension AppModel {
                 }
             }
 
+            // 복원본에 없는 연결의 키는 남기지 않는다.
+            forgetCredentials(keeping: Set(restored.sources.map(\.id)))
             document = restored
             persist()
             invalidateHomeChart()

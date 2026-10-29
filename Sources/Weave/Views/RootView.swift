@@ -42,6 +42,12 @@ struct RootView: View {
             TradeFormView(assetID: assetID, editing: editing, prefill: prefill)
         case .manualAssetForm:
             ManualAssetForm()
+        case .connections:
+            ConnectionsView()
+        case .addToss:
+            AddTossView()
+        case .importReview(let sourceID):
+            ImportReviewView(sourceID: sourceID)
         case nil:
             if model.document.assets.isEmpty {
                 OnboardingView()

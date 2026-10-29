@@ -137,6 +137,13 @@ extension AppModel {
         document.trades(for: assetID).count
     }
 
+    /// 삭제 확인 문구 — 가져온 거래도 같이 지워지고, 계좌에 남아 있으면 다음 동기화 때 다시 들어온다.
+    func deleteAssetMessage(_ asset: Asset) -> String {
+        let message = t("\(asset.name) and \(tradeCount(assetID: asset.id)) trade(s) will be deleted.")
+        guard hasLinkedHoldings(assetID: asset.id) else { return message }
+        return message + "\n" + t("If a linked account still holds it, the next sync brings it back.")
+    }
+
     func toggleMenuBar(assetID: UUID) {
         mutateAsset(id: assetID) { $0.showInMenuBar.toggle() }
         updateMenuBarTitle()

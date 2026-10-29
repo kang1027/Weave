@@ -215,6 +215,62 @@ Entered via ✎ in the Home footer. Consists of a top search bar + a held-asset 
 - `Application Support/Weave/portfolio.json` — assets · trades (buy/sell) · settings.
 - The schema has a `version` field, with a migration chain on load.
 - Quote/candle/FX caches are separate files (separated from the portfolio data, harmless to delete).
+- `sources` lists linked accounts and wallets (kind · display name · masked account/address label · last sync).
+  Keys and full addresses are not stored in the document. A trade imported from a source keeps its
+  `sourceID` and the source's execution ID (`externalID`); manual trades have neither.
+- The file is saved as `version` 3 only once a source or an imported trade exists. Otherwise it stays at
+  version 2 so v0.1.x builds can still open it. A v0.1.x build refuses a version 3 file instead of
+  silently dropping the linked data.
+
+### Linked accounts
+
+Settings › Linked accounts. Toss Securities works today; Korea Investment and wallets come later. Upbit is
+left out because its API keys require an allowlisted static IP.
+
+- **Toss Securities**: the user pastes the Open API client ID and secret from WTS › Settings › Open API.
+  Weave checks them, picks the brokerage account, and stores the keys plus `accountSeq` in the macOS Keychain
+  (this Mac only). The document keeps only the masked account number (`••••8901`).
+- **Allowed IPs**: Toss only answers IPs registered in WTS. On another network a sync fails with a message
+  that says where to add the IP, and the last synced data stays. A **Check this network's IP** button asks
+  `api.ipify.org` only when tapped.
+- **What is read**: holdings (quantity · average cost) and orders. The first sync reads every closed order
+  since the account opened; later syncs read from 7 days before the last sync. An order is one row with its
+  total filled quantity and average fill price, so one order becomes one imported trade (`externalID` =
+  order ID). Partly filled then canceled or replaced orders keep their filled part; `CANCEL_REJECTED` and
+  `REPLACE_REJECTED` records are skipped. Holdings and open orders are read before and after the order
+  history; an instrument that moved in between, or has an order still filling, is not reconciled this time.
+  Order APIs are never called.
+- **Access token**: Toss allows one valid token per client, so Weave reuses it until a minute before it
+  expires and reissues once on a 401.
+- **First sync** goes to a review screen (new trades · duplicates · needs review · new assets · opening
+  balances). Later syncs run with the quote refresh, at most every 5 minutes, and apply without review.
+- **New assets**: Korean stocks are created on Naver, US stocks on Yahoo (`BRK.B` → `BRK-B`). Positions that
+  were sold out and have no asset in Weave are left out. When the 30-asset limit blocks a new asset, its
+  trades wait and `lastSyncedAt` does not move, so they come in once there is room.
+- **Last sync** is the time the snapshot was taken, even if the review was applied later.
+- **Disconnect** deletes the keys, the imported trades, and assets whose every trade came from that account.
+
+- **Already imported**: executions whose `externalID` is already in the document are skipped, as are repeats in the same sync.
+- **Same trade entered manually**: same asset · side · quantity, same day, price within 1% → suggested as a
+  duplicate. By default the imported record replaces the manual one.
+- **Opening balance**: when the holding is larger than the fetched history explains, an opening-balance buy
+  is added just before the history starts. Its price is solved so that replaying the history gives the
+  source's average cost. One opening balance per source and asset.
+- **Balance adjustment**: the account is the original, so a gap the history can't explain is closed with a
+  locked adjustment trade dated at the sync. Holding less than the history (transfer out, after-hours sale)
+  → a sell at the average cost, so no realized P&L (a reverse split keeps the old average). Holding more once
+  the source already has trades for the asset (transfer in, split) → a buy priced so the average matches the
+  account, which is 0 for a split. Only the first import uses an opening balance.
+- **Needs review**: a history that dips below zero; a missing average cost; or manual trades on the same
+  asset that could double count with an opening balance (deleting them lets the next sync match the
+  account). These are not filled in automatically.
+- **Dust**: holdings under a threshold (₩10,000 planned) are skipped unless the asset already exists.
+- **Locked**: imported trades can't be edited or deleted in the app (the source is the original). A manual
+  sell can only sell what was entered manually, so it never reduces a linked account's holding.
+- **Deleting an asset** also deletes its imported trades. If a linked account still holds it, the next sync
+  brings it back.
+- **Holdings by location**: the detail screen shows how much of the asset sits in each source and in
+  manual trades, once the asset has an imported trade.
 
 ---
 
