@@ -10,7 +10,7 @@ struct ImportReviewView: View {
 
     private var source: LinkedSource? { model.document.source(id: sourceID) }
     private var plan: ImportPlan? { model.pendingImports[sourceID]?.plan }
-    private var mismatches: [HoldingMismatch] { plan?.mismatches ?? model.linkMismatches[sourceID] ?? [] }
+    private var mismatches: [HoldingMismatch] { plan?.unresolved ?? model.linkMismatches[sourceID] ?? [] }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -30,6 +30,7 @@ struct ImportReviewView: View {
                         tiles(plan)
                         newAssets(plan)
                         openingBalances(plan)
+                        adjustments(plan)
                         duplicates(plan)
                     }
                     if !mismatches.isEmpty {
@@ -75,7 +76,7 @@ struct ImportReviewView: View {
         HStack(spacing: 6) {
             tile(plan.newTradeCount, model.t("New trades"))
             tile(plan.duplicates.count, model.t("Duplicates"))
-            tile(plan.mismatches.count, model.t("Needs review"), highlight: !plan.mismatches.isEmpty)
+            tile(plan.unresolved.count, model.t("Needs review"), highlight: !plan.unresolved.isEmpty)
         }
         .padding(.horizontal, 14)
     }
@@ -132,6 +133,28 @@ struct ImportReviewView: View {
                             .monospacedDigit()
                             .foregroundStyle(theme.text)
                         Text(model.t("Holdings older than the order history start at \(MoneyFormatter.price(trade.price, currency: trade.instrument.currency)), matched to the account's average cost."))
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(theme.text2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func adjustments(_ plan: ImportPlan) -> some View {
+        let adjusted = plan.mismatches.filter(\.adjusted)
+        if !adjusted.isEmpty {
+            sectionLabel(model.t("Balance adjustment"))
+            card {
+                rows(adjusted) { mismatch in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(mismatch.instrument.name) \(mismatch.difference > 0 ? "+" : "")\(MoneyFormatter.quantity(mismatch.difference))")
+                            .font(.system(size: 12, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(theme.text)
+                        Text(model.mismatchText(mismatch))
                             .font(.system(size: 10.5))
                             .foregroundStyle(theme.text2)
                             .fixedSize(horizontal: false, vertical: true)

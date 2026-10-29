@@ -547,6 +547,7 @@ private struct TradeRow: View {
             .dateTime.year(.twoDigits).month(.defaultDigits).day().locale(model.locale)
         )
         if trade.isOpeningBalance { return "\(date) · \(model.t("Opening balance")) · \(sourceName)" }
+        if trade.isBalanceAdjustment { return "\(date) · \(model.t("Balance adjustment")) · \(sourceName)" }
         if trade.isImported { return "\(date) · \(sourceName)" }
         return trade.note.isEmpty ? date : "\(date) · \(trade.note)"
     }

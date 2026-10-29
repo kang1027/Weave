@@ -248,9 +248,13 @@ left out because its API keys require an allowlisted static IP.
 - **Opening balance**: when the holding is larger than the fetched history explains, an opening-balance buy
   is added just before the history starts. Its price is solved so that replaying the history gives the
   source's average cost. One opening balance per source and asset.
-- **Needs review**: history larger than the holding, or a history that dips below zero (withdrawals,
-  transfers); a missing average cost; a second gap after the opening balance; or manual trades on the same
-  asset that could double count with an opening balance. These are not filled in automatically.
+- **Balance adjustment**: the account is the original, so a gap the history can't explain is closed with a
+  locked adjustment trade dated at the sync. Holding less than the history (transfer out, after-hours sale)
+  → a sell at the average cost, so no realized P&L. Holding more after the opening balance (transfer in,
+  split) → a buy priced so the average matches the account.
+- **Needs review**: a history that dips below zero; a missing average cost; or manual trades on the same
+  asset that could double count with an opening balance (deleting them lets the next sync match the
+  account). These are not filled in automatically.
 - **Dust**: holdings under a threshold (₩10,000 planned) are skipped unless the asset already exists.
 - **Locked**: imported trades can't be edited or deleted in the app (the source is the original). A manual
   sell can only sell what was entered manually, so it never reduces a linked account's holding.

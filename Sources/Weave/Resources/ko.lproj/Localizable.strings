@@ -114,6 +114,9 @@
 "Entered manually" = "직접 입력";
 "Linked account" = "연결한 계좌";
 "Opening balance" = "기초 잔고";
+"Balance adjustment" = "잔고 맞춤";
+"The account holds less than its history shows, like after a transfer out or an after-hours sale. A balance adjustment at the average cost matches it." = "출고나 시간외 매도처럼 거래 내역에 없는 이유로 계좌 보유가 적어요. 차이만큼 평단으로 잔고 맞춤을 넣었어요.";
+"The account holds more than its history shows, like after a transfer in or a split. A balance adjustment matches it." = "입고나 액면분할처럼 거래 내역에 없는 이유로 계좌 보유가 많아요. 차이만큼 잔고 맞춤을 넣었어요.";
 "Imported from %@" = "%@에서 가져옴";
 "Imported trades can't be changed here" = "가져온 거래는 여기서 고칠 수 없어요";
 "Linked account holdings change only when the account syncs" = "연결한 계좌 보유분은 그 계좌를 동기화할 때만 바뀌어요";
@@ -132,7 +135,7 @@
 "The account holds less than its history shows, likely a transfer out." = "계좌 보유가 거래 내역보다 적어요. 출고나 이체가 있었던 것 같아요.";
 "The account didn't give an average cost, so no opening balance was added." = "계좌가 평단을 주지 않아서 기초 잔고를 넣지 않았어요.";
 "The account holds more than its history shows, likely a transfer in." = "계좌 보유가 거래 내역보다 많아요. 입고나 이체가 있었던 것 같아요.";
-"You entered trades for this manually, so no opening balance was added to avoid counting it twice." = "직접 입력한 거래가 있어서 두 번 세지 않게 기초 잔고를 넣지 않았어요.";
+"You entered trades for this manually, so no opening balance was added to avoid counting it twice. Delete those trades to match the account on the next sync." = "직접 입력한 거래가 있어서 두 번 세지 않게 기초 잔고를 넣지 않았어요. 그 거래를 지우면 다음 동기화 때 계좌에 맞춰요.";
 "Linked accounts" = "연결한 계좌";
 "Brokers" = "증권사";
 "Import holdings and trades from Toss Securities" = "토스증권 보유와 거래를 가져와요";

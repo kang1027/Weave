@@ -173,7 +173,7 @@ extension AppModel {
             // 받는 사이에 연결을 해제했으면 버린다.
             guard let current = document.source(id: id) else { return }
             let plan = ImportPlanner.plan(snapshot: snapshot, document: document)
-            linkMismatches[id] = plan.mismatches
+            linkMismatches[id] = plan.unresolved
             if current.lastSyncedAt == nil, !plan.trades.isEmpty || !plan.duplicates.isEmpty {
                 pendingImports[id] = PendingImport(snapshot: snapshot, plan: plan)
             } else {
@@ -230,7 +230,7 @@ extension AppModel {
     func applyPendingImport(sourceID: UUID) {
         guard let pending = pendingImports[sourceID] else { return }
         let plan = ImportPlanner.plan(snapshot: pending.snapshot, document: document)
-        linkMismatches[sourceID] = plan.mismatches
+        linkMismatches[sourceID] = plan.unresolved
         applyImport(plan)
     }
 
@@ -287,6 +287,10 @@ extension AppModel {
 
     func mismatchText(_ mismatch: HoldingMismatch) -> String {
         switch mismatch.reason {
+        case .historyExceedsHolding where mismatch.adjusted:
+            return t("The account holds less than its history shows, like after a transfer out or an after-hours sale. A balance adjustment at the average cost matches it.")
+        case .holdingExceedsHistory where mismatch.adjusted:
+            return t("The account holds more than its history shows, like after a transfer in or a split. A balance adjustment matches it.")
         case .historyExceedsHolding:
             return t("The account holds less than its history shows, likely a transfer out.")
         case .missingAverageCost:
@@ -294,7 +298,7 @@ extension AppModel {
         case .holdingExceedsHistory:
             return t("The account holds more than its history shows, likely a transfer in.")
         case .manualTradesMayOverlap:
-            return t("You entered trades for this manually, so no opening balance was added to avoid counting it twice.")
+            return t("You entered trades for this manually, so no opening balance was added to avoid counting it twice. Delete those trades to match the account on the next sync.")
         }
     }
 }

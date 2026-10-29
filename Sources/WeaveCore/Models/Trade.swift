@@ -20,11 +20,14 @@ public struct Trade: Identifiable, Codable, Equatable, Hashable, Sendable {
     public var externalID: String?
     /// 기초 잔고 — 받아온 체결 이력보다 보유가 많을 때 채우는 시작 매수.
     public var openingBalance: Bool?
+    /// 잔고 맞춤 — 이력에 없는 입출고만큼 계좌 보유에 맞춘 거래.
+    public var balanceAdjustment: Bool?
 
     public var amount: Decimal { quantity * price }
     /// 가져온 거래는 소스가 원본이라 앱에서 고치거나 지우지 않는다.
     public var isImported: Bool { sourceID != nil }
     public var isOpeningBalance: Bool { openingBalance == true }
+    public var isBalanceAdjustment: Bool { balanceAdjustment == true }
 
     public init(
         id: UUID = UUID(),
@@ -36,7 +39,8 @@ public struct Trade: Identifiable, Codable, Equatable, Hashable, Sendable {
         note: String = "",
         sourceID: UUID? = nil,
         externalID: String? = nil,
-        openingBalance: Bool? = nil
+        openingBalance: Bool? = nil,
+        balanceAdjustment: Bool? = nil
     ) {
         self.id = id
         self.assetID = assetID
@@ -48,5 +52,6 @@ public struct Trade: Identifiable, Codable, Equatable, Hashable, Sendable {
         self.sourceID = sourceID
         self.externalID = externalID
         self.openingBalance = openingBalance
+        self.balanceAdjustment = balanceAdjustment
     }
 }
