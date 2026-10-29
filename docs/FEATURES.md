@@ -97,7 +97,7 @@ Entered via ✎ in the Home footer. Consists of a top search bar + a held-asset 
   invested cost and the signed unrealized P&L amount.
 - Header `LIVE` toggle: while enabled, samples only this asset's quote every second and
   renders a rolling 1-second chart; it stops automatically when leaving the detail screen.
-- **Kimchi premium card** (crypto, base currency KRW only): the Upbit KRW price, the Binance price
+- **Kimchi premium card** (crypto; always with base currency KRW, otherwise only when turned on in Settings): the Upbit KRW price, the Binance price
   converted to KRW (`$price × USD/KRW`), and the premium %, plus a 30-day daily premium sparkline with
   its min~max range. Refreshed on each quote refresh, not by `LIVE`, with a USD/KRW rate at most 5 minutes old. Hidden for coins without an
   Upbit KRW market.
@@ -192,6 +192,7 @@ Entered via ✎ in the Home footer. Consists of a top search bar + a held-asset 
   - Price refresh interval (select: 1/5/10/15 min)
   - Base currency (select: KRW/USD/JPY; new installs default to KRW for Korean systems, JPY for Japanese systems, USD otherwise)
     — used **only for aggregate calculations** like total and the Combined chart
+  - Kimchi premium (toggle, default off; shown only when base currency isn't KRW) — show the kimchi premium card on crypto detail
   - Asset display currency (select: **source currency as-is** (default) / convert to base currency)
     — with source currency, BTC shows in $ and Samsung Electronics in ₩, each in its own currency
   - Data backup/restore (button) · clear candle cache · permanently delete all data after a successful backup export

@@ -107,12 +107,12 @@ extension AppModel {
 
     // MARK: - 김프
 
-    /// 김프 카드를 띄울 자산 — 원화 기준으로 보는 사용자의 바이낸스 코인만.
+    /// 김프 카드를 띄울 자산 — 바이낸스 코인만. 기준 통화가 KRW가 아니면 설정에서 켠 경우에만.
     func showsKimchiPremium(for asset: Asset) -> Bool {
         kimchiPremiumService != nil
             && asset.market == .crypto
             && asset.provider == .binance
-            && settings.baseCurrency.uppercased() == "KRW"
+            && (settings.baseCurrency.uppercased() == "KRW" || settings.showsKimchiPremiumOutsideKRW)
     }
 
     /// 값이 오기 전에 카드 자리를 잡아 둘지 — 업비트에 없던 코인은 잡지 않는다.

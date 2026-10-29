@@ -47,6 +47,7 @@ import Testing
         settings.baseCurrency = "USD"
         settings.rotationSeconds = 30
         settings.hiddenHomeChartAssetIDs = [asset.id]
+        settings.showsKimchiPremiumOutsideKRW = true
         let doc = PortfolioDocument(assets: [asset], trades: [trade], settings: settings)
 
         try store.save(doc)
@@ -66,6 +67,7 @@ import Testing
         #expect(doc.settings.theme == .system)
         #expect(doc.settings.privacyMode == false)
         #expect(doc.settings.hiddenHomeChartAssetIDs.isEmpty)
+        #expect(doc.settings.showsKimchiPremiumOutsideKRW == false)
     }
 
     @Test func unknownEnumValuesFallBackWithoutFailingDocument() throws {

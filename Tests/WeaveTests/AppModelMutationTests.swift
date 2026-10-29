@@ -56,7 +56,10 @@ private struct DelayedQuoteProvider: MarketDataProvider {
 
 @Suite struct AppModelMutationTests {
     @MainActor
-    private func makeModel(provider: any MarketDataProvider) -> AppModel {
+    private func makeModel(
+        provider: any MarketDataProvider,
+        kimchiPremiumService: KimchiPremiumService? = nil
+    ) -> AppModel {
         let cacheDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("weave-app-model-tests-\(UUID().uuidString)")
         return AppModel(
@@ -68,6 +71,7 @@ private struct DelayedQuoteProvider: MarketDataProvider {
                 cacheDirectory: nil
             ),
             searchService: SearchService(providers: [provider]),
+            kimchiPremiumService: kimchiPremiumService,
             updater: UpdaterHandle()
         )
     }
@@ -93,6 +97,38 @@ private struct DelayedQuoteProvider: MarketDataProvider {
 
         await state.finish(with: Quote(price: 7503, changePercent: 1, currency: "USD"))
         _ = await task.value
+    }
+
+    @MainActor
+    @Test func kimchiPremiumOutsideKRWFollowsSetting() {
+        let state = DelayedQuoteState()
+        let provider = DelayedQuoteProvider(state: state)
+        let model = makeModel(
+            provider: provider,
+            kimchiPremiumService: KimchiPremiumService(
+                upbit: UpbitProvider(http: FailingHTTPClient()),
+                binance: provider,
+                yahoo: provider,
+                usdKRW: { 1_400 }
+            )
+        )
+        let bitcoin = Asset(
+            name: "Bitcoin",
+            symbol: "BTC",
+            provider: .binance,
+            providerSymbol: "BTCUSDT",
+            market: .crypto,
+            currency: "USD"
+        )
+
+        model.settings.baseCurrency = "KRW"
+        #expect(model.showsKimchiPremium(for: bitcoin))
+
+        model.settings.baseCurrency = "USD"
+        #expect(!model.showsKimchiPremium(for: bitcoin))
+
+        model.settings.showsKimchiPremiumOutsideKRW = true
+        #expect(model.showsKimchiPremium(for: bitcoin))
     }
 
     @MainActor

@@ -61,6 +61,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var returnRingFullPercent: Int
     /// 홈 Value History 자산별 범례에서 차트 라인을 숨긴 자산 ID.
     public var hiddenHomeChartAssetIDs: [UUID]
+    /// 기준 통화가 KRW가 아닐 때도 크립토 상세에 김프 카드를 띄울지. KRW면 항상 띄운다.
+    public var showsKimchiPremiumOutsideKRW: Bool
 
     public static func defaultBaseCurrency(for locale: Locale = .current) -> String {
         switch locale.language.languageCode?.identifier.lowercased() {
@@ -84,7 +86,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         switchAssetHotkey: Hotkey? = Hotkey.defaultSwitchAsset,
         dayRingFullPercent: Int = 2,
         returnRingFullPercent: Int = 25,
-        hiddenHomeChartAssetIDs: [UUID] = []
+        hiddenHomeChartAssetIDs: [UUID] = [],
+        showsKimchiPremiumOutsideKRW: Bool = false
     ) {
         self.theme = theme
         self.baseCurrency = baseCurrency
@@ -100,6 +103,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.dayRingFullPercent = dayRingFullPercent
         self.returnRingFullPercent = returnRingFullPercent
         self.hiddenHomeChartAssetIDs = hiddenHomeChartAssetIDs
+        self.showsKimchiPremiumOutsideKRW = showsKimchiPremiumOutsideKRW
     }
 
     enum CodingKeys: String, CodingKey {
@@ -108,6 +112,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case privacyMode, launchAtLogin, autoUpdateCheck, hotkey, switchAssetHotkey
         case dayRingFullPercent, returnRingFullPercent
         case hiddenHomeChartAssetIDs
+        case showsKimchiPremiumOutsideKRW
     }
 
     // 필드 추가·미지의 enum 값·타입 불일치가 있어도 문서 전체 로드가 깨지지 않게
@@ -129,6 +134,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         dayRingFullPercent = (try? c.decodeIfPresent(Int.self, forKey: .dayRingFullPercent)) ?? nil ?? d.dayRingFullPercent
         returnRingFullPercent = (try? c.decodeIfPresent(Int.self, forKey: .returnRingFullPercent)) ?? nil ?? d.returnRingFullPercent
         hiddenHomeChartAssetIDs = (try? c.decodeIfPresent([UUID].self, forKey: .hiddenHomeChartAssetIDs)) ?? nil ?? d.hiddenHomeChartAssetIDs
+        showsKimchiPremiumOutsideKRW = (try? c.decodeIfPresent(Bool.self, forKey: .showsKimchiPremiumOutsideKRW)) ?? nil ?? d.showsKimchiPremiumOutsideKRW
     }
 
     private static func lenientEnum<T: RawRepresentable>(
