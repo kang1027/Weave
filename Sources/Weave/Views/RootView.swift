@@ -14,9 +14,11 @@ struct RootView: View {
             theme.bg.ignoresSafeArea()
             content
                 .overlay(alignment: .top) {
+                    // 알리기만 한다 — 아래 화면 클릭을 가로채지 않는다.
                     if model.isAwaitingKeychain {
                         KeychainNotice()
                             .padding(.top, 52)
+                            .allowsHitTesting(false)
                             .transition(.opacity)
                     }
                 }
