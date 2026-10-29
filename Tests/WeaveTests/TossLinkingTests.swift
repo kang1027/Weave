@@ -139,6 +139,8 @@ private func makeModel(toss: FakeToss, credentials: MemoryCredentials) -> AppMod
         #expect(model.document.sources.isEmpty)
         #expect(model.document.trades.isEmpty)
         #expect(model.document.assets.map(\.id) == [manualAsset.id])
+        // 키체인 지우기는 키체인 큐에서 따로 끝난다.
+        for _ in 0..<100 where credentials.count != 0 { try await Task.sleep(for: .milliseconds(10)) }
         #expect(credentials.count == 0)
     }
 
@@ -178,7 +180,7 @@ private func makeModel(toss: FakeToss, credentials: MemoryCredentials) -> AppMod
     }
 
     @MainActor
-    @Test func blockedIPSavesNothingAndExplainsWhy() async {
+    @Test func blockedIPSavesNothingAndExplainsWhy() async throws {
         let toss = FakeToss()
         toss["/oauth2/token"] = (403, #"{"error":"access_denied","error_description":"IP address not allowed"}"#)
         let credentials = MemoryCredentials()
@@ -187,6 +189,8 @@ private func makeModel(toss: FakeToss, credentials: MemoryCredentials) -> AppMod
         let result = await model.connectToss(clientID: "id", clientSecret: "secret")
         #expect(result == .failure(.ipNotAllowed))
         #expect(model.document.sources.isEmpty)
+        // 키체인 지우기는 키체인 큐에서 따로 끝난다.
+        for _ in 0..<100 where credentials.count != 0 { try await Task.sleep(for: .milliseconds(10)) }
         #expect(credentials.count == 0)
         #expect(model.linkFailureText(.ipNotAllowed).contains("WTS"))
     }

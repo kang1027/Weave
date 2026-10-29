@@ -139,6 +139,9 @@ final class AppModel: ObservableObject {
     @Published var walletConfigs: [UUID: WalletConfig] = [:]
     /// 키체인에서 읽은 증권사 키 — 동기화마다 키체인을 다시 열지 않게 앱이 켜져 있는 동안 기억한다.
     var tossCredentialCache: [UUID: TossCredentials] = [:]
+    /// 키체인 허용 창을 기다리는 중 — 창이 다른 창 뒤에 숨어 있어도 무엇을 기다리는지 알린다.
+    @Published var isAwaitingKeychain = false
+    var keychainPending = 0
 
     init(
         store: any PortfolioStore,

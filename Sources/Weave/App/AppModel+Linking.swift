@@ -166,7 +166,7 @@ extension AppModel {
     func tossCredentials(for id: UUID) async throws -> TossCredentials? {
         if let cached = tossCredentialCache[id] { return cached }
         let store = credentialStore
-        let value = try await Task.detached { try store.tossCredentials(for: id) }.value
+        let value = try await onKeychain { try store.tossCredentials(for: id) }
         if let value { tossCredentialCache[id] = value }
         return value
     }
@@ -174,22 +174,43 @@ extension AppModel {
     func walletConfig(for id: UUID) async throws -> WalletConfig? {
         if let cached = walletConfigs[id] { return cached }
         let store = credentialStore
-        let value = try await Task.detached { try store.walletConfig(for: id) }.value
+        let value = try await onKeychain { try store.walletConfig(for: id) }
         if let value { walletConfigs[id] = value }
         return value
     }
 
     private func saveCredentials(_ write: @escaping @Sendable (any CredentialStoring) throws -> Void) async throws {
         let store = credentialStore
-        try await Task.detached { try write(store) }.value
+        try await onKeychain { try write(store) }
     }
 
-    /// 지우기도 허용 창이 뜰 수 있어 밖에서 한다 — 기다릴 필요는 없다.
+    /// 지우기도 허용 창이 뜰 수 있다 — 기다리지 않고 키체인 큐에 맡긴다.
     private func deleteCredentials(_ ids: [UUID]) {
         guard !ids.isEmpty else { return }
         let store = credentialStore
-        Task.detached { ids.forEach(store.delete(for:)) }
+        Task { try? await onKeychain { ids.forEach(store.delete(for:)) } }
     }
+
+    /// 키체인 전용 직렬 큐에서 돌린다. 허용 창을 기다리며 막혀도 Swift 동시성 스레드를 붙잡지 않고,
+    /// 창이 한 번에 하나씩만 뜬다. 1.5초 넘게 걸리면 허용을 기다리는 중이라고 화면에 알린다.
+    private func onKeychain<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        keychainPending += 1
+        let notice = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
+            self?.isAwaitingKeychain = true
+        }
+        defer {
+            keychainPending -= 1
+            notice.cancel()
+            if keychainPending == 0 { isAwaitingKeychain = false }
+        }
+        return try await withCheckedThrowingContinuation { continuation in
+            Self.keychainQueue.async { continuation.resume(with: Result { try work() }) }
+        }
+    }
+
+    private static let keychainQueue = DispatchQueue(label: "app.weave.keychain")
 
     /// 연결 해제 — 키·주소, 가져온 거래, 이 연결에서만 거래가 있던 자산을 지운다.
     /// 지갑으로 옮겼던 직접 입력분은 이동 기록이 지워지면서 직접 입력분으로 돌아온다.

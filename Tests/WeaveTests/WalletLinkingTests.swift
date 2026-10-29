@@ -114,6 +114,8 @@ private func makeModel(_ document: PortfolioDocument, mempool: FakeMempool, cred
         #expect(PositionCalculator.firstOversell(in: manual) == nil)
         #expect(PositionCalculator.snapshot(trades: manual).quantity == Decimal(string: "0.3")!)
         #expect(model.document.assets.map(\.id) == [bitcoin.id])
+        // 키체인 지우기는 키체인 큐에서 따로 끝난다.
+        for _ in 0..<100 where credentials.count != 0 { try await Task.sleep(for: .milliseconds(10)) }
         #expect(credentials.count == 0)
     }
 

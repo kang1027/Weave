@@ -141,6 +141,7 @@
 "%lld to review" = "%lld to review";
 "Sync now" = "Sync now";
 "Just now" = "Just now";
+"Waiting for keychain access. Click Always Allow in the keychain prompt." = "Waiting for keychain access. Click Always Allow in the keychain prompt.";
 "and %lld more" = "and %lld more";
 "Type" = "Type";
 "Addresses" = "Addresses";
