@@ -113,6 +113,13 @@ private struct SourceRow: View {
                 failureView(failure)
             }
 
+            if let skipped = model.linkSkippedTrades[source.id] {
+                Text(model.t("\(skipped) trade(s) weren't imported because Weave is at its asset limit."))
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(theme.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             if model.pendingImports[source.id] != nil {
                 LinkPrimaryButton(title: model.t("Review import")) {
                     model.push(.importReview(source.id))

@@ -149,6 +149,8 @@
 "%lld to review" = "%lld to review";
 "Sync now" = "Sync now";
 "Just now" = "Just now";
+"Weave holds up to %lld assets, so %lld stock(s) won't be added. Free up assets and the next sync brings them in." = "Weave holds up to %lld assets, so %lld stock(s) won't be added. Free up assets and the next sync brings them in.";
+"%lld trade(s) weren't imported because Weave is at its asset limit." = "%lld trade(s) weren't imported because Weave is at its asset limit.";
 "%lld holding(s)" = "%lld holding(s)";
 "Syncing…" = "Syncing…";
 "● Failed" = "● Failed";

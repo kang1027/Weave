@@ -91,7 +91,8 @@ struct AddTossView: View {
             isConnecting = false
             switch result {
             case .success(let sourceID):
-                // 이 화면 대신 검토 화면으로 — 뒤로 가면 연결 목록이 나온다.
+                // 이 화면 대신 검토 화면으로 — 뒤로 가면 연결 목록이 나온다. 연결 중에 화면을 떠났으면 건드리지 않는다.
+                guard model.currentRoute == .addToss else { return }
                 model.pop()
                 if model.pendingImports[sourceID] != nil {
                     model.push(.importReview(sourceID))

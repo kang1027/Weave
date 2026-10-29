@@ -110,8 +110,12 @@ final class AppModel: ObservableObject {
     @Published var pendingImports: [UUID: PendingImport] = [:]
     /// 자동으로 채우지 못해 사용자가 봐야 하는 차이.
     @Published var linkMismatches: [UUID: [HoldingMismatch]] = [:]
+    /// 자산 한도로 넣지 못한 가져온 거래 수.
+    @Published var linkSkippedTrades: [UUID: Int] = [:]
     var tossClients: [UUID: TossClient] = [:]
     var lastLinkSyncAttempt: [UUID: Date] = [:]
+    /// 전체 삭제·복원마다 올라간다 — 그 전에 시작한 동기화 결과를 버린다.
+    var linkGeneration = 0
     /// 키 보관소 — 테스트는 메모리 보관소로 바꿔 끼운다.
     var credentialStore: any CredentialStoring = KeychainCredentialStore()
     /// 증권사 API 요청 — 오류 본문까지 봐야 해서 시세용 HTTPClient와 따로 둔다.

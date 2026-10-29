@@ -4,7 +4,8 @@ import WeaveCore
 
 /// 연결한 계좌의 키 보관소. 테스트는 메모리 보관소로 바꿔 끼운다.
 protocol CredentialStoring: Sendable {
-    func tossCredentials(for sourceID: UUID) -> TossCredentials?
+    /// 없으면 nil. 잠김·접근 거부·손상은 오류로 구분한다 — "키 없음"으로 보이면 연결을 지우게 된다.
+    func tossCredentials(for sourceID: UUID) throws -> TossCredentials?
     func save(_ credentials: TossCredentials, for sourceID: UUID) throws
     func delete(for sourceID: UUID)
 }
@@ -17,15 +18,17 @@ enum CredentialStoreError: Error {
 struct KeychainCredentialStore: CredentialStoring {
     static let service = "app.weave.linked-source"
 
-    func tossCredentials(for sourceID: UUID) -> TossCredentials? {
+    func tossCredentials(for sourceID: UUID) throws -> TossCredentials? {
         var query = baseQuery(sourceID)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var item: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-              let data = item as? Data
-        else { return nil }
-        return try? JSONDecoder().decode(TossCredentials.self, from: data)
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess, let data = item as? Data else {
+            throw CredentialStoreError.keychain(status)
+        }
+        return try JSONDecoder().decode(TossCredentials.self, from: data)
     }
 
     func save(_ credentials: TossCredentials, for sourceID: UUID) throws {

@@ -156,7 +156,7 @@ private func order(
         let filledAt = try Date("2026-03-28T00:31:15Z", strategy: .iso8601)
         let orderedAt = try Date("2026-03-28T00:30:00Z", strategy: .iso8601)
         func make(_ id: String, _ symbol: String, _ side: TradeSide?, _ filled: Decimal, _ price: Decimal?, _ currency: String = "KRW") -> TossOrder {
-            TossOrder(orderID: id, symbol: symbol, side: side, currency: currency, filledQuantity: filled,
+            TossOrder(orderID: id, symbol: symbol, status: "FILLED", side: side, currency: currency, filledQuantity: filled,
                       averageFilledPrice: price, orderedAt: orderedAt, filledAt: filled > 0 ? filledAt : nil)
         }
         let snapshot = TossConnector.snapshot(
@@ -184,6 +184,43 @@ private func order(
         #expect(snapshot.unsettled.map(\.symbol) == ["AAPL"])
         #expect(snapshot.historyStart == filledAt)
         #expect(TossConnector.maskedAccount("123-45-678901") == "••••8901")
+    }
+
+    @Test func rejectedRecordsAndMidSyncMovesAreLeftAlone() throws {
+        let at = try Date("2026-03-28T00:31:15Z", strategy: .iso8601)
+        func make(_ id: String, _ symbol: String, _ status: String, _ filled: Decimal) -> TossOrder {
+            TossOrder(orderID: id, symbol: symbol, status: status, side: .buy, currency: "KRW", filledQuantity: filled,
+                      averageFilledPrice: filled > 0 ? 70_000 : nil, orderedAt: at, filledAt: filled > 0 ? at : nil)
+        }
+        func holding(_ symbol: String, _ quantity: Decimal) -> TossHolding {
+            TossHolding(symbol: symbol, name: symbol, marketCountry: "KR", currency: "KRW", quantity: quantity, averagePurchasePrice: 70_000)
+        }
+        // 받는 사이 000660 보유가 늘었고, 035720의 진행 중 주문이 끝났다.
+        let moving = TossConnector.movedSymbols(
+            holdingsBefore: [holding("005930", 10), holding("000660", 1)],
+            holdingsAfter: [holding("005930", 10), holding("000660", 2)],
+            openBefore: [make("O1", "035720", "PENDING", 0), make("O2", "005930", "PENDING", 0)],
+            openAfter: [make("O2", "005930", "PENDING", 0)]
+        )
+        #expect(moving == ["000660", "035720"])
+
+        let snapshot = TossConnector.snapshot(
+            sourceID: UUID(),
+            holdings: [holding("005930", 10), holding("000660", 2)],
+            closed: [
+                make("A", "005930", "FILLED", 10),
+                make("R", "005930", "CANCEL_REJECTED", 10),
+                make("P", "005930", "REPLACED", 3),
+                make("O1", "035720", "FILLED", 1)
+            ],
+            open: [],
+            moving: moving,
+            from: nil,
+            now: at
+        )
+        #expect(snapshot.executions.map(\.externalID) == ["A", "P", "O1"])
+        #expect(Set(snapshot.unsettled.map(\.symbol)) == ["000660", "035720"])
+        #expect(snapshot.takenAt == at)
     }
 
     // MARK: - 플래너 규칙

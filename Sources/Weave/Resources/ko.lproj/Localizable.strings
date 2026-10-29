@@ -149,6 +149,8 @@
 "%lld to review" = "확인 필요 %lld건";
 "Sync now" = "지금 동기화";
 "Just now" = "방금";
+"Weave holds up to %lld assets, so %lld stock(s) won't be added. Free up assets and the next sync brings them in." = "자산은 최대 %1$lld개라 %2$lld개 종목은 넣지 못해요. 자산을 정리하면 다음 동기화 때 들어와요.";
+"%lld trade(s) weren't imported because Weave is at its asset limit." = "자산 한도에 걸려 거래 %lld건을 가져오지 못했어요.";
 "%lld holding(s)" = "%lld종목";
 "Syncing…" = "동기화 중…";
 "● Failed" = "● 실패";

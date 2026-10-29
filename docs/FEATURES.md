@@ -232,14 +232,18 @@ left out because its API keys require an allowlisted static IP.
 - **What is read**: holdings (quantity · average cost) and orders. The first sync reads every closed order
   since the account opened; later syncs read from 7 days before the last sync. An order is one row with its
   total filled quantity and average fill price, so one order becomes one imported trade (`externalID` =
-  order ID). Partly filled then canceled orders keep their filled part. An instrument with an order still
-  filling is not reconciled until the order closes. Order APIs are never called.
+  order ID). Partly filled then canceled or replaced orders keep their filled part; `CANCEL_REJECTED` and
+  `REPLACE_REJECTED` records are skipped. Holdings and open orders are read before and after the order
+  history; an instrument that moved in between, or has an order still filling, is not reconciled this time.
+  Order APIs are never called.
 - **Access token**: Toss allows one valid token per client, so Weave reuses it until a minute before it
   expires and reissues once on a 401.
 - **First sync** goes to a review screen (new trades · duplicates · needs review · new assets · opening
   balances). Later syncs run with the quote refresh, at most every 5 minutes, and apply without review.
 - **New assets**: Korean stocks are created on Naver, US stocks on Yahoo (`BRK.B` → `BRK-B`). Positions that
-  were sold out and have no asset in Weave are left out.
+  were sold out and have no asset in Weave are left out. When the 30-asset limit blocks a new asset, its
+  trades wait and `lastSyncedAt` does not move, so they come in once there is room.
+- **Last sync** is the time the snapshot was taken, even if the review was applied later.
 - **Disconnect** deletes the keys, the imported trades, and assets whose every trade came from that account.
 
 - **Already imported**: executions whose `externalID` is already in the document are skipped, as are repeats in the same sync.
@@ -250,8 +254,9 @@ left out because its API keys require an allowlisted static IP.
   source's average cost. One opening balance per source and asset.
 - **Balance adjustment**: the account is the original, so a gap the history can't explain is closed with a
   locked adjustment trade dated at the sync. Holding less than the history (transfer out, after-hours sale)
-  → a sell at the average cost, so no realized P&L. Holding more after the opening balance (transfer in,
-  split) → a buy priced so the average matches the account.
+  → a sell at the average cost, so no realized P&L (a reverse split keeps the old average). Holding more once
+  the source already has trades for the asset (transfer in, split) → a buy priced so the average matches the
+  account, which is 0 for a split. Only the first import uses an opening balance.
 - **Needs review**: a history that dips below zero; a missing average cost; or manual trades on the same
   asset that could double count with an opening balance (deleting them lets the next sync match the
   account). These are not filled in automatically.

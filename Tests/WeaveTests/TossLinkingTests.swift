@@ -18,7 +18,7 @@ private final class MemoryCredentials: CredentialStoring, @unchecked Sendable {
     private let lock = NSLock()
     private var items: [UUID: TossCredentials] = [:]
 
-    func tossCredentials(for sourceID: UUID) -> TossCredentials? { lock.withLock { items[sourceID] } }
+    func tossCredentials(for sourceID: UUID) throws -> TossCredentials? { lock.withLock { items[sourceID] } }
     func save(_ credentials: TossCredentials, for sourceID: UUID) throws { lock.withLock { items[sourceID] = credentials } }
     func delete(for sourceID: UUID) { lock.withLock { items[sourceID] = nil } }
     var count: Int { lock.withLock { items.count } }
@@ -99,7 +99,7 @@ private func makeModel(toss: FakeToss, credentials: MemoryCredentials) -> AppMod
         let sourceID = try await model.connectToss(clientID: " tsck_live_id ", clientSecret: "secret").get()
         let source = try #require(model.document.source(id: sourceID))
         #expect(source.label == "••••8901")
-        #expect(credentials.tossCredentials(for: sourceID) == TossCredentials(clientID: "tsck_live_id", clientSecret: "secret", accountSeq: 3))
+        #expect(try credentials.tossCredentials(for: sourceID) == TossCredentials(clientID: "tsck_live_id", clientSecret: "secret", accountSeq: 3))
 
         // 2) 첫 동기화는 검토 대기 — 아직 아무것도 들어가지 않았다.
         let pending = try #require(model.pendingImports[sourceID])
@@ -140,6 +140,41 @@ private func makeModel(toss: FakeToss, credentials: MemoryCredentials) -> AppMod
         #expect(model.document.trades.isEmpty)
         #expect(model.document.assets.map(\.id) == [manualAsset.id])
         #expect(credentials.count == 0)
+    }
+
+    @MainActor
+    @Test func quietSyncLeavesTheChartAloneAndAssetLimitHoldsTheWindow() async throws {
+        let toss = FakeToss()
+        toss["/oauth2/token"] = (200, #"{"access_token":"T","token_type":"Bearer","expires_in":86400}"#)
+        toss["/api/v1/accounts"] = (200, #"{"result":[{"accountNo":"12345678901","accountSeq":3,"accountType":"BROKERAGE"}]}"#)
+        toss["/api/v1/holdings"] = holdings([("005930", "삼성전자", "KRW", "10", "70000")])
+        toss["/api/v1/orders?closed"] = orders([order("A", "005930", "BUY", "10", "70000", "KRW", "2026-03-28T09:31:15+09:00")])
+        toss["/api/v1/orders?open"] = orders([])
+        let model = makeModel(toss: toss, credentials: MemoryCredentials())
+        let sourceID = try await model.connectToss(clientID: "id", clientSecret: "secret").get()
+        let takenAt = try #require(model.pendingImports[sourceID]?.snapshot.takenAt)
+        model.applyPendingImport(sourceID: sourceID)
+        #expect(model.document.source(id: sourceID)?.lastSyncedAt == takenAt)
+
+        // 바뀐 게 없는 동기화는 홈 차트를 다시 그리게 하지 않는다.
+        let generation = model.chartGeneration
+        await model.syncSource(id: sourceID)
+        #expect(model.chartGeneration == generation)
+
+        // 자산이 꽉 차 새 종목을 못 만들면 동기화 시점을 앞당기지 않는다.
+        for index in 0..<(AppModel.assetSoftLimit - model.document.assets.count) {
+            model.document.assets.append(Asset(name: "M\(index)", symbol: "M\(index)", provider: .manual, providerSymbol: "m\(index)", market: .other, currency: "KRW"))
+        }
+        let before = model.document.source(id: sourceID)?.lastSyncedAt
+        toss["/api/v1/holdings"] = holdings([("005930", "삼성전자", "KRW", "10", "70000"), ("AAPL", "Apple Inc.", "USD", "1", "150")])
+        toss["/api/v1/orders?closed"] = orders([
+            order("A", "005930", "BUY", "10", "70000", "KRW", "2026-03-28T09:31:15+09:00"),
+            order("N", "AAPL", "BUY", "1", "150", "USD", "2026-04-01T23:31:15+09:00")
+        ])
+        await model.syncSource(id: sourceID)
+        #expect(model.linkSkippedTrades[sourceID] == 1)
+        #expect(model.document.source(id: sourceID)?.lastSyncedAt == before)
+        #expect(!model.document.trades.contains { $0.externalID == "N" })
     }
 
     @MainActor

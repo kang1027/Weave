@@ -270,6 +270,30 @@ private var utc: Calendar {
         #expect(plan.adjustments.map(\.price) == [306_000])
     }
 
+    @Test func splitAfterImportKeepsTheAccountAverage() {
+        // 10주 @1,000을 가져온 뒤 10:1 분할 — 계좌는 100주 @100.
+        let hynixAsset = asset(hynix)
+        let bought = Trade(assetID: hynixAsset.id, side: .buy, quantity: 10, price: 1_000, date: date("2026-02-01"), sourceID: source.id, externalID: "B1")
+        var doc = document(assets: [hynixAsset], trades: [bought])
+        let plan = ImportPlanner.plan(
+            snapshot: SourceSnapshot(
+                sourceID: source.id,
+                holdings: [ImportedHolding(instrument: hynix, quantity: 100, averageCost: 100)],
+                executions: [], historyStart: date("2026-02-20"), takenAt: date("2026-03-01")
+            ),
+            document: doc
+        )
+        // 첫 가져오기가 아니라서 이력 앞으로 소급되는 기초 잔고가 아니라 그 시점의 잔고 맞춤이 된다.
+        #expect(plan.openingBalances.isEmpty)
+        #expect(plan.adjustments.map(\.quantity) == [90])
+        #expect(plan.adjustments.map(\.price) == [0])
+        #expect(plan.adjustments.map(\.date) == [date("2026-03-01")])
+        ImportApplier.apply(plan, to: &doc)
+        let position = PositionCalculator.snapshot(trades: doc.trades)
+        #expect(position.quantity == 100)
+        #expect(position.averageCost == 100)
+    }
+
     @Test func skipsDustUnlessTheAssetAlreadyExists() {
         let snapshot = snapshot(
             holdings: [ImportedHolding(instrument: penny, quantity: 3, averageCost: 10)],

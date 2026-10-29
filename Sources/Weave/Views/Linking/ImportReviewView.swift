@@ -28,6 +28,16 @@ struct ImportReviewView: View {
 
                     if let plan {
                         tiles(plan)
+                        let overLimit = model.assetsOverLimit(plan)
+                        if overLimit > 0 {
+                            LinkNotice(
+                                systemName: "exclamationmark.triangle.fill",
+                                text: model.t("Weave holds up to \(AppModel.assetSoftLimit) assets, so \(overLimit) stock(s) won't be added. Free up assets and the next sync brings them in."),
+                                tint: theme.orange
+                            )
+                            .padding(.horizontal, 14)
+                            .padding(.top, 10)
+                        }
                         newAssets(plan)
                         openingBalances(plan)
                         adjustments(plan)

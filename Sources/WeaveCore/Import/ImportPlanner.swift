@@ -125,7 +125,7 @@ public struct HoldingMismatch: Equatable, Sendable {
         case historyExceedsHolding
         /// 기초 잔고가 필요한데 소스가 평단을 주지 않았다.
         case missingAverageCost
-        /// 기초 잔고가 이미 있는데 보유가 이력보다 또 많다 — 입고·이체 등 이력에 없는 움직임.
+        /// 이 계좌에서 이미 가져온 거래가 있는데 보유가 이력보다 많다 — 입고·분할 등 이력에 없는 움직임.
         case holdingExceedsHistory
         /// 직접 입력한 거래가 있어 기초 잔고와 겹칠 수 있다 — 조회 기간 전 매수를 손으로 넣어 둔 경우 등.
         case manualTradesMayOverlap
@@ -263,8 +263,9 @@ public enum ImportPlanner {
                 if PositionCalculator.firstOversell(in: history) != nil { flag(.historyExceedsHolding) }
                 continue
             }
-            // 기초 잔고는 계좌·종목당 하나 — 그 뒤에 생긴 입고·분할은 잔고 맞춤으로 채운다.
-            if existing.contains(where: \.isOpeningBalance) {
+            // 기초 잔고는 첫 가져오기에만 — 이미 가져온 거래 뒤에 생긴 입고·분할은 그 시점의 잔고 맞춤으로 채운다.
+            // 기초 잔고로 넣으면 이력 맨 앞으로 소급돼 지난 차트와 실현손익이 바뀐다.
+            if !existing.isEmpty {
                 adjust(.buy, gap, at: adjustmentCost(gap: gap, history: history, targetAverage: holding?.averageCost))
                 flag(.holdingExceedsHistory, adjusted: true)
                 continue
@@ -319,17 +320,16 @@ public enum ImportPlanner {
         let beta = finalAverage(0)
         let alpha = finalAverage(1) - beta
         guard alpha > 0 else { return targetAverage }
-        let cost = (targetAverage - beta) / alpha
-        // 이력과 소스 평단이 안 맞으면(수수료 반영 방식 차이 등) 음수가 나올 수 있다 — 소스 평단으로 둔다.
-        return cost > 0 ? cost.rounded(scale: 8) : targetAverage
+        // 이력 단가가 소스 평단보다 높으면(분할 등) 음수가 나온다 — 평단이 c에 따라 늘어나니 0이 가장 가깝다.
+        return max(0, (targetAverage - beta) / alpha).rounded(scale: 8)
     }
 
-    /// 늘어난 수량의 단가 — 얹은 뒤 평단이 소스 평단과 같아지게 한다. 안 맞으면 소스 평단, 그것도 없으면 지금 평단.
+    /// 늘어난 수량의 단가 — 얹은 뒤 평단이 소스 평단과 같아지게 한다(분할이면 0). 소스 평단이 없으면 지금 평단.
     static func adjustmentCost(gap: Decimal, history: [Trade], targetAverage: Decimal?) -> Decimal {
         let position = PositionCalculator.snapshot(trades: history)
         guard let targetAverage, targetAverage > 0 else { return position.averageCost }
         let cost = (targetAverage * (position.quantity + gap) - position.quantity * position.averageCost) / gap
-        return cost > 0 ? cost.rounded(scale: 8) : targetAverage
+        return max(0, cost).rounded(scale: 8)
     }
 
     private static func isClose(_ lhs: Decimal, _ rhs: Decimal, tolerance: Decimal) -> Bool {

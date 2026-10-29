@@ -44,6 +44,8 @@ public struct TossHolding: Equatable, Sendable {
 public struct TossOrder: Equatable, Sendable {
     public var orderID: String
     public var symbol: String
+    /// `FILLED`, `CANCELED`, `REPLACED`, `CANCEL_REJECTED` 등 — 거부 레코드는 체결로 세지 않는다.
+    public var status: String
     public var side: TradeSide?
     public var currency: String
     public var filledQuantity: Decimal
@@ -132,6 +134,7 @@ public actor TossClient {
                 }
                 var orderId: String
                 var symbol: String
+                var status: String
                 var side: String
                 var currency: String
                 var orderedAt: String
@@ -159,7 +162,7 @@ public actor TossClient {
                     let orderedAt = Self.parseDate(item.orderedAt)
                 else { throw TossError.invalidResponse }
                 orders.append(TossOrder(
-                    orderID: item.orderId, symbol: item.symbol,
+                    orderID: item.orderId, symbol: item.symbol, status: item.status,
                     side: TradeSide(rawValue: item.side.lowercased()),
                     currency: item.currency, filledQuantity: filled,
                     averageFilledPrice: item.execution.averageFilledPrice.flatMap(Decimal.clean),

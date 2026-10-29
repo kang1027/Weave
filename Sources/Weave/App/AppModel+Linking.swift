@@ -38,7 +38,7 @@ enum LinkFailure: Error, Equatable {
         case TossError.noAccount: self = .noAccount
         case TossError.server(let status, let code): self = .server(code.isEmpty ? "HTTP \(status)" : code)
         case TossError.invalidResponse: self = .server("invalid-response")
-        case is CredentialStoreError: self = .keychain
+        case is CredentialStoreError, is DecodingError: self = .keychain
         case is URLError: self = .network
         default: self = .server(String(describing: error))
         }
@@ -62,20 +62,16 @@ extension AppModel {
         guard !credentials.clientID.isEmpty, !credentials.clientSecret.isEmpty else {
             return .failure(.invalidCredentials)
         }
-        // 같은 키를 두 번 연결하면 같은 체결이 두 번 들어간다.
-        let linked = document.sources.filter { $0.kind == .toss }.compactMap {
-            credentialStore.tossCredentials(for: $0.id)?.clientID
-        }
-        guard !linked.contains(credentials.clientID) else { return .failure(.alreadyLinked) }
+        // 같은 계좌를 두 번 연결하면 같은 체결이 두 번 들어간다.
+        guard !isTossLinked(clientID: credentials.clientID) else { return .failure(.alreadyLinked) }
 
         let client = TossClient(credentials: credentials, http: linkHTTP)
         do {
             guard let account = try await client.accounts().first else { return .failure(.noAccount) }
-            let source = LinkedSource(
-                kind: .toss,
-                name: t("Toss Securities"),
-                label: TossConnector.maskedAccount(account.accountNo)
-            )
+            let label = TossConnector.maskedAccount(account.accountNo)
+            // 기다리는 사이 같은 키나 계좌가 먼저 연결됐을 수 있다.
+            guard !isTossLinked(clientID: credentials.clientID, label: label) else { return .failure(.alreadyLinked) }
+            let source = LinkedSource(kind: .toss, name: t("Toss Securities"), label: label)
             var stored = credentials
             stored.accountSeq = account.accountSeq
             try credentialStore.save(stored, for: source.id)
@@ -90,6 +86,15 @@ extension AppModel {
         }
     }
 
+    private func isTossLinked(clientID: String, label: String? = nil) -> Bool {
+        document.sources.contains { source in
+            guard source.kind == .toss else { return false }
+            if let label, source.label == label { return true }
+            let stored = try? credentialStore.tossCredentials(for: source.id)
+            return stored?.clientID == clientID
+        }
+    }
+
     /// 연결 해제 — 키, 가져온 거래, 이 연결에서만 거래가 있던 자산을 지운다.
     func disconnectSource(id: UUID) {
         let removedAssets = assetsOnlyIn(sourceID: id)
@@ -98,6 +103,7 @@ extension AppModel {
         linkStatus[id] = nil
         pendingImports[id] = nil
         linkMismatches[id] = nil
+        linkSkippedTrades[id] = nil
         lastLinkSyncAttempt[id] = nil
         document.trades.removeAll { $0.sourceID == id }
         for assetID in removedAssets {
@@ -148,7 +154,10 @@ extension AppModel {
         linkStatus = [:]
         pendingImports = [:]
         linkMismatches = [:]
+        linkSkippedTrades = [:]
         lastLinkSyncAttempt = [:]
+        // 이미 받고 있던 동기화 결과가 바뀐 문서에 들어가지 않게 한다.
+        linkGeneration += 1
     }
 
     // MARK: - 동기화
@@ -166,22 +175,23 @@ extension AppModel {
     /// 한 연결을 동기화한다. 처음 가져올 때는 검토 화면에 올리고, 그 뒤로는 바로 반영한다.
     func syncSource(id: UUID) async {
         guard let source = document.source(id: id), linkStatus[id] != .syncing else { return }
+        let generation = linkGeneration
         lastLinkSyncAttempt[id] = Date()
         linkStatus[id] = .syncing
         do {
             let snapshot = try await fetchSnapshot(source)
-            // 받는 사이에 연결을 해제했으면 버린다.
-            guard let current = document.source(id: id) else { return }
+            // 받는 사이에 연결을 해제했거나 데이터를 지우고 복원했으면 버린다.
+            guard generation == linkGeneration, let current = document.source(id: id) else { return }
             let plan = ImportPlanner.plan(snapshot: snapshot, document: document)
             linkMismatches[id] = plan.unresolved
             if current.lastSyncedAt == nil, !plan.trades.isEmpty || !plan.duplicates.isEmpty {
                 pendingImports[id] = PendingImport(snapshot: snapshot, plan: plan)
             } else {
-                applyImport(plan)
+                applyImport(plan, syncedAt: snapshot.takenAt)
             }
             linkStatus[id] = .synced(Date())
         } catch {
-            guard document.source(id: id) != nil else { return }
+            guard generation == linkGeneration, document.source(id: id) != nil else { return }
             linkStatus[id] = .failed(LinkFailure(error))
         }
     }
@@ -189,7 +199,7 @@ extension AppModel {
     private func fetchSnapshot(_ source: LinkedSource) async throws -> SourceSnapshot {
         switch source.kind {
         case .toss:
-            guard let credentials = credentialStore.tossCredentials(for: source.id),
+            guard let credentials = try credentialStore.tossCredentials(for: source.id),
                   let accountSeq = credentials.accountSeq
             else { throw LinkFailure.missingCredentials }
             let client = tossClients[source.id] ?? TossClient(credentials: credentials, http: linkHTTP)
@@ -206,8 +216,10 @@ extension AppModel {
     // MARK: - 적용
 
     /// 계획대로 넣는다. 없는 종목은 자산을 먼저 만든다(자산 한도까지).
+    /// - syncedAt: 스냅샷을 받은 시각 — 다음 동기화가 이 시각 기준으로 주문을 다시 받는다.
     @discardableResult
-    func applyImport(_ plan: ImportPlan) -> ImportResult {
+    func applyImport(_ plan: ImportPlan, syncedAt: Date) -> ImportResult {
+        let previousSync = document.source(id: plan.sourceID)?.lastSyncedAt
         var assetIDs: [ImportInstrument: UUID] = [:]
         for instrument in plan.missingAssets {
             guard !isAtAssetLimit else { break }
@@ -215,9 +227,15 @@ extension AppModel {
             document.assets.append(asset)
             assetIDs[instrument] = asset.id
         }
-        let result = ImportApplier.apply(plan, to: &document, assetIDs: assetIDs)
+        let result = ImportApplier.apply(plan, to: &document, assetIDs: assetIDs, now: syncedAt)
         pendingImports[plan.sourceID] = nil
+        linkSkippedTrades[plan.sourceID] = result.skippedWithoutAsset > 0 ? result.skippedWithoutAsset : nil
+        if result.skippedWithoutAsset > 0, let index = document.sources.firstIndex(where: { $0.id == plan.sourceID }) {
+            // 자산 한도로 못 넣은 거래가 있으면 동기화 시점을 앞당기지 않는다 — 자리가 나면 다시 받는다.
+            document.sources[index].lastSyncedAt = previousSync
+        }
         persist()
+        guard result.added + result.openingBalances + result.merged > 0 || !assetIDs.isEmpty else { return result }
         invalidateHomeChart()
         updateMenuBarTitle()
         if !assetIDs.isEmpty {
@@ -231,7 +249,16 @@ extension AppModel {
         guard let pending = pendingImports[sourceID] else { return }
         let plan = ImportPlanner.plan(snapshot: pending.snapshot, document: document)
         linkMismatches[sourceID] = plan.unresolved
-        applyImport(plan)
+        applyImport(plan, syncedAt: pending.snapshot.takenAt)
+        // 검토를 오래 미뤘으면 그사이 생긴 주문을 바로 받아 온다.
+        if Date().timeIntervalSince(pending.snapshot.takenAt) > Self.linkSyncInterval {
+            Task { await syncSource(id: sourceID) }
+        }
+    }
+
+    /// 자산 한도 때문에 새로 만들 수 없는 종목 수.
+    func assetsOverLimit(_ plan: ImportPlan) -> Int {
+        max(0, plan.missingAssets.count - max(0, Self.assetSoftLimit - document.assets.count))
     }
 
     private func makeAsset(for instrument: ImportInstrument) -> Asset {
