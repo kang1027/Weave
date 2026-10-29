@@ -131,6 +131,19 @@ struct SettingsView: View {
                         }
                     }
 
+                    sectionLabel(model.t("Linked accounts"))
+                    SettingsCard {
+                        Button { model.push(.connections) } label: {
+                            SettingsRow(title: model.t("Brokers"), subtitle: linkedSummary) {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(theme.text2)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     sectionLabel(model.t("Data"))
                     SettingsCard {
                         SettingsRow(title: model.t("Quote refresh")) {
@@ -219,6 +232,12 @@ struct SettingsView: View {
 
             settingsFooter
         }
+    }
+
+    private var linkedSummary: String {
+        let sources = model.document.sources
+        guard !sources.isEmpty else { return model.t("Import holdings and trades from Toss Securities") }
+        return sources.map { [$0.name, $0.label].filter { !$0.isEmpty }.joined(separator: " ") }.joined(separator: ", ")
     }
 
     private func sectionLabel(_ text: String) -> some View {

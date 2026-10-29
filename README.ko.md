@@ -81,7 +81,7 @@ scripts/bundle.sh          # dist/Weave.app 번들 생성
 
 ## 데이터 · 프라이버시
 
-포트폴리오는 이 Mac 로컬(`Application Support/Weave`)에만 저장되며 외부로 전송되지 않습니다. Binance·Naver·Yahoo Finance의 공개 시세·캔들만 조회하고, 계정·API 키·텔레메트리는 전혀 없습니다. 자세한 내용은 [PRIVACY.md](PRIVACY.md)·[SECURITY.md](SECURITY.md)에 있습니다.
+포트폴리오는 이 Mac 로컬(`Application Support/Weave`)에만 저장되며 외부로 전송되지 않습니다. Binance·Naver·Yahoo Finance의 공개 시세·캔들을 조회하고, 계정·텔레메트리는 전혀 없습니다. 증권사 계좌(토스증권)를 연결하면 그 API 키는 macOS 키체인에만 두고 그 증권사에만 보냅니다. 자세한 내용은 [PRIVACY.md](PRIVACY.md)·[SECURITY.md](SECURITY.md)에 있습니다.
 
 시세 데이터는 비공식 공개 엔드포인트에서 오며 지연되거나 부정확할 수 있습니다. Weave는 개인용 기록 도구이지 투자 조언이 아닙니다.
 

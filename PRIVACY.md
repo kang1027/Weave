@@ -10,7 +10,8 @@ Everything is kept on your Mac only:
 - `~/Library/Application Support/Weave/logos/` — any custom asset icons you upload.
 - A local candle/quote/logo cache to avoid re-fetching market data and asset logos.
 
-There is **no account, no sign-in, no cloud sync, and no server owned by this project.** Nothing you enter is transmitted anywhere.
+There is **no account, no sign-in, no cloud sync, and no server owned by this project.** Nothing you enter is
+transmitted anywhere, except the keys of a broker account you choose to link, which go only to that broker.
 
 ## Network requests
 
@@ -26,13 +27,27 @@ Each logo is downloaded once and cached locally.
 
 These requests contain only the symbol/endpoint being queried. Weave sends **no account identifiers, no API keys, and no personal data**. There is **no analytics, telemetry, tracking, or crash reporting** of any kind.
 
+## Linked accounts (optional)
+
+Nothing below happens unless you link an account in **Settings › Linked accounts**. The keys you enter are
+stored in the **macOS Keychain** for this Mac only — never in `portfolio.json` or in backups.
+
+- **Toss Securities Open API** (`openapi.tossinvest.com`) — Weave sends the client ID and secret you entered to
+  Toss to get an access token, then reads your account list, holdings, and order history about every 5 minutes
+  while the app runs. It never calls order APIs. Toss only answers IPs you allowed in its WTS settings.
+- **ipify** (`api.ipify.org`) — only when you tap **Check this network's IP**, to show which IP to allow in Toss.
+  It returns your public IP; nothing else is sent.
+
+Disconnecting an account deletes its keys from the Keychain together with the trades imported from it.
+**Delete all my data** does the same for every linked account.
+
 ## Updates
 
 The packaged app checks for updates via [Sparkle](https://sparkle-project.org). It fetches an appcast and update archive over HTTPS from GitHub, and every update is verified with an EdDSA signature. Weave does **not** send a system profile with update checks.
 
 ## Data leaving your Mac
 
-The only time your data leaves the device is when **you** choose **Export** and pick a destination — Weave writes a self-contained `.weave` backup to the location you select. Importing reads a file you choose. Neither step contacts any server.
+Apart from the broker keys described under Linked accounts, the only time your data leaves the device is when **you** choose **Export** and pick a destination — Weave writes a self-contained `.weave` backup to the location you select. Importing reads a file you choose. Neither step contacts any server.
 
 ## Market data & disclaimer
 

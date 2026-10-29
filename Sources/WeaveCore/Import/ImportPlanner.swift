@@ -75,12 +75,25 @@ public struct SourceSnapshot: Sendable {
     public var executions: [ImportedExecution]
     /// 체결 내역을 받아온 시작 시각 — 증권사 API는 조회 기간에 한도가 있다.
     public var historyStart: Date
+    /// 아직 체결 중인 주문이 있는 종목 — 보유엔 들어갔지만 체결 내역엔 아직 없어 이번엔 대조하지 않는다.
+    public var unsettled: Set<ImportInstrument>
+    /// 보유를 받은 시각 — 잔고 맞춤 거래의 날짜.
+    public var takenAt: Date
 
-    public init(sourceID: UUID, holdings: [ImportedHolding], executions: [ImportedExecution], historyStart: Date) {
+    public init(
+        sourceID: UUID,
+        holdings: [ImportedHolding],
+        executions: [ImportedExecution],
+        historyStart: Date,
+        unsettled: Set<ImportInstrument> = [],
+        takenAt: Date = Date()
+    ) {
         self.sourceID = sourceID
         self.holdings = holdings
         self.executions = executions
         self.historyStart = historyStart
+        self.unsettled = unsettled
+        self.takenAt = takenAt
     }
 }
 
@@ -93,6 +106,8 @@ public struct PlannedTrade: Equatable, Sendable {
     public var date: Date
     /// 기초 잔고면 nil.
     public var externalID: String?
+    /// 잔고 맞춤 — 계좌 보유와 이력의 차이를 메우는 거래.
+    public var isAdjustment = false
 
     public var isOpeningBalance: Bool { externalID == nil }
 }
@@ -110,7 +125,7 @@ public struct HoldingMismatch: Equatable, Sendable {
         case historyExceedsHolding
         /// 기초 잔고가 필요한데 소스가 평단을 주지 않았다.
         case missingAverageCost
-        /// 기초 잔고가 이미 있는데 보유가 이력보다 또 많다 — 입고·이체 등 이력에 없는 움직임.
+        /// 이 계좌에서 이미 가져온 거래가 있는데 보유가 이력보다 많다 — 입고·분할 등 이력에 없는 움직임.
         case holdingExceedsHistory
         /// 직접 입력한 거래가 있어 기초 잔고와 겹칠 수 있다 — 조회 기간 전 매수를 손으로 넣어 둔 경우 등.
         case manualTradesMayOverlap
@@ -120,6 +135,8 @@ public struct HoldingMismatch: Equatable, Sendable {
     /// 실제 보유 − 체결로 계산한 보유.
     public var difference: Decimal
     public var reason: Reason
+    /// 잔고 맞춤으로 계좌 보유에 맞췄는지 — 아니면 사람이 봐야 한다.
+    public var adjusted = false
 }
 
 public struct ImportPlan: Equatable, Sendable {
@@ -130,11 +147,16 @@ public struct ImportPlan: Equatable, Sendable {
     public var mismatches: [HoldingMismatch]
     /// 소액이라 건너뛴 종목(이미 자산으로 있는 종목은 건너뛰지 않는다).
     public var skippedDust: [ImportInstrument]
+    /// 지금은 없고 자산도 없는 종목 — 다 팔고 끝난 지난 거래는 가져오지 않는다.
+    public var closedPositions: [ImportInstrument]
     /// 아직 자산이 없는 종목 — 적용 전에 자산을 만들어야 한다.
     public var missingAssets: [ImportInstrument]
 
-    public var newTradeCount: Int { trades.filter { !$0.isOpeningBalance }.count }
+    public var newTradeCount: Int { trades.filter { !$0.isOpeningBalance && !$0.isAdjustment }.count }
     public var openingBalances: [PlannedTrade] { trades.filter(\.isOpeningBalance) }
+    public var adjustments: [PlannedTrade] { trades.filter(\.isAdjustment) }
+    /// 자동으로 맞추지 못해 사람이 봐야 하는 차이.
+    public var unresolved: [HoldingMismatch] { mismatches.filter { !$0.adjusted } }
     public var isEmpty: Bool { trades.isEmpty && duplicates.isEmpty && mismatches.isEmpty }
 }
 
@@ -153,6 +175,8 @@ public enum ImportPlanner {
             document.assets.first(where: instrument.matches)
         }
         let skipped = dust.filter { assetFor($0) == nil }
+        let held = Set(snapshot.holdings.filter { $0.quantity > 0 }.map(\.instrument))
+        let closed = Set(snapshot.executions.map(\.instrument)).filter { !held.contains($0) && assetFor($0) == nil }
 
         // 1) 이미 가져온 체결과 같은 스냅샷 안의 중복은 건너뛴다.
         let imported = Set(
@@ -160,7 +184,7 @@ public enum ImportPlanner {
         )
         var seen = Set<String>()
         let executions = snapshot.executions
-            .filter { !skipped.contains($0.instrument) }
+            .filter { !skipped.contains($0.instrument) && !closed.contains($0.instrument) }
             .filter { !imported.contains($0.externalID) && seen.insert($0.externalID).inserted }
             .sorted { $0.date < $1.date }
 
@@ -203,7 +227,7 @@ public enum ImportPlanner {
             instruments.append(instrument)
         }
 
-        for instrument in instruments where !skipped.contains(instrument) {
+        for instrument in instruments where !skipped.contains(instrument) && !snapshot.unsettled.contains(instrument) {
             let holding = snapshot.holdings.first { $0.instrument == instrument }
             let existing = assetFor(instrument).map { asset in
                 existingBySource.filter { $0.assetID == asset.id }
@@ -213,11 +237,25 @@ public enum ImportPlanner {
             // 매도를 보유로 자르지 않은 순수량 — 기간 전에 산 걸 기간 안에 판 만큼도 기초 잔고로 채워야 한다.
             let net = history.reduce(Decimal(0)) { $0 + ($1.side == .buy ? $1.quantity : -$1.quantity) }
             let gap = (holding?.quantity ?? 0) - net
-            func flag(_ reason: HoldingMismatch.Reason) {
-                mismatches.append(HoldingMismatch(instrument: instrument, difference: gap, reason: reason))
+            func flag(_ reason: HoldingMismatch.Reason, adjusted: Bool = false) {
+                mismatches.append(HoldingMismatch(instrument: instrument, difference: gap, reason: reason, adjusted: adjusted))
+            }
+            func adjust(_ side: TradeSide, _ quantity: Decimal, at price: Decimal) {
+                // 계좌가 원본 — 같은 동기화를 두 번 적용해도 한 번만 들어가게 시각으로 ID를 만든다.
+                let stamp = Int(snapshot.takenAt.timeIntervalSince1970)
+                trades.append(PlannedTrade(
+                    instrument: instrument, side: side, quantity: quantity, price: price,
+                    date: snapshot.takenAt, externalID: "adjust:\(instrument.symbol):\(stamp)", isAdjustment: true
+                ))
             }
             if gap < 0 {
-                flag(.historyExceedsHolding)
+                // 이력에 없는 출고·시간외 매도 — 줄어든 만큼 평단으로 팔아 실현손익 없이 계좌 보유에 맞춘다.
+                // 중간에 이미 마이너스가 되는 이력은 끝에서 맞춰도 틀리니 사람이 본다.
+                let consistent = PositionCalculator.firstOversell(in: history) == nil
+                if consistent {
+                    adjust(.sell, -gap, at: PositionCalculator.snapshot(trades: history).averageCost)
+                }
+                flag(.historyExceedsHolding, adjusted: consistent)
                 continue
             }
             guard gap > 0 else {
@@ -225,9 +263,11 @@ public enum ImportPlanner {
                 if PositionCalculator.firstOversell(in: history) != nil { flag(.historyExceedsHolding) }
                 continue
             }
-            // 기초 잔고는 계좌·종목당 하나 — 그 뒤에 생긴 차이는 사람이 봐야 한다.
-            if existing.contains(where: \.isOpeningBalance) {
-                flag(.holdingExceedsHistory)
+            // 기초 잔고는 첫 가져오기에만 — 이미 가져온 거래 뒤에 생긴 입고·분할은 그 시점의 잔고 맞춤으로 채운다.
+            // 기초 잔고로 넣으면 이력 맨 앞으로 소급돼 지난 차트와 실현손익이 바뀐다.
+            if !existing.isEmpty {
+                adjust(.buy, gap, at: adjustmentCost(gap: gap, history: history, targetAverage: holding?.averageCost))
+                flag(.holdingExceedsHistory, adjusted: true)
                 continue
             }
             if let asset = assetFor(instrument), document.trades.contains(where: {
@@ -264,6 +304,7 @@ public enum ImportPlanner {
             duplicates: duplicates,
             mismatches: mismatches,
             skippedDust: skipped.sorted { $0.symbol < $1.symbol },
+            closedPositions: closed.sorted { $0.symbol < $1.symbol },
             missingAssets: missing
         )
     }
@@ -279,9 +320,16 @@ public enum ImportPlanner {
         let beta = finalAverage(0)
         let alpha = finalAverage(1) - beta
         guard alpha > 0 else { return targetAverage }
-        let cost = (targetAverage - beta) / alpha
-        // 이력과 소스 평단이 안 맞으면(수수료 반영 방식 차이 등) 음수가 나올 수 있다 — 소스 평단으로 둔다.
-        return cost > 0 ? cost.rounded(scale: 8) : targetAverage
+        // 이력 단가가 소스 평단보다 높으면(분할 등) 음수가 나온다 — 평단이 c에 따라 늘어나니 0이 가장 가깝다.
+        return max(0, (targetAverage - beta) / alpha).rounded(scale: 8)
+    }
+
+    /// 늘어난 수량의 단가 — 얹은 뒤 평단이 소스 평단과 같아지게 한다(분할이면 0). 소스 평단이 없으면 지금 평단.
+    static func adjustmentCost(gap: Decimal, history: [Trade], targetAverage: Decimal?) -> Decimal {
+        let position = PositionCalculator.snapshot(trades: history)
+        guard let targetAverage, targetAverage > 0 else { return position.averageCost }
+        let cost = (targetAverage * (position.quantity + gap) - position.quantity * position.averageCost) / gap
+        return max(0, cost).rounded(scale: 8)
     }
 
     private static func isClose(_ lhs: Decimal, _ rhs: Decimal, tolerance: Decimal) -> Bool {
@@ -300,7 +348,8 @@ extension PlannedTrade {
         Trade(
             assetID: assetID, side: side, quantity: quantity, price: price, date: date,
             sourceID: sourceID, externalID: externalID,
-            openingBalance: isOpeningBalance ? true : nil
+            openingBalance: isOpeningBalance ? true : nil,
+            balanceAdjustment: isAdjustment ? true : nil
         )
     }
 }

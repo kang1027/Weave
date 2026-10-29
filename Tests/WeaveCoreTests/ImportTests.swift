@@ -218,20 +218,80 @@ private var utc: Calendar {
             ),
             document: document()
         )
-        #expect(plan.mismatches.contains(HoldingMismatch(instrument: samsung, difference: -2, reason: .historyExceedsHolding)))
+        // 계좌가 원본 — 이력보다 적게 가진 만큼은 평단으로 팔아 맞추고, 평단이 없어 못 채운 건 사람이 본다.
+        #expect(plan.mismatches.contains(HoldingMismatch(instrument: samsung, difference: -2, reason: .historyExceedsHolding, adjusted: true)))
         #expect(plan.mismatches.contains(HoldingMismatch(instrument: hynix, difference: 2, reason: .missingAverageCost)))
+        #expect(plan.unresolved.map(\.instrument) == [hynix])
         #expect(plan.openingBalances.isEmpty)
+        #expect(plan.adjustments.map(\.side) == [.sell])
+        #expect(plan.adjustments.map(\.quantity) == [2])
+        #expect(plan.adjustments.map(\.price) == [70_000])
+        #expect(plan.newTradeCount == 1)
     }
 
-    @Test func secondOpeningBalanceGoesToReview() {
+    @Test func balanceAdjustmentIsAppliedOnceAndSettlesTheHolding() {
+        let samsungAsset = asset(samsung)
+        let snap = SourceSnapshot(
+            sourceID: source.id,
+            holdings: [ImportedHolding(instrument: samsung, quantity: 3, averageCost: 70_000)],
+            executions: [execution("B1", samsung, .buy, 5, 70_000, "2026-02-01")],
+            historyStart: date("2026-01-01"),
+            takenAt: date("2026-03-01")
+        )
+        var doc = document(assets: [samsungAsset])
+        let plan = ImportPlanner.plan(snapshot: snap, document: doc)
+        ImportApplier.apply(plan, to: &doc)
+        ImportApplier.apply(plan, to: &doc)
+
+        let adjustments = doc.trades.filter(\.isBalanceAdjustment)
+        #expect(adjustments.count == 1)
+        #expect(adjustments.first?.isImported == true)
+        #expect(adjustments.first?.date == date("2026-03-01"))
+        #expect(PositionCalculator.snapshot(trades: doc.trades).quantity == 3)
+        #expect(PositionCalculator.realizedPnL(of: adjustments[0], in: doc.trades) == 0)
+
+        // 다음 동기화는 더 맞출 게 없다.
+        let next = ImportPlanner.plan(snapshot: snap, document: doc)
+        #expect(next.trades.isEmpty)
+        #expect(next.mismatches.isEmpty)
+    }
+
+    @Test func holdingGrowthAfterTheOpeningBalanceIsAdjusted() {
         let hynixAsset = asset(hynix)
         let opening = Trade(assetID: hynixAsset.id, side: .buy, quantity: 8, price: 298_500, date: date("2025-12-31"), sourceID: source.id, openingBalance: true)
         let plan = ImportPlanner.plan(
             snapshot: snapshot(holdings: [ImportedHolding(instrument: hynix, quantity: 10, averageCost: 300_000)]),
             document: document(assets: [hynixAsset], trades: [opening])
         )
+        // 기초 잔고 뒤의 입고·분할은 잔고 맞춤으로 채운다. 단가는 얹은 뒤 평단이 계좌 평단이 되게 정한다.
         #expect(plan.openingBalances.isEmpty)
-        #expect(plan.mismatches == [HoldingMismatch(instrument: hynix, difference: 2, reason: .holdingExceedsHistory)])
+        #expect(plan.mismatches == [HoldingMismatch(instrument: hynix, difference: 2, reason: .holdingExceedsHistory, adjusted: true)])
+        #expect(plan.adjustments.map(\.side) == [.buy])
+        #expect(plan.adjustments.map(\.price) == [306_000])
+    }
+
+    @Test func splitAfterImportKeepsTheAccountAverage() {
+        // 10주 @1,000을 가져온 뒤 10:1 분할 — 계좌는 100주 @100.
+        let hynixAsset = asset(hynix)
+        let bought = Trade(assetID: hynixAsset.id, side: .buy, quantity: 10, price: 1_000, date: date("2026-02-01"), sourceID: source.id, externalID: "B1")
+        var doc = document(assets: [hynixAsset], trades: [bought])
+        let plan = ImportPlanner.plan(
+            snapshot: SourceSnapshot(
+                sourceID: source.id,
+                holdings: [ImportedHolding(instrument: hynix, quantity: 100, averageCost: 100)],
+                executions: [], historyStart: date("2026-02-20"), takenAt: date("2026-03-01")
+            ),
+            document: doc
+        )
+        // 첫 가져오기가 아니라서 이력 앞으로 소급되는 기초 잔고가 아니라 그 시점의 잔고 맞춤이 된다.
+        #expect(plan.openingBalances.isEmpty)
+        #expect(plan.adjustments.map(\.quantity) == [90])
+        #expect(plan.adjustments.map(\.price) == [0])
+        #expect(plan.adjustments.map(\.date) == [date("2026-03-01")])
+        ImportApplier.apply(plan, to: &doc)
+        let position = PositionCalculator.snapshot(trades: doc.trades)
+        #expect(position.quantity == 100)
+        #expect(position.averageCost == 100)
     }
 
     @Test func skipsDustUnlessTheAssetAlreadyExists() {

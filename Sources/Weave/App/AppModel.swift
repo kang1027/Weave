@@ -17,6 +17,9 @@ enum Route: Hashable {
     case settings
     case tradeForm(assetID: UUID, editing: Trade?, prefill: TradePrefill?)
     case manualAssetForm
+    case connections
+    case addToss
+    case importReview(UUID)
 }
 
 @MainActor
@@ -107,6 +110,23 @@ final class AppModel: ObservableObject {
     private var hasStartedBackgroundWork = false
     var lastRefreshAt: Date?
     var rotationIndex = 0
+
+    // 계좌 연결 — 상태는 화면 표시용이라 문서에 저장하지 않는다.
+    @Published var linkStatus: [UUID: LinkStatus] = [:]
+    /// 첫 동기화 결과 — 사용자가 검토하고 적용한다.
+    @Published var pendingImports: [UUID: PendingImport] = [:]
+    /// 자동으로 채우지 못해 사용자가 봐야 하는 차이.
+    @Published var linkMismatches: [UUID: [HoldingMismatch]] = [:]
+    /// 자산 한도로 넣지 못한 가져온 거래 수.
+    @Published var linkSkippedTrades: [UUID: Int] = [:]
+    var tossClients: [UUID: TossClient] = [:]
+    var lastLinkSyncAttempt: [UUID: Date] = [:]
+    /// 전체 삭제·복원마다 올라간다 — 그 전에 시작한 동기화 결과를 버린다.
+    var linkGeneration = 0
+    /// 키 보관소 — 테스트는 메모리 보관소로 바꿔 끼운다.
+    var credentialStore: any CredentialStoring = KeychainCredentialStore()
+    /// 증권사 API 요청 — 오류 본문까지 봐야 해서 시세용 HTTPClient와 따로 둔다.
+    var linkHTTP: any HTTPSending = URLSessionHTTPClient()
 
     init(
         store: any PortfolioStore,
@@ -334,6 +354,7 @@ final class AppModel: ObservableObject {
             while let self, !Task.isCancelled {
                 await self.refreshQuotes()
                 self.lastRefreshAt = Date()
+                Task { await self.syncLinkedSources() }
                 let interval = max(60, min(900, self.settings.quoteRefreshSeconds))
                 self.nextRefreshAt = Date().addingTimeInterval(TimeInterval(interval))
                 try? await Task.sleep(for: .seconds(interval))
