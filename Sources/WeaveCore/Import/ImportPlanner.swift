@@ -75,12 +75,21 @@ public struct SourceSnapshot: Sendable {
     public var executions: [ImportedExecution]
     /// 체결 내역을 받아온 시작 시각 — 증권사 API는 조회 기간에 한도가 있다.
     public var historyStart: Date
+    /// 아직 체결 중인 주문이 있는 종목 — 보유엔 들어갔지만 체결 내역엔 아직 없어 이번엔 대조하지 않는다.
+    public var unsettled: Set<ImportInstrument>
 
-    public init(sourceID: UUID, holdings: [ImportedHolding], executions: [ImportedExecution], historyStart: Date) {
+    public init(
+        sourceID: UUID,
+        holdings: [ImportedHolding],
+        executions: [ImportedExecution],
+        historyStart: Date,
+        unsettled: Set<ImportInstrument> = []
+    ) {
         self.sourceID = sourceID
         self.holdings = holdings
         self.executions = executions
         self.historyStart = historyStart
+        self.unsettled = unsettled
     }
 }
 
@@ -130,6 +139,8 @@ public struct ImportPlan: Equatable, Sendable {
     public var mismatches: [HoldingMismatch]
     /// 소액이라 건너뛴 종목(이미 자산으로 있는 종목은 건너뛰지 않는다).
     public var skippedDust: [ImportInstrument]
+    /// 지금은 없고 자산도 없는 종목 — 다 팔고 끝난 지난 거래는 가져오지 않는다.
+    public var closedPositions: [ImportInstrument]
     /// 아직 자산이 없는 종목 — 적용 전에 자산을 만들어야 한다.
     public var missingAssets: [ImportInstrument]
 
@@ -153,6 +164,8 @@ public enum ImportPlanner {
             document.assets.first(where: instrument.matches)
         }
         let skipped = dust.filter { assetFor($0) == nil }
+        let held = Set(snapshot.holdings.filter { $0.quantity > 0 }.map(\.instrument))
+        let closed = Set(snapshot.executions.map(\.instrument)).filter { !held.contains($0) && assetFor($0) == nil }
 
         // 1) 이미 가져온 체결과 같은 스냅샷 안의 중복은 건너뛴다.
         let imported = Set(
@@ -160,7 +173,7 @@ public enum ImportPlanner {
         )
         var seen = Set<String>()
         let executions = snapshot.executions
-            .filter { !skipped.contains($0.instrument) }
+            .filter { !skipped.contains($0.instrument) && !closed.contains($0.instrument) }
             .filter { !imported.contains($0.externalID) && seen.insert($0.externalID).inserted }
             .sorted { $0.date < $1.date }
 
@@ -203,7 +216,7 @@ public enum ImportPlanner {
             instruments.append(instrument)
         }
 
-        for instrument in instruments where !skipped.contains(instrument) {
+        for instrument in instruments where !skipped.contains(instrument) && !snapshot.unsettled.contains(instrument) {
             let holding = snapshot.holdings.first { $0.instrument == instrument }
             let existing = assetFor(instrument).map { asset in
                 existingBySource.filter { $0.assetID == asset.id }
@@ -264,6 +277,7 @@ public enum ImportPlanner {
             duplicates: duplicates,
             mismatches: mismatches,
             skippedDust: skipped.sorted { $0.symbol < $1.symbol },
+            closedPositions: closed.sorted { $0.symbol < $1.symbol },
             missingAssets: missing
         )
     }
