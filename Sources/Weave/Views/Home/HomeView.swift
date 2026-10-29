@@ -55,7 +55,7 @@ struct HomeView: View {
         .confirmDialog(
             $deletionTarget,
             title: { _ in model.t("Delete asset?") },
-            message: { model.t("\($0.name) and \(model.tradeCount(assetID: $0.id)) trade(s) will be deleted.") },
+            message: { model.deleteAssetMessage($0) },
             confirmTitle: model.t("Delete"),
             isDestructive: true,
             cancelTitle: model.t("Cancel"),

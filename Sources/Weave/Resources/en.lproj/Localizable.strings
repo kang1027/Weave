@@ -24,6 +24,7 @@
 "Automatic updates" = "Automatic updates";
 "Available in packaged app only" = "Available in packaged app only";
 "Available: %@" = "Available: %@";
+"Entered manually: %@" = "Entered manually: %@";
 "Avg %@" = "Avg %@";
 "BUY" = "BUY";
 "Export data…" = "Export data…";
@@ -33,6 +34,7 @@
 "Buy" = "Buy";
 "By Asset" = "By Asset";
 "Can't sell more than you hold (%@)" = "Can't sell more than you hold (%@)";
+"Can't sell more than you entered manually (%@)" = "Can't sell more than you entered manually (%@)";
 "Cancel" = "Cancel";
 "Change color" = "Change color";
 "Check for updates now…" = "Check for updates now…";
@@ -114,6 +116,8 @@
 "Opening balance" = "Opening balance";
 "Imported from %@" = "Imported from %@";
 "Imported trades can't be changed here" = "Imported trades can't be changed here";
+"Linked account holdings change only when the account syncs" = "Linked account holdings change only when the account syncs";
+"If a linked account still holds it, the next sync brings it back." = "If a linked account still holds it, the next sync brings it back.";
 "Total P&L %@" = "Total P&L %@";
 "Record shortcut" = "Record shortcut";
 "Refresh now" = "Refresh now";

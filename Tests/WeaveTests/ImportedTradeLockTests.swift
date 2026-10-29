@@ -45,4 +45,26 @@ private struct OfflineHTTP: HTTPClient {
         model.deleteTrade(id: manual.id)
         #expect(model.document.trades.map(\.id) == [imported.id])
     }
+
+    @MainActor
+    @Test func manualSellsCannotReduceLinkedHoldings() {
+        let source = LinkedSource(kind: .toss, name: "토스증권", label: "••••5678")
+        let asset = Asset(name: "삼성전자", symbol: "005930", provider: .naver, providerSymbol: "005930", market: .koreaStock, currency: "KRW")
+        let imported = Trade(assetID: asset.id, side: .buy, quantity: 10, price: 70_000, date: Date(timeIntervalSince1970: 1_780_000_000), sourceID: source.id, externalID: "E1")
+        let manual = Trade(assetID: asset.id, side: .buy, quantity: 2, price: 71_000, date: Date(timeIntervalSince1970: 1_780_100_000))
+        let cacheDir = FileManager.default.temporaryDirectory.appendingPathComponent("weave-lock-tests-\(UUID().uuidString)")
+        let naver = NaverProvider(http: OfflineHTTP())
+        let model = AppModel(
+            store: SeededStore(document: PortfolioDocument(assets: [asset], trades: [imported, manual], sources: [source])),
+            quoteService: QuoteService(providers: [naver]),
+            candleService: CandleService(providers: [naver], cacheDirectory: cacheDir),
+            fxService: FXService(yahoo: YahooProvider(http: OfflineHTTP()), cacheDirectory: nil),
+            searchService: SearchService(providers: [naver])
+        )
+        let later = Date(timeIntervalSince1970: 1_780_200_000)
+
+        #expect(model.hasLinkedHoldings(assetID: asset.id))
+        #expect(model.addTrade(assetID: asset.id, side: .sell, quantity: 3, price: 72_000, date: later, note: "") == .exceedsHolding(available: 2))
+        #expect(model.addTrade(assetID: asset.id, side: .sell, quantity: 2, price: 72_000, date: later, note: "") == nil)
+    }
 }

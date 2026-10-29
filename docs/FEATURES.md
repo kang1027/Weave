@@ -234,7 +234,10 @@ keys require an allowlisted static IP.
   transfers); a missing average cost; a second gap after the opening balance; or manual trades on the same
   asset that could double count with an opening balance. These are not filled in automatically.
 - **Dust**: holdings under a threshold (₩10,000 planned) are skipped unless the asset already exists.
-- **Locked**: imported trades can't be edited or deleted in the app (the source is the original).
+- **Locked**: imported trades can't be edited or deleted in the app (the source is the original). A manual
+  sell can only sell what was entered manually, so it never reduces a linked account's holding.
+- **Deleting an asset** also deletes its imported trades. If a linked account still holds it, the next sync
+  brings it back.
 - **Holdings by location**: the detail screen shows how much of the asset sits in each source and in
   manual trades, once the asset has an imported trade.
 

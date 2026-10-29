@@ -37,10 +37,12 @@ struct TradeFormView: View {
     private var availableQuantity: Decimal {
         PositionCalculator.availableQuantity(
             at: date,
-            trades: model.document.trades(for: assetID),
+            trades: model.manualTrades(for: assetID),
             excluding: editing?.id
         )
     }
+
+    private var hasLinkedHoldings: Bool { model.hasLinkedHoldings(assetID: assetID) }
 
     private var sellExceedsHolding: Bool {
         guard side == .sell, let quantity else { return false }
@@ -124,8 +126,11 @@ struct TradeFormView: View {
                     }
 
                     if side == .sell {
+                        let availableText = MoneyFormatter.quantity(availableQuantity, maxFractionDigits: quantityFractionDigits)
                         HStack(spacing: 4) {
-                            Text(model.t("Available: \(MoneyFormatter.quantity(availableQuantity, maxFractionDigits: quantityFractionDigits))"))
+                            Text(hasLinkedHoldings
+                                ? model.t("Entered manually: \(availableText)")
+                                : model.t("Available: \(availableText)"))
                                 .font(.system(size: 10.5))
                                 .foregroundStyle(theme.text2)
                             if sellExceedsHolding {
@@ -133,6 +138,11 @@ struct TradeFormView: View {
                                     .font(.system(size: 10.5, weight: .semibold))
                                     .foregroundStyle(theme.redText)
                             }
+                        }
+                        if hasLinkedHoldings {
+                            Text(model.t("Linked account holdings change only when the account syncs"))
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(theme.text2)
                         }
                     }
 
@@ -410,7 +420,9 @@ struct TradeFormView: View {
         switch error {
         case .exceedsHolding(let available):
             let qty = asset?.formattedQuantity(available) ?? MoneyFormatter.quantity(available)
-            return model.t("Can't sell more than you hold (\(qty))")
+            return hasLinkedHoldings
+                ? model.t("Can't sell more than you entered manually (\(qty))")
+                : model.t("Can't sell more than you hold (\(qty))")
         case .invalidInput:
             return model.t("Enter a valid quantity and price")
         case .imported:

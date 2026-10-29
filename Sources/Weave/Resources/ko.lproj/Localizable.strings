@@ -24,6 +24,7 @@
 "Automatic updates" = "자동 업데이트";
 "Available in packaged app only" = "패키지 앱에서만 사용 가능";
 "Available: %@" = "매도 가능: %@";
+"Entered manually: %@" = "직접 입력분: %@";
 "Avg %@" = "평단 %@";
 "BUY" = "매수";
 "Export data…" = "데이터 내보내기…";
@@ -33,6 +34,7 @@
 "Buy" = "매수";
 "By Asset" = "자산별";
 "Can't sell more than you hold (%@)" = "보유 수량보다 많이 팔 수 없어요 (%@)";
+"Can't sell more than you entered manually (%@)" = "직접 입력한 수량보다 많이 팔 수 없어요 (%@)";
 "Cancel" = "취소";
 "Change color" = "색상 변경";
 "Check for updates now…" = "지금 업데이트 확인…";
@@ -114,6 +116,8 @@
 "Opening balance" = "기초 잔고";
 "Imported from %@" = "%@에서 가져옴";
 "Imported trades can't be changed here" = "가져온 거래는 여기서 고칠 수 없어요";
+"Linked account holdings change only when the account syncs" = "연결한 계좌 보유분은 그 계좌를 동기화할 때만 바뀌어요";
+"If a linked account still holds it, the next sync brings it back." = "연결한 계좌에 아직 있으면 다음 동기화 때 다시 들어와요.";
 "Total P&L %@" = "총 손익 %@";
 "Record shortcut" = "단축키 등록";
 "Refresh now" = "지금 새로고침";
