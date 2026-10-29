@@ -260,6 +260,11 @@ is left out because its API keys require an allowlisted static IP.
   USDT markets; the script swaps legacy contracts the list still carries, such as KNC v1, for the ones Binance
   trades). Unknown contracts are never read, so spam tokens with look-alike symbols don't come in. WETH
   counts as ETH. A failed balance call stops the sync instead of reading as zero.
+- **Yield and staking tokens** (`EVMYieldTokens.swift`, hand-kept, each address checked on-chain): Aave v3
+  aTokens count 1:1 as their underlying; Aave static aTokens and Umbrella stake tokens are ERC-4626 vaults, so
+  their shares go through `convertToAssets` (Umbrella: stk → waEth → underlying) and count as USDC, ETH, or WBTC.
+  USDT and GHO have no Binance price, so they only show under "Not imported". A wallet change worth under $5
+  waits until it adds up, so accruing interest doesn't log a trade every sync.
 - **Connection detail**: tapping a link shows its type, addresses, chains, last sync, the holdings it brought
   in, and the balances it left out (under $10 or no Binance price), largest first.
 - **Coins**: only coins with a Binance USDT market. New coins become Binance assets (`BTCUSDT`). A balance

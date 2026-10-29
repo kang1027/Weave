@@ -21,6 +21,9 @@ public struct EVMClient: Sendable {
             + tokens.map { (target: $0.contract, data: Self.balanceOf(owner), symbol: $0.symbol, decimals: $0.decimals) }
 
         var amounts: [String: Decimal] = [:]
+        // 금고 토큰 지분 — 원금으로 바꾼 뒤 더한다. 지분 워드를 그대로 다음 convertToAssets 인자로 넘긴다.
+        var shares: [(token: EVMToken, word: Data)] = []
+        let vaults = Dictionary(tokens.map { ($0.contract, $0) }, uniquingKeysWith: { first, _ in first })
         for start in stride(from: 0, to: calls.count, by: Self.batchSize) {
             let batch = Array(calls[start..<min(start + Self.batchSize, calls.count)])
             let results = try await aggregate(batch.map { ($0.target, $0.data) }, chain: chain)
@@ -30,8 +33,24 @@ public struct EVMClient: Sendable {
                     throw WalletError.partialFailure(chain: chain.name)
                 }
                 guard raw > 0 else { continue }
+                if let vault = vaults[call.target], !vault.vaultPath.isEmpty {
+                    shares.append((vault, result.data))
+                    continue
+                }
                 amounts[call.symbol, default: 0] += raw / Self.power(of: call.decimals)
             }
+        }
+        for (token, word) in shares {
+            var current = word
+            for vault in token.vaultPath {
+                let results = try await aggregate([(vault, Self.convertToAssets(current))], chain: chain)
+                guard let result = results.first, result.success, result.data.count == 32 else {
+                    throw WalletError.partialFailure(chain: chain.name)
+                }
+                current = result.data
+            }
+            guard let raw = Self.uint(current) else { throw WalletError.invalidResponse }
+            amounts[token.symbol, default: 0] += raw / Self.power(of: token.decimals)
         }
         return amounts
     }
@@ -67,6 +86,11 @@ public struct EVMClient: Sendable {
     /// balanceOf(address)
     static func balanceOf(_ owner: String) -> Data {
         Data(hex: "70a08231")! + word(address: owner)
+    }
+
+    /// ERC-4626 convertToAssets(uint256) — 인자는 받은 32바이트 워드 그대로.
+    static func convertToAssets(_ shares: Data) -> Data {
+        Data(hex: "07a2d13a")! + shares
     }
 
     /// Multicall3.getEthBalance(address)

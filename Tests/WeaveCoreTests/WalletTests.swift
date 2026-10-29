@@ -96,6 +96,42 @@ private actor FakeRPC: HTTPSending {
         }
     }
 
+    @Test func vaultTokensCountAsTheirUnderlyingCoin() async throws {
+        let rpc = FakeRPC(balance: 3_000_000)
+        // 지분 → 중간 금고 → 원금. 가짜 RPC는 어떤 호출이든 3,000,000을 돌려준다.
+        let staked = EVMToken(chain: .ethereum, contract: "0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6", symbol: "USDC", decimals: 6,
+                              vaultPath: ["0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6", "0xd4fa2d31b7968e448877f69a96de69f5de8cd23e"])
+        let plain = EVMToken(chain: .ethereum, contract: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", symbol: "USDC", decimals: 6)
+        let balances = try await EVMClient(http: rpc).balances(owner: owner, chain: .ethereum, tokens: [plain, staked])
+        // 잔고 한 번 + 금고 두 단계 = 세 번 부른다. 스테이킹분도 USDC로 더한다.
+        #expect(await rpc.calls == 3)
+        #expect(balances["USDC"] == 6)
+        #expect(EVMClient.convertToAssets(Data(repeating: 1, count: 32)).prefix(4).hex == "07a2d13a")
+        // 손으로 관리하는 이자 토큰도 지갑 조회 목록에 들어간다.
+        #expect(EVMToken.all.contains { $0.contract == "0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6" })
+    }
+
+    @Test func smallWalletChangesWaitUntilTheyAddUp() {
+        let wallet = LinkedSource(kind: .evmWallet, name: "메인 지갑", label: "0x…")
+        let usdc = ImportInstrument(market: .crypto, symbol: "USDC", name: "USD Coin", currency: "USD")
+        let asset = Asset(name: "USD Coin", symbol: "USDC", provider: .binance, providerSymbol: "USDCUSDT", market: .crypto, currency: "USD")
+        let doc = PortfolioDocument(assets: [asset], trades: [
+            Trade(assetID: asset.id, side: .buy, quantity: 3_690, price: 1, date: date("2026-01-01"), sourceID: wallet.id, openingBalance: true)
+        ], sources: [wallet])
+        func plan(_ quantity: Decimal) -> ImportPlan {
+            ImportPlanner.plan(snapshot: SourceSnapshot(
+                sourceID: wallet.id,
+                holdings: [ImportedHolding(instrument: usdc, quantity: quantity, averageCost: nil, marketPrice: 1)],
+                executions: [], historyStart: date("2026-03-01"), takenAt: date("2026-03-01"),
+                inheritsManualHoldings: true, minimumChangeValue: 5
+            ), document: doc)
+        }
+        // 이자로 $0.4 늘었다 — 기록하지 않고 쌓이게 둔다.
+        #expect(plan(Decimal(string: "3690.4")!).trades.isEmpty)
+        // $6 넘게 쌓이면 한 번에 기록한다.
+        #expect(plan(Decimal(string: "3696.2")!).adjustments.map(\.quantity) == [Decimal(string: "6.2")!])
+    }
+
     @Test func addressesAreCheckedAndShortened() {
         #expect(WalletConfig.isEVMAddress(owner))
         #expect(!WalletConfig.isEVMAddress("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA9604"))

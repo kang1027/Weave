@@ -86,6 +86,8 @@ public struct SourceSnapshot: Sendable {
     public var inheritsManualHoldings: Bool
     /// 소액 잔고 — 이 소스가 아직 안 가진 종목이면 새로 들이지 않는다(이미 가진 종목은 그대로 대조해서 경계에서 오락가락하지 않는다).
     public var dust: Set<ImportInstrument>
+    /// 지갑 — 이보다 작은 변화(시세 기준)는 기록하지 않고 쌓이게 둔다. 이자가 붙는 토큰이 매번 거래를 남기지 않게.
+    public var minimumChangeValue: Decimal
 
     public init(
         sourceID: UUID,
@@ -95,7 +97,8 @@ public struct SourceSnapshot: Sendable {
         unsettled: Set<ImportInstrument> = [],
         takenAt: Date = Date(),
         inheritsManualHoldings: Bool = false,
-        dust: Set<ImportInstrument> = []
+        dust: Set<ImportInstrument> = [],
+        minimumChangeValue: Decimal = 0
     ) {
         self.sourceID = sourceID
         self.holdings = holdings
@@ -105,6 +108,7 @@ public struct SourceSnapshot: Sendable {
         self.takenAt = takenAt
         self.inheritsManualHoldings = inheritsManualHoldings
         self.dust = dust
+        self.minimumChangeValue = minimumChangeValue
     }
 }
 
@@ -274,6 +278,10 @@ public enum ImportPlanner {
             // 지갑 — 매수 기록이 없다. 들어온 만큼은 직접 입력분에서 평단 그대로 옮겨 오고, 모자라면 그때 시세로 잡는다.
             // 나간 만큼은 직접 입력분으로 평단 그대로 돌려놓는다 — 거래소로 옮겨 팔면 그 매도를 직접 입력하면 된다.
             if snapshot.inheritsManualHoldings {
+                // 이미 가진 코인의 작은 변화(이자 등)는 쌓였다가 한 번에 기록한다. 다 빠져나간 건(시세 없음) 바로 기록한다.
+                if !existing.isEmpty, let price = holding?.marketPrice, abs(gap) * price < snapshot.minimumChangeValue {
+                    continue
+                }
                 let stamp = Int(snapshot.takenAt.timeIntervalSince1970 * 1000)
                 // side는 지갑 쪽 방향. 직접 입력 쪽은 반대 방향으로 같은 수량·단가가 들어간다.
                 func move(_ side: TradeSide, _ quantity: Decimal, at price: Decimal) {

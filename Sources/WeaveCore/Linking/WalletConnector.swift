@@ -36,6 +36,8 @@ public struct BitcoinClient: Sendable {
 public enum WalletConnector {
     /// 이보다 작은 잔고(USD)로는 새 코인을 들이지 않는다 — 에어드랍·잔돈 토큰이 자산 목록을 채우지 않게.
     static let dustValue: Decimal = 10
+    /// 이보다 작은 변화(USD)는 다음 동기화로 미룬다 — 이자 토큰이 5분마다 잔고 맞춤을 쌓지 않게.
+    static let minimumChangeValue: Decimal = 5
 
     public static func fetch(
         config: WalletConfig,
@@ -52,7 +54,7 @@ public enum WalletConnector {
             let client = EVMClient(http: http)
             for address in config.addresses {
                 for chain in config.chains {
-                    let tokens = EVMToken.known.filter { $0.chain == chain }
+                    let tokens = EVMToken.all.filter { $0.chain == chain }
                     let balances = try await client.balances(owner: address, chain: chain, tokens: tokens)
                     amounts.merge(balances, uniquingKeysWith: +)
                 }
@@ -98,7 +100,8 @@ public enum WalletConnector {
             unsettled: unpriced,
             takenAt: now,
             inheritsManualHoldings: true,
-            dust: dust
+            dust: dust,
+            minimumChangeValue: minimumChangeValue
         )
     }
 }

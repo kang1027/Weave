@@ -33,13 +33,18 @@ public enum EVMChain: String, Codable, Sendable, CaseIterable {
     }
 }
 
-/// 잔고를 읽을 ERC-20 토큰. 목록은 `EVMTokenList.swift`에서 생성한다.
+/// 잔고를 읽을 ERC-20 토큰. 목록은 `EVMTokenList.swift`(생성)와 `EVMYieldTokens.swift`(손으로 관리)에 있다.
 public struct EVMToken: Equatable, Sendable {
     public var chain: EVMChain
     public var contract: String
-    /// 바이낸스 심볼 — WETH는 ETH로 맞춰 둔다.
+    /// 바이낸스 심볼 — WETH는 ETH로, 이자·스테이킹 토큰은 원금 코인으로 맞춰 둔다.
     public var symbol: String
+    /// 원금 코인의 소수 자리.
     public var decimals: Int
+    /// ERC-4626 금고 토큰이면 잔고에 차례로 `convertToAssets`를 부를 컨트랙트 — 끝나면 원금 코인 단위가 된다.
+    public var vaultPath: [String] = []
+
+    public static var all: [EVMToken] { known + yieldBearing }
 }
 
 /// 지갑 연결 설정. 주소는 키처럼 키체인에 두고 문서엔 줄인 주소만 남긴다.
