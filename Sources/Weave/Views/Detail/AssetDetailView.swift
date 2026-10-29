@@ -422,9 +422,9 @@ struct AssetDetailView: View {
         let buys = traded.filter { $0.side == .buy }.count
         let sells = traded.count - buys
         let moves = trades.count - traded.count
-        var parts: [String] = [model.t("\(buys) buys")]
+        var parts: [String] = [counted(buys, "buy")]
         if sells > 0 {
-            parts.append(model.t("\(sells) sells"))
+            parts.append(counted(sells, "sell"))
         }
         if moves > 0 {
             parts.append(model.t(moves == 1 ? "1 move" : "\(moves) moves"))
