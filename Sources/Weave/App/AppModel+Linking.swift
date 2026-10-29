@@ -559,8 +559,11 @@ extension AppModel {
     /// 연결 화면 스크린샷 — WEAVE_SHOT_EVM에 공개 주소를 주면 그 지갑을 메모리 보관소로 연결해 둔다.
     func pushShotLinkState(_ state: String, env: [String: String]) {
         guard state.hasPrefix("link") else { return }
-        push(.settings)
-        push(.connections)
+        // link-home은 연결만 해 두고 홈에 남는다(홈 목록의 출처 배지용).
+        if state != "link-home" {
+            push(.settings)
+            push(.connections)
+        }
         Task {
             if let address = env["WEAVE_SHOT_EVM"] {
                 _ = await connectWallet(kind: .evm, name: "Main wallet", addresses: [address], chains: EVMChain.allCases)
