@@ -54,6 +54,14 @@ private struct FixedPrices: CryptoPriceSource {
 private let address = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq"
 
 @MainActor
+private extension AppModel {
+    func portfolioMetrics(for assetID: UUID) -> PositionSnapshot? {
+        PortfolioCalculator.compute(assets: document.assets, trades: document.trades, quotes: [:], fxRates: ["USD": 1], baseCurrency: "USD")
+            .perAsset.first { $0.asset.id == assetID }?.position
+    }
+}
+
+@MainActor
 private func makeModel(_ document: PortfolioDocument, mempool: FakeMempool, credentials: MemoryCredentials) -> AppModel {
     let naver = NaverProvider(http: OfflineHTTP())
     let model = AppModel(
@@ -120,7 +128,7 @@ private func makeModel(_ document: PortfolioDocument, mempool: FakeMempool, cred
     }
 
     @MainActor
-    @Test func disconnectKeepsReturnedCoinsThatWereSoldLater() async throws {
+    @Test func coinsSentOutOfAWalletLeaveThePortfolio() async throws {
         let mempool = FakeMempool()
         mempool.set(address, 100_000_000)
         let model = makeModel(.empty, mempool: mempool, credentials: MemoryCredentials())
@@ -128,20 +136,21 @@ private func makeModel(_ document: PortfolioDocument, mempool: FakeMempool, cred
         model.applyPendingImport(sourceID: sourceID)
         let bitcoin = try #require(model.document.assets.first)
 
-        // 0.6을 거래소로 보내 직접 입력분으로 돌아왔고, 거기서 팔았다.
+        // 0.6을 거래소로 보냈다 — 직접 입력분에서 온 코인이 아니라 직접 입력분에 쌓이지 않고 포트폴리오에서 빠진다.
         mempool.set(address, 40_000_000)
         await model.syncSource(id: sourceID)
-        #expect(model.addTrade(assetID: bitcoin.id, side: .sell, quantity: Decimal(string: "0.6")!, price: 90_000, date: Date(), note: "") == nil)
+        let position = try #require(model.portfolioMetrics(for: bitcoin.id))
+        #expect(position.quantity == Decimal(string: "0.4")!)
+        #expect(position.realizedPnL == 0)
+        #expect(!model.document.trades.contains { $0.sourceID == nil })
+        #expect(model.addTrade(assetID: bitcoin.id, side: .sell, quantity: Decimal(string: "0.6")!, price: 90_000, date: Date(), note: "") == .exceedsHolding(available: 0))
 
-        // 돌아온 기록을 지우면 그 매도가 마이너스가 되니 일반 거래로 남긴다 — 실현손익도 그대로다.
+        // 다음 동기화에서 다시 빼지 않는다.
+        await model.syncSource(id: sourceID)
+        #expect(model.portfolioMetrics(for: bitcoin.id)?.quantity == Decimal(string: "0.4")!)
+
         model.disconnectSource(id: sourceID)
-        let trades = model.document.trades
-        #expect(trades.count == 2)
-        #expect(trades.allSatisfy { !$0.isLocked })
-        #expect(PositionCalculator.firstOversell(in: trades) == nil)
-        let sale = try #require(trades.first { $0.side == .sell })
-        #expect(model.realizedPnL(of: sale) == 6_000)
-        #expect(trades.contains { $0.note.hasPrefix("← ") })
+        #expect(model.document.trades.isEmpty)
     }
 
     @MainActor

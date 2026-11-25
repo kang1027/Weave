@@ -290,8 +290,11 @@ is left out because its API keys require an allowlisted static IP.
   - More in the wallet → the same amount moves over from the manual holdings at their average cost. What the
     manual holdings can't cover starts at the market price (an opening balance on the first link, a balance
     adjustment later).
-  - Less in the wallet → the difference goes back to the manual holdings at the wallet's average cost, so a sale
-    on an exchange can be entered there as a manual sell.
+  - Less in the wallet → the difference goes back to the manual holdings at the wallet's average cost, but only
+    up to what the wallets took from them. The rest left the portfolio (sent to an exchange, swapped for another
+    token): once every wallet has synced, it's recorded as a locked balance adjustment sell at the wallet's
+    average cost, so no realized P&L. Coins sold on an exchange after leaving a wallet don't need a manual sell;
+    if they're still held there, add them by hand.
   - Both sides of a move are locked. The trade list shows one move row (wallet side), and moves are left out
     of buy/sell counts, chart markers, and the asset's average cost and realized P&L (only each location's own
     ledger uses them).
@@ -300,7 +303,7 @@ is left out because its API keys require an allowlisted static IP.
   - A manual buy whose coins moved to a wallet can't be deleted or lowered below what moved.
   - Disconnecting deletes the moves, so the manual holdings come back. If coins that came back were sold by hand
     afterwards, that asset's manual-side moves stay as plain trades (with a note) so the manual holdings never go
-    negative.
+    negative. Older returns that were already sold by hand are left as they are.
 
 - **Already imported**: executions whose `externalID` is already in the document are skipped, as are repeats in the same sync.
 - **Same trade entered manually**: same asset · side · quantity, same day, price within 1% → suggested as a

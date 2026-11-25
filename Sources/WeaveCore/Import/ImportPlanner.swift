@@ -291,7 +291,7 @@ public enum ImportPlanner {
                 ))
             }
             // 지갑 — 매수 기록이 없다. 들어온 만큼은 직접 입력분에서 평단 그대로 옮겨 오고, 모자라면 그때 시세로 잡는다.
-            // 나간 만큼은 직접 입력분으로 평단 그대로 돌려놓는다 — 거래소로 옮겨 팔면 그 매도를 직접 입력하면 된다.
+            // 나간 만큼은 일단 직접 입력분으로 평단 그대로 돌려놓는다 — 다른 지갑이 가져가지 않은 몫은 WalletDepartures가 뺀다.
             if snapshot.inheritsManualHoldings {
                 // 이미 가진 코인의 작은 변화(이자 등)는 쌓였다가 한 번에 기록한다. 다 빠져나간 건(시세 없음) 바로 기록한다.
                 if !existing.isEmpty, let price = holding?.marketPrice, abs(gap) * price < snapshot.minimumChangeValue {
