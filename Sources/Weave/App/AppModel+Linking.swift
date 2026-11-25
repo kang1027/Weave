@@ -448,12 +448,15 @@ extension AppModel {
             receive(snapshot, for: id, firstSync: document.source(id: id)?.lastSyncedAt == nil)
             linkStatus[id] = .synced(Date())
         }
-        settleWalletDepartures()
+        // 받지 못한 지갑이 있으면 그 지갑이 가져갈 몫까지 빼게 되니 다음 동기화로 미룬다.
+        if live.count == document.sources.filter(\.kind.isWallet).count {
+            settleWalletDepartures()
+        }
     }
 
     /// 모든 지갑을 반영한 뒤, 다른 지갑이 가져가지 않은 채 직접 입력분에 남은 유출을 포트폴리오에서 뺀다.
     /// 검토 대기 중인 지갑이 있으면 그 지갑이 가져갈 수 있으니 적용할 때까지 미룬다.
-    func settleWalletDepartures() {
+    private func settleWalletDepartures() {
         let waiting = document.sources.contains { $0.kind.isWallet && pendingImports[$0.id] != nil }
         guard !waiting, WalletDepartures.settle(&document) > 0 else { return }
         persist()
@@ -533,7 +536,6 @@ extension AppModel {
         let plan = ImportPlanner.plan(snapshot: pending.snapshot, document: document)
         linkMismatches[sourceID] = plan.unresolved
         applyImport(plan, syncedAt: pending.snapshot.takenAt)
-        settleWalletDepartures()
         // 검토를 오래 미뤘으면 그사이 생긴 주문을 바로 받아 온다.
         if Date().timeIntervalSince(pending.snapshot.takenAt) > Self.linkSyncInterval {
             Task { await syncSource(id: sourceID) }

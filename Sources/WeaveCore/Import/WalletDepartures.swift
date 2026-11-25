@@ -9,8 +9,8 @@ public enum WalletDepartures {
     private static let manualPrefix = "move-manual:"
 
     /// 자산마다 지갑 → 직접 입력 이동이 직접 입력 → 지갑 이동보다 많은 만큼을, 최근 이동부터 지갑 쪽 잔고 맞춤 매도로 바꾼다.
-    /// 지갑 평단에 팔아 실현손익은 없다. 돌아온 코인을 이미 직접 매도했으면 그만큼은 건드리지 않는다.
-    /// - Returns: 정리한 자산 수.
+    /// 그 시점의 자산 평단에 팔아 실현손익은 없다. 돌아온 코인을 이미 직접 매도했으면 그만큼은 건드리지 않는다.
+    /// - Returns: 바꾼 이동 수.
     @discardableResult
     public static func settle(_ document: inout PortfolioDocument) -> Int {
         let manualLegs = document.trades.filter { $0.sourceID == nil && $0.isTransfer }
@@ -34,24 +34,29 @@ public enum WalletDepartures {
                 }) else { continue }
                 let gone = min(leg.quantity, excess)
                 excess -= gone
+                settled += 1
+                // 지갑 평단이 아니라 자산 전체 평단 — 둘이 다르면(직접 입력 매수가 따로 있으면) 가짜 실현손익이 생긴다.
+                let wallet = document.trades[walletIndex]
+                let cost = PositionCalculator.snapshot(trades: document.trades.filter {
+                    $0.assetID == assetID && !$0.isTransfer && $0.date <= wallet.date
+                }).averageCost
                 if gone == leg.quantity {
                     // 통째로 나갔다 — 지갑 쪽 이동을 잔고 맞춤 매도로 바꾸고 직접 입력 쪽은 지운다.
                     // externalID는 남겨 같은 이동이 다시 들어오지 않게 한다.
                     document.trades[walletIndex].transferSourceID = nil
                     document.trades[walletIndex].balanceAdjustment = true
+                    document.trades[walletIndex].price = cost
                     document.trades.remove(at: manualIndex)
                 } else {
-                    let wallet = document.trades[walletIndex]
                     document.trades[walletIndex].quantity -= gone
                     document.trades[manualIndex].quantity -= gone
                     document.trades.append(Trade(
-                        assetID: assetID, side: .sell, quantity: gone, price: wallet.price, date: wallet.date,
+                        assetID: assetID, side: .sell, quantity: gone, price: cost, date: wallet.date,
                         sourceID: wallet.sourceID, externalID: "leave:" + manualID.dropFirst(manualPrefix.count),
                         balanceAdjustment: true
                     ))
                 }
             }
-            settled += 1
         }
         return settled
     }

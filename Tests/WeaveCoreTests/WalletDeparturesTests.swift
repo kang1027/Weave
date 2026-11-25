@@ -114,4 +114,27 @@ private func manual(_ document: PortfolioDocument, _ assetID: UUID) -> Decimal {
         #expect(PositionCalculator.snapshot(trades: doc.trades.filter { $0.sourceID == wallet.id }).quantity == 0)
         #expect(doc.trades.filter { $0.isTransfer }.map(\.quantity) == [30, 30])
     }
+    @Test func leavingAtADifferentWalletAverageBooksNoProfitOrLoss() {
+        let wallet = LinkedSource(kind: .evmWallet, name: "Crypto", label: "0x…")
+        let (coin, asset) = usdc("BTC")
+        var doc = PortfolioDocument(assets: [asset], sources: [wallet])
+        func sync(_ quantity: Decimal, price: Decimal, on value: String) {
+            let snap = SourceSnapshot(
+                sourceID: wallet.id,
+                holdings: quantity > 0 ? [ImportedHolding(instrument: coin, quantity: quantity, averageCost: nil, marketPrice: price)] : [],
+                executions: [], historyStart: day(value), takenAt: day(value), inheritsManualHoldings: true
+            )
+            ImportApplier.apply(ImportPlanner.plan(snapshot: snap, document: doc), to: &doc)
+            WalletDepartures.settle(&doc)
+        }
+        // 지갑엔 60,000에 잡힌 1 BTC, 거래소엔 직접 입력한 100,000짜리 1 BTC — 자산 평단 80,000.
+        sync(1, price: 60_000, on: "2026-01-01")
+        doc.trades.append(Trade(assetID: asset.id, side: .buy, quantity: 1, price: 100_000, date: day("2026-02-01")))
+        sync(0, price: 90_000, on: "2026-03-01")
+        let result = position(doc, asset.id)
+        #expect(result.quantity == 1)
+        #expect(result.averageCost == 80_000)
+        #expect(result.realizedPnL == 0)
+        #expect(manual(doc, asset.id) == 1)
+    }
 }

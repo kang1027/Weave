@@ -35,9 +35,12 @@ private final class MemoryCredentials: CredentialStoring, @unchecked Sendable {
 private final class FakeMempool: HTTPSending, @unchecked Sendable {
     private let lock = NSLock()
     private var satoshis: [String: Int64] = [:]
+    private var down: Set<String> = []
     func set(_ address: String, _ value: Int64) { lock.withLock { satoshis[address] = value } }
+    func setDown(_ address: String, _ isDown: Bool) { lock.withLock { if isDown { down.insert(address) } else { down.remove(address) } } }
     func send(_ request: URLRequest) async throws -> (data: Data, status: Int) {
         let address = request.url!.lastPathComponent
+        if lock.withLock({ down.contains(address) }) { return (Data(), 503) }
         let value = lock.withLock { satoshis[address] ?? 0 }
         let body = #"{"address":"\#(address)","chain_stats":{"funded_txo_sum":\#(value),"spent_txo_sum":0}}"#
         return (Data(body.utf8), 200)
@@ -187,6 +190,17 @@ private func makeModel(_ document: PortfolioDocument, mempool: FakeMempool, cred
         mempool.set(address, 50_000_000)
         mempool.set(other, 50_000_000)
         await model.syncSource(id: second)
+        #expect(total() == 1)
+        #expect(model.document.trades.filter { $0.isBalanceAdjustment }.isEmpty)
+
+        // A → B로 0.3을 더 옮겼는데 B를 못 받았다 — A에서 빠진 몫은 B를 받을 때까지 빼지 않는다.
+        mempool.set(address, 20_000_000)
+        mempool.set(other, 80_000_000)
+        mempool.setDown(other, true)
+        await model.syncSource(id: first)
+        #expect(total() == 1)
+        mempool.setDown(other, false)
+        await model.syncSource(id: first)
         #expect(total() == 1)
         #expect(model.document.trades.filter { $0.isBalanceAdjustment }.isEmpty)
     }
