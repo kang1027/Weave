@@ -59,6 +59,8 @@ and clicking it opens a 360×720 popover where you manage the entire portfolio.
     icon) for the place that holds the most of it. Hovering lists every linked place.
 - Sorting: fixed descending by valuation.
 - Row click → asset detail. Context menu: pin / hide / delete.
+- An asset that was bought but now holds nothing (sold, or sent out of a wallet) drops off the list. It stays in
+  asset management and in the totals' history, and comes back once it's held again. Assets with no trades yet stay.
 
 ### 2.5 Footer
 - Left: `Weave 0.1.0 · Next refresh in 4m` (version + countdown to next price refresh).

@@ -22,6 +22,11 @@ public struct AssetMetrics: Identifiable, Equatable, Sendable {
     public var weight: Double
 
     public var id: UUID { asset.id }
+
+    /// 사 본 적은 있는데 지금은 하나도 없다 — 다 팔았거나 지갑 밖으로 나갔다. 아직 거래가 없는 관심 종목은 아니다.
+    public var isSoldOut: Bool {
+        !asset.isManual && position.buyCount > 0 && position.quantity <= 0
+    }
 }
 
 /// 링 게이지 세그먼트 하나 — Day/Return은 손익 기여, Assets는 평가금 비중.
