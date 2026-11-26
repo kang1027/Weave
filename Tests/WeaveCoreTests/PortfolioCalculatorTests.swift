@@ -164,4 +164,23 @@ import Testing
         #expect(RingScale.fillFraction(percent: 5, fullAt: 2) == 1)
         #expect(RingScale.fillFraction(percent: 0, fullAt: 25) == 0)
     }
+
+    @Test func onlyAssetsThatWereBoughtAndAreNowEmptyAreSoldOut() {
+        let sold = makeAsset(name: "SOLD")
+        let held = makeAsset(name: "HELD")
+        let watched = makeAsset(name: "WATCH")
+        let house = makeAsset(name: "HOUSE", manualValue: 100)
+        let trades = [
+            buy(sold, qty: 1, price: 10),
+            Trade(assetID: sold.id, side: .sell, quantity: 1, price: 12, date: Date(timeIntervalSince1970: 1)),
+            buy(held, qty: 1, price: 10)
+        ]
+        let result = PortfolioCalculator.compute(
+            assets: [sold, held, watched, house], trades: trades, quotes: [:], fxRates: ["USD": 1], baseCurrency: "USD"
+        )
+        #expect(result.perAsset.filter(\.isSoldOut).map(\.asset.id) == [sold.id])
+        #expect(result.portfolio.assetCount == 3)
+        // 숨겨도 계산에선 빠지지 않는다 — 실현손익이 그대로 남는다.
+        #expect(result.perAsset.first { $0.asset.id == sold.id }?.position.realizedPnL == 2)
+    }
 }

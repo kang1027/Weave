@@ -36,7 +36,8 @@ struct HomeView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 2)
                     VStack(spacing: 0) {
-                        ForEach(perAsset) { metric in
+                        // 다 판(0개) 자산은 목록에서 뺀다 — 관리 화면엔 남고, 다시 사면 돌아온다.
+                        ForEach(perAsset.filter { !$0.isSoldOut }) { metric in
                             AssetListRow(metric: metric) {
                                 deletionTarget = metric.asset
                             }
