@@ -179,6 +179,7 @@ import Testing
             assets: [sold, held, watched, house], trades: trades, quotes: [:], fxRates: ["USD": 1], baseCurrency: "USD"
         )
         #expect(result.perAsset.filter(\.isSoldOut).map(\.asset.id) == [sold.id])
+        #expect(result.portfolio.assetCount == 3)
         // 숨겨도 계산에선 빠지지 않는다 — 실현손익이 그대로 남는다.
         #expect(result.perAsset.first { $0.asset.id == sold.id }?.position.realizedPnL == 2)
     }

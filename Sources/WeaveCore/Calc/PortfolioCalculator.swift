@@ -111,7 +111,8 @@ public enum PortfolioCalculator {
                 $0.unrealizedPnLBase
             },
             assetSegments: donutSegments(metrics: metrics, totalValueBase: totalValueBase),
-            assetCount: metrics.count
+            // 홈 목록과 같은 수 — 다 판 자산은 세지 않는다.
+            assetCount: metrics.filter { !$0.isSoldOut }.count
         )
     }
 
